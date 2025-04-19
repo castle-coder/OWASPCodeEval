@@ -1,0 +1,77 @@
+tests:
+  - id: A01_Broken_Access_Control
+    name: "Admin Page Unauthorized Access"
+    description: "로그인하지 않은 사용자가 /admin 페이지에 접근 가능한지 확인"
+    method: GET
+    endpoint: "/admin"
+    headers: {}
+    cookies: {}
+    expected_status: 302  # 로그인 페이지로 리다이렉트
+    expected_redirect: "/login"
+    expect_vulnerability: false
+
+  - id: A01_Broken_Access_Control_Elevation
+    name: "일반 사용자가 관리자 권한 페이지 접근"
+    description: "is_admin=False 계정이 /admin 접근 가능한지 테스트"
+    steps:
+      - login:
+          username: "testuser"
+          password: "testpass"
+    method: GET
+    endpoint: "/admin"
+    expected_body_contains: "Access Denied"
+    expect_vulnerability: false
+
+  - id: A02_Cryptographic_Failures
+    name: "비밀번호 평문 저장 여부 확인"
+    description: "DB에서 비밀번호를 평문으로 저장하는지 확인 (mock 환경에서 직접 확인)"
+    manual_check: true
+    notes: "users 리스트를 출력해서 password 필드가 해시되지 않았는지 확인"
+
+  - id: A03_Injection_SQL
+    name: "SQL Injection in Login"
+    description: "SQL 인젝션 시도로 로그인 우회 테스트"
+    method: POST
+    endpoint: "/login"
+    data:
+      username: "' OR '1'='1"
+      password: "anything"
+    expected_body_contains: "Login failed!"  # 성공하면 취약
+    expect_vulnerability: false
+
+  - id: A04_Insecure_Design
+    name: "관리자가 아닌데 다른 사용자 강제 삭제 시도"
+    description: "일반 사용자가 POST로 /admin에 user_id를 넘겨 타인 삭제 시도"
+    steps:
+      - login:
+          username: "testuser"
+          password: "testpass"
+    method: POST
+    endpoint: "/admin"
+    data:
+      user_id: 0
+    expected_body_contains: "Access Denied"
+    expect_vulnerability: false
+
+  - id: A05_Security_Misconfiguration
+    name: "Debug 모드 활성화 확인"
+    description: "app.run(debug=True) 여부 수동 확인"
+    manual_check: true
+    notes: "운영 환경에서는 debug=False 설정 필요"
+
+  - id: A07_Auth_Broken_Authentication
+    name: "세션 하이재킹 시도"
+    description: "다른 사용자의 세션 ID를 쿠키에 주입해서 권한 탈취 테스트"
+    method: GET
+    endpoint: "/profile"
+    headers:
+      Cookie: "session=<target_session_cookie_here>"
+    expected_status: 200
+    expected_body_contains: "username"
+    expect_vulnerability: true
+
+  - id: A09_Security_Logging
+    name: "로그에 민감정보 출력 확인"
+    description: "로그에서 비밀번호 등 민감정보가 저장되지 않는지 확인"
+    manual_check: true
+    notes: "password 등 요청값이 로그 출력되지 않아야 함"
