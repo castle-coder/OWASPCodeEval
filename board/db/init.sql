@@ -1,0 +1,17 @@
+CREATE DATABASE IF NOT EXISTS vuln_board;
+USE vuln_board;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) NOT NULL,
+  password VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  filename VARCHAR(255)
+);
+
+INSERT INTO users (username, password) VALUES ('admin', 'admin123');
