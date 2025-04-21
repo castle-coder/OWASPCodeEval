@@ -1,7 +1,30 @@
 tests:
+  - id: A1_BrokenAccess_Edit
+    description: "일반 사용자가 다른 사용자의 게시글을 수정 시도"
+    endpoint: "/board/edit/2"
+    login_user: 1  # user가 admin 게시글 수정 시도
+    data:
+      title: "불법 수정"
+      content: "권한 없음"
+    expect_db_unchanged: true
+
+  - id: A1_BrokenAccess_Delete
+    description: "일반 사용자가 다른 사용자의 게시글 삭제 시도"
+    endpoint: "/board/delete/2"
+    login_user: 1
+    data: {}
+    expect_db_unchanged: true
+
+  - id: A1_BrokenAccess_Block
+    description: "관리자 아닌 사용자가 게시글 차단 시도"
+    endpoint: "/admin/block/1"
+    login_user: 1
+    data: {}
+    expect_db_unchanged: true
+
   - id: A1_SQLi
     description: "게시글 작성 시 SQL Injection 테스트"
-    endpoint: "/board/create"
+    endpoint: "/board"
     login_user: 1
     data:
       title: "1'; DROP TABLE boards; --"
@@ -10,7 +33,7 @@ tests:
 
   - id: A3_XSS
     description: "게시글 작성 시 XSS 공격 테스트"
-    endpoint: "/board/create"
+    endpoint: "/board"
     login_user: 1
     data:
       title: "<script>alert('xss')</script>"
@@ -28,7 +51,7 @@ tests:
 
   - id: A7_MissingAuth
     description: "로그인하지 않고 게시글 작성 시도"
-    endpoint: "/board/create"
+    endpoint: "/board"
     login_user: null
     data:
       title: "익명 작성 시도"

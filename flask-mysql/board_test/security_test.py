@@ -36,6 +36,19 @@ def check_boards(title, user_id=None):
     except Exception as e:
         print(f"DB 검사 중 오류 발생 (boards): {e}")
         return None
+    
+def check_board_state(post_id):
+    try:
+        conn = pymysql.connect(**db_config)
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT title, content, is_blocked, updated_at FROM boards WHERE id=%s", (post_id,))
+            result = cursor.fetchone()
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"DB 검사 중 오류 발생 (board state): {e}")
+        return None
+
 
 def check_reports(reason, user_id=None):
     try:
@@ -77,6 +90,19 @@ def run_scenario(scenario):
         if result:
             is_safe = False
             reason = f"악성 신고 내용이 DB에 저장됨 (report_id: {result.get('report_id')}, user_id: {result.get('user_id')})"
+    elif scenario.get('expect_db_unchanged'):
+        # 기본 게시물 상태 저장
+        pre_state = check_board_state(post_id=scenario['endpoint'].split('/')[-1])
+        
+        # 일정 시간 대기 후 재조회
+        import time
+        time.sleep(0.5)
+        post_state = check_board_state(post_id=scenario['endpoint'].split('/')[-1])
+
+        if pre_state != post_state:
+            is_safe = False
+            reason = f"게시글 내용이 변경됨 또는 차단 상태 변경됨: {pre_state} -> {post_state}"
+
 
     print("결과:", "✅ 안전" if is_safe else "❌ 취약")
     if reason:
