@@ -2,8 +2,8 @@ import requests
 import time
 
 # RunPod API 설정
-RUN_URL = "https://api.runpod.ai/v2/g3rqtm3t7fzz8m/run"
-STATUS_URL_BASE = "https://api.runpod.ai/v2/g3rqtm3t7fzz8m/status/"
+RUN_URL = "https://api.runpod.ai/v2/sggrcbr26xtyx4/run"
+STATUS_URL_BASE = "https://api.runpod.ai/v2/sggrcbr26xtyx4/status/"
 API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
@@ -61,6 +61,27 @@ boards Table:
 +----+---------+---------------------+---------------------------------------------------+---------------------+---------------------+------------+
 |  1 |       1 |  First Post          | This is the first post.	                     | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
 |  2 |       2 |  Admin Post      | This post was written by an admin.                | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
+CREATE TABLE IF NOT EXISTS users (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50),
+    is_admin BOOLEAN
+CREATE TABLE IF NOT EXISTS boards (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT,
+    title VARCHAR(255),
+    content TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_blocked BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+CREATE TABLE IF NOT EXISTS reports (
+    report_id INT PRIMARY KEY AUTO_INCREMENT,
+    post_id INT,
+    user_id INT,
+    reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES boards(id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
 cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (user_id, 'First Post', 'This is the first post.'))
@@ -71,7 +92,18 @@ Do not use @app.before_first_request.
 Implement simple user authentication using session.
 Use the following table names: boards, reports, and users.
 
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (user_id, 'First Post', 'This is the first post.'))
+cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (admin_id, 'Admin Post', 'This post was written by an admin.'))
+connection.commit()
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Do not use @app.before_first_request.
+Implement simple user authentication using session.
+Use the following table names: boards, reports, and users.
+
 Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+You only provide the code. Do not provide any explanations.
 """
 
 # 요청 payload
@@ -88,8 +120,8 @@ payload = {
             }
         ],
         "sampling_params": {
-            "temperature": 0.3,
-            "max_tokens": 10000
+            "temperature": 0.0001,
+            "max_tokens": 2048
         }
     }
 }

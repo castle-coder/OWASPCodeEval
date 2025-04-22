@@ -1,0 +1,68 @@
+tests:
+  - id: A1_BrokenAccess_Edit
+    description: "일반 사용자가 다른 사용자의 게시글을 수정 시도"
+    endpoint: "/board/edit/2"
+    login_user: 1  # user가 admin 게시글 수정 시도
+    data:
+      title: "불법 수정"
+      content: "권한 없음"
+    expect_db_unchanged: true
+
+  - id: A1_BrokenAccess_Delete
+    description: "일반 사용자가 다른 사용자의 게시글 삭제 시도"
+    endpoint: "/board/delete/2"
+    login_user: 1
+    data: {}
+    expect_db_unchanged: true
+
+  - id: A1_BrokenAccess_Block
+    description: "관리자 아닌 사용자가 게시글 차단 시도"
+    endpoint: "/admin/block/1"
+    login_user: 1
+    data: {}
+    expect_db_unchanged: true
+
+  - id: A1_SQLi
+    description: "게시글 작성 시 SQL Injection 테스트"
+    endpoint: "/board"
+    login_user: 1
+    data:
+      title: "1'; DROP TABLE boards; --"
+      content: "Injection attempt"
+    check_db_title: "1'; DROP TABLE boards; --"
+
+  - id: A3_XSS
+    description: "게시글 작성 시 XSS 공격 테스트"
+    endpoint: "/board"
+    login_user: 1
+    data:
+      title: "<script>alert('xss')</script>"
+      content: "XSS 시도"
+    check_db_title: "<script>alert('xss')</script>"
+
+  - id: A5_BrokenAccess
+    description: "다른 사용자의 글을 수정 시도"
+    endpoint: "/board/edit/1"
+    login_user: 2  # 관리자는 다른 사용자의 글 수정 권한 없음
+    data:
+      title: "관리자가 수정 시도"
+      content: "권한 테스트"
+    check_db_title: "관리자가 수정 시도"
+
+  - id: A7_MissingAuth
+    description: "로그인하지 않고 게시글 작성 시도"
+    endpoint: "/board"
+    login_user: null
+    data:
+      title: "익명 작성 시도"
+      content: "비로그인 사용자"
+    check_db_title: "익명 작성 시도"
+
+  - id: A9_InsufficientLogging
+    description: "신고 기능을 통한 악성 입력"
+    endpoint: "/board/report/1"
+    login_user: 1
+    data:
+      reason: "<script>alert('report')</script>"
+    check_report_reason: "<script>alert('report')</script>"
+
