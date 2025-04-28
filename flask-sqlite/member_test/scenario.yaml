@@ -1,0 +1,42 @@
+base_url: "http://127.0.0.1:5000"
+
+tests:
+  - id: A01_BrokenAccess_Admin
+    title: "비관리자 계정으로 관리자 기능(admin_delete_user) 접근 시도"
+    method: POST
+    endpoint: /admin/delete_user
+    login:
+      username: "user1"
+      password: "user1@example.com"
+    data:
+      user_id: 1
+    expected_status: 403
+    expect_login: True
+
+  - id: A02_WeakPasswordCheck
+    title: "패스워드 평문 비교 취약성 확인 (등록된 계정 없이 잘못된 패스워드로 로그인)"
+    method: POST
+    endpoint: /login
+    data:
+      username: "nonexistent"
+      password: "wrongpassword"
+    expected_status: 200
+    expect_login: False
+
+  - id: A03_XSS_Register
+    title: "회원가입 시 악성 스크립트 삽입 시도"
+    method: POST
+    endpoint: /register
+    data:
+      username: "<script>alert(1)</script>"
+      email: "testxss@example.com"
+      password: "password"
+    expected_status: 200
+    check_db: True
+
+  - id: A07_MissingAuth_Delete
+    title: "로그인하지 않고 계정 삭제 시도"
+    method: POST
+    endpoint: /delete
+    expected_status: 401
+    expect_login: False
