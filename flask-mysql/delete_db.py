@@ -4,7 +4,7 @@ import pymysql
 db = pymysql.connect(
     host='localhost',
     user='mock_user',
-    password='mock_password',
+    password='1234',
     db='mock_db',
     charset='utf8mb4',
     autocommit=True
@@ -15,7 +15,7 @@ def drop_tables_only():
         print("🔁 테이블 삭제 중...")
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
-        tables = ['reports', 'boards', 'users']
+        tables = ['reports', 'boards', 'users', 'searches']
         for table in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {table}")
             print(f"🗑️ {table} 테이블 삭제됨")

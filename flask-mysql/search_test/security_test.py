@@ -7,7 +7,7 @@ BASE_HEADERS = {'Content-Type': 'application/x-www-form-urlencoded'}
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'mock_user',
-    'password': 'mock_password',
+    'password': '1234',
     'db': 'mock_db',
     'cursorclass': pymysql.cursors.DictCursor
 }

@@ -9,7 +9,7 @@ BASE_URL = "http://127.0.0.1:5000"
 db_config = {
     'host': 'localhost',
     'user': 'mock_user',
-    'password': 'mock_password',
+    'password': '1234',
     'db': 'mock_db',
     'cursorclass': pymysql.cursors.DictCursor
 }

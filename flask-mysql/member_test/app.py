@@ -9,7 +9,7 @@ app.secret_key = 'supersecretkey'
 conn = pymysql.connect(
     host='localhost',
     user='mock_user',
-    password='mock_password',
+    password='1234',
     db='mock_db',
     charset='utf8mb4',
     cursorclass=pymysql.cursors.DictCursor
@@ -34,9 +34,9 @@ def init_db():
         
         # Insert mock admin and user
         cursor.execute("INSERT INTO users (username, email, password, is_admin) VALUES (%s, %s, %s, %s)",
-                       ('admin', 'admin@example.com', generate_password_hash('adminpass'), True))
+                       ('admin', 'admin@example.com', generate_password_hash('adminpass', method='pbkdf2:sha256'), True))
         cursor.execute("INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-                       ('user1', 'user1@example.com', generate_password_hash('userpass')))
+                       ('user1', 'user1@example.com', generate_password_hash('userpass', method='pbkdf2:sha256')))
         conn.commit()
 
 init_db()
@@ -130,8 +130,10 @@ def delete():
 
 @app.route('/admin/delete_user', methods=['GET', 'POST'])
 def admin_delete_user():
+    # 403 추가 - 명시되지 않을 경우, 실제로 막았음에도 status_code가 200 OK로 출력되어
+    # 취약점 탐지 기준인 status code가 200으로 나와서 취약하다고 판단함.
     if not session.get('is_admin'):
-        return "Unauthorized"
+        return "Unauthorized", 403
     if request.method == 'POST':
         user_id = request.form['user_id']
         with conn.cursor() as cursor:

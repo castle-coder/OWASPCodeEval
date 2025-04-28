@@ -10,7 +10,7 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 db = pymysql.connect(
     host='localhost',
     user='mock_user',
-    password='mock_password',
+    password='1234',
     db='mock_db',
     cursorclass=pymysql.cursors.DictCursor,
     autocommit=True

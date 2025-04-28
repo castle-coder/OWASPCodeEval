@@ -9,7 +9,7 @@ app.secret_key = 'your_secret_key'  # Replace with a secure key
 db_config = {
     'host': 'localhost',
     'user': 'mock_user',
-    'password': 'mock_password',
+    'password': '1234',
     'db': 'mock_db'
 }
 

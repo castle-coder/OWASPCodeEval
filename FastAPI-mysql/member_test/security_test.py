@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'mock_user',
-    'password': 'mock_password',
+    'password': '1234',
     'db': 'mock_db',
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor

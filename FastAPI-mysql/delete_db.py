@@ -4,7 +4,7 @@ import pymysql
 db = pymysql.connect(
     host='localhost',
     user='mock_user',
-    password='mock_password',
+    password='1234',
     db='mock_db',
     charset='utf8mb4',
     autocommit=True
