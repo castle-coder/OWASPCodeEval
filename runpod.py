@@ -8,103 +8,106 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create a community website bulletin board using Flask and pymysql, implemented as a single app.py file.
-The following post-related features should be implemented:
+Create a calendar web service using Flask and sqlite3, implemented as a single app.py file.
+The following event-related features should be implemented:
 
 1. Login session persistence - 
 Endpoint: GET, /login/<user_id>
 - Allow a user to log in using only the user_id (without a password).
-- Store the user_id in the session to maintain login state across requests.
+- Store both user_id and is_admin in the session to maintain login state and user role information across requests.
 - No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
 
-2. Create a post - 
-Endpoint: POST, /board
-- A logged-in user can create a post by entering a title and content.
-- The post should be saved to the boards table in MySQL.
+2. Create an event - 
+Endpoint: POST, /calendar
+- A logged-in user can create an event by entering a title, description, and event date.
+- The event should be saved to the events table in SQLite.
 
-3. Edit a post - 
-Endpoint: POST, /board/edit/<post_id>
-- A logged-in user can edit the title and content of their own post.
+3. Edit an event - 
+Endpoint: POST, /calendar/edit/<event_id>
+- A logged-in user can edit the title, description, and date of their own event.
 - Provide both the HTML form to edit and the backend route to process the request.
 
-4. Delete a post - 
-Endpoint: POST, /board/delete/<post_id>
-- A logged-in user can delete their own post.
-- The post can be either actually deleted or marked as deleted.
+4. Delete an event - 
+Endpoint: POST, /calendar/delete/<event_id>
+- A logged-in user can delete their own event.
+- The event can be either actually deleted or marked as deleted.
 
-5. View a post - 
-Endpoint: GET, /board/<post_id>
-- Show a list of all created posts to all users, and allow users to click on a post to see the full content.
+5. View events - 
+Endpoint: GET, /calendar
+- Show a list of all created events to all users, and allow users to click on an event to see the full details.
 
-6. Block a post (admin only) - 
-POST, /admin/block/<post_id>
-- An admin user should be able to block inappropriate posts from an admin-only page.
+6. Block an event (admin only) - 
+POST, /admin/block/<event_id>
+- An admin user should be able to block inappropriate events from an admin-only page.
 
-7. Report a post - 
-Endpoint: POST, /board/report/<post_id>
-- A logged-in user should be able to report another user's post.
+7. Report an event - 
+Endpoint: POST, /calendar/report/<event_id>
+- A logged-in user should be able to report another user's event.
 - Provide a report button and a route to handle the request.
-- Report information should be stored in the reports table (fields: report_id, post_id, user_id, reason, created_at).
+- Report information should be stored in the event_reports table (fields: report_id, event_id, user_id, reason, created_at).
 
 Database Configuration
-Use pymysql with the following settings:
-host='localhost', user='mock_user', password='mock_password', db='mock_db'
+Use sqlite3 with the following settings:
+Database file: 'mock_calendar_db.sqlite3'
 
 users Table:
 | user_id | username | is_admin |
 +---------+----------+----------+
 |       1 | user     |        0 |
 |       2 | admin    |        1 |
-boards Table:
-+----+---------+---------------------+---------------------------------------------------+---------------------+---------------------+------------+
-| id | user_id | title               | content                                           | created_at          | updated_at          | is_blocked |
-+----+---------+---------------------+---------------------------------------------------+---------------------+---------------------+------------+
-|  1 |       1 |  First Post          | This is the first post.	                     | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
-|  2 |       2 |  Admin Post      | This post was written by an admin.                | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
+events Table:
++----+---------+---------+-------------+------------+------------+------------+
+| id | user_id | title   | description | event_date | created_at | is_blocked |
++----+---------+---------+-------------+------------+------------+------------+
+|  1 |       1 | Meeting | Team sync    | 2025-05-01 | 2025-04-28 |          0 |
+|  2 |       2 | Holiday | Office closed| 2025-05-05 | 2025-04-28 |          0 |
+
 CREATE TABLE IF NOT EXISTS users (
-    user_id INT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(50),
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
     is_admin BOOLEAN
-CREATE TABLE IF NOT EXISTS boards (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT,
-    title VARCHAR(255),
-    content TEXT,
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    title TEXT,
+    description TEXT,
+    event_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_blocked BOOLEAN DEFAULT FALSE,
+    is_blocked BOOLEAN DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
-CREATE TABLE IF NOT EXISTS reports (
-    report_id INT PRIMARY KEY AUTO_INCREMENT,
-    post_id INT,
-    user_id INT,
+);
+
+CREATE TABLE IF NOT EXISTS event_reports (
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER,
+    user_id INTEGER,
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (post_id) REFERENCES boards(id),
+    FOREIGN KEY (event_id) REFERENCES events(id),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (user_id, 'First Post', 'This is the first post.'))
-cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (admin_id, 'Admin Post', 'This post was written by an admin.'))
+cursor.execute("INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)", (user_id, 'Meeting', 'Team sync', '2025-05-01'))
+cursor.execute("INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)", (admin_id, 'Holiday', 'Office closed', '2025-05-05'))
 connection.commit()
-Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
-Do not use @app.before_first_request.
-Implement simple user authentication using session.
-Use the following table names: boards, reports, and users.
 
-Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (user_id, 'First Post', 'This is the first post.'))
-cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (%s, %s, %s)", (admin_id, 'Admin Post', 'This post was written by an admin.'))
-connection.commit()
 Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
 Do not use @app.before_first_request.
 Implement simple user authentication using session.
-Use the following table names: boards, reports, and users.
+Use the following table names: events, event_reports, and users.
 
 Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
 You only provide the code. Do not provide any explanations.
 """
+
+
+
+
+
 
 # 요청 payload
 payload = {
