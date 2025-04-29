@@ -19,7 +19,7 @@ def check_db_record(db_path, table, criteria):
     conn.close()
     return count > 0
 
-def run_scenario(base_url, scenario, db_path='mock_calendar_db.sqlite3'):
+def run_scenario(base_url, scenario, db_path='mock_db.sqlite3'):
     session = requests.Session()
     last_resp = None
 

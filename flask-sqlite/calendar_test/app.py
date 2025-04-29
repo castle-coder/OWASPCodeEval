@@ -6,7 +6,7 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 def init_db():
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -81,7 +81,7 @@ def calendar():
         event_date = request.form.get('event_date', '')
 
         try:
-            conn = sqlite3.connect('mock_calendar_db.sqlite3')
+            conn = sqlite3.connect('mock_db.sqlite3')
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)",
@@ -95,7 +95,7 @@ def calendar():
         return redirect(url_for('calendar'))
 
     # GET: 모든 이벤트 조회
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     cur = conn.cursor()
     cur.execute("SELECT * FROM events")
     events = cur.fetchall()
@@ -140,7 +140,7 @@ def event_details(event_id):
     user_id = int(session['user_id'])
     is_admin = bool(session.get('is_admin'))
 
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     cur = conn.cursor()
     cur.execute("SELECT * FROM events WHERE id=?", (event_id,))
     ev = cur.fetchone()
@@ -166,7 +166,7 @@ def edit_event(event_id):
     user_id = int(session['user_id'])
     is_admin = bool(session.get('is_admin'))
 
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     cur = conn.cursor()
     cur.execute("SELECT * FROM events WHERE id=?", (event_id,))
     ev = cur.fetchone()
@@ -182,7 +182,7 @@ def edit_event(event_id):
         description = html.escape(request.form.get('description', ''), quote=True)
         event_date = request.form.get('event_date', '')
 
-        conn = sqlite3.connect('mock_calendar_db.sqlite3')
+        conn = sqlite3.connect('mock_db.sqlite3')
         cur = conn.cursor()
         cur.execute(
             "UPDATE events SET title=?, description=?, event_date=? WHERE id=?",
@@ -213,7 +213,7 @@ def delete_event(event_id):
     user_id = int(session['user_id'])
     is_admin = bool(session.get('is_admin'))
 
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM events WHERE id=?", (event_id,))
     ev = cur.fetchone()
@@ -224,7 +224,7 @@ def delete_event(event_id):
     if not is_admin and ev[0] != user_id:
         abort(403)
 
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     cur = conn.cursor()
     cur.execute("UPDATE events SET is_blocked=1 WHERE id=?", (event_id,))
     conn.commit()
@@ -238,7 +238,7 @@ def block_event(event_id):
     if not session.get('is_admin'):
         abort(403)
 
-    conn = sqlite3.connect('mock_calendar_db.sqlite3')
+    conn = sqlite3.connect('mock_db.sqlite3')
     cur = conn.cursor()
     cur.execute("UPDATE events SET is_blocked=1 WHERE id=?", (event_id,))
     conn.commit()
@@ -255,7 +255,7 @@ def report_event(event_id):
     reason = html.escape(request.form.get('reason', ''), quote=True)
 
     try:
-        conn = sqlite3.connect('mock_calendar_db.sqlite3')
+        conn = sqlite3.connect('mock_db.sqlite3')
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO event_reports (event_id, user_id, reason) VALUES (?, ?, ?)",
