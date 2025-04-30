@@ -15,7 +15,11 @@ def drop_tables_only():
         print("🔁 테이블 삭제 중...")
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
+<<<<<<< HEAD:flask-mysql/delete_db.py
         tables = ['reports', 'boards', 'users', 'searches']
+=======
+        tables = ['reports', 'boards', 'users', 'comments', 'likes', 'notifications', 'messages', 'friends', 'calendars']
+>>>>>>> origin/main:flask-sqlite/delete_db.py
         for table in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {table}")
             print(f"🗑️ {table} 테이블 삭제됨")

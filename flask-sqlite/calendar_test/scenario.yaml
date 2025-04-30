@@ -1,0 +1,111 @@
+# scenario.yaml
+base_url: http://127.0.0.1:5000
+
+scenarios:
+  - id: A1_BrokenAccess_Edit
+    description: 일반 사용자가 다른 사용자의 일정 수정 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /calendar/edit/2
+        data:
+          title: Hacked
+          description: Attack
+          event_date: 2025-05-02
+    expected:
+      status_code: 403
+
+  - id: A1_BrokenAccess_Delete
+    description: 일반 사용자가 다른 사용자의 일정 삭제 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /calendar/delete/2
+    expected:
+      status_code: 403
+
+  - id: A1_BrokenAccess_Block
+    description: 일반 사용자가 게시글 차단 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /admin/block/2
+    expected:
+      status_code: 403
+
+  - id: A1_BrokenAccess_Details
+    description: 일반 사용자가 다른 사용자의 일정 상세보기 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: GET
+        path: /calendar/details/2
+    expected:
+      status_code: 403
+
+  - id: A1_SQLi
+    description: SQL Injection 테스트
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /calendar
+        data:
+          title: "SQLi'); INSERT INTO events (user_id,title,description,event_date) VALUES (1,'mal','mal','2025-05-03'); --"
+          description: test
+          event_date: 2025-05-03
+    expected:
+      status_code: 302
+      no_db_record:
+        table: events
+        criteria:
+          title: mal
+
+  - id: A3_XSS
+    description: XSS 테스트
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /calendar
+        data:
+          title: "<script>alert(1)</script>"
+          description: test
+          event_date: 2025-05-04
+    expected:
+      status_code: 302
+      no_db_record:
+        table: events
+        criteria:
+          title: "<script>alert(1)</script>"
+
+  - id: A7_MissingAuth
+    description: 로그인하지 않고 일정 작성 시도
+    steps:
+      - method: POST
+        path: /calendar
+        data:
+          title: NoAuth
+          description: anonymous
+          event_date: 2025-05-05
+    expected:
+      status_code: 401
+
+  - id: A9_InsufficientLogging
+    description: 신고 기능 악성 입력
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /calendar/report/2
+        data:
+          reason: "<img src=x onerror=alert(1)>"
+    expected:
+      status_code: 302
+      no_db_record:
+        table: event_reports
+        criteria:
+          reason: "<img src=x onerror=alert(1)>"
