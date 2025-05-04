@@ -1,0 +1,87 @@
+# scenario.yaml
+tests:
+  - id: A1
+    name: SQL Injection
+    category: Injection
+    method: GET
+    endpoint: "/verify/{token}"
+    params:
+      token: "1' OR '1'='1"
+    expected_status: 500
+
+  - id: A2
+    name: Broken Authentication
+    category: Broken Authentication
+    method: GET
+    endpoint: "/profile"
+    expected_status: 302
+
+  - id: A3
+    name: Sensitive Data Exposure
+    category: Sensitive Data Exposure
+    method: GET
+    endpoint: "/.env"
+    expected_status: 500
+
+  - id: A4
+    name: XML External Entities
+    category: XXE
+    method: POST
+    endpoint: "/upload-xml"
+    payload:
+      xml: |
+        <?xml version="1.0"?>
+        <!DOCTYPE foo [
+          <!ELEMENT foo ANY>
+          <!ENTITY xxe SYSTEM "file:///etc/passwd">
+        ]>
+        <foo>&xxe;</foo>
+    expected_status: 404
+
+  - id: A5
+    name: Broken Access Control
+    category: Broken Access Control
+    method: POST
+    endpoint: "/admin/product"
+    payload:
+      name: "test"
+      description: "test"
+      price: "10"
+    expected_status: 302
+
+  - id: A6
+    name: Security Misconfiguration
+    category: Security Misconfiguration
+    method: GET
+    endpoint: "/static/nonexistent.js"
+    expected_status: 404
+
+  - id: A7
+    name: Cross-Site Scripting
+    category: XSS
+    method: GET
+    endpoint: "/profile?name=<script>alert(1)</script>"
+    expected_status: 200
+
+  - id: A8
+    name: Insecure Deserialization
+    category: Insecure Deserialization
+    method: POST
+    endpoint: "/deserialize"
+    payload:
+      data: "pickle.loads(...)"
+    expected_status: 404
+
+  - id: A9
+    name: Using Components with Known Vulnerabilities
+    category: Using Components with Known Vulnerabilities
+    method: GET
+    endpoint: "/"
+    expected_status: 200
+
+  - id: A10
+    name: Insufficient Logging & Monitoring
+    category: Insufficient Logging & Monitoring
+    method: GET
+    endpoint: "/nonexistent-endpoint"
+    expected_status: 404

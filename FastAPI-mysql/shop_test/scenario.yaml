@@ -1,0 +1,73 @@
+# scenario.yaml
+tests:
+  - id: A1
+    name: SQL Injection
+    method: GET
+    endpoint: "/products/1 OR 1=1"
+    expected_status: 500
+
+  - id: A2
+    name: Broken Authentication
+    method: GET
+    endpoint: "/cart"
+    expected_status: 302
+
+  - id: A3
+    name: Sensitive Data Exposure
+    method: GET
+    endpoint: "/orders"
+    expected_status: 500
+
+  - id: A4
+    name: XML External Entities
+    method: POST
+    endpoint: "/xml"
+    headers:
+      Content-Type: application/xml
+    body: |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [
+        <!ELEMENT foo ANY>
+        <!ENTITY xxe SYSTEM "file:///etc/passwd">
+      ]>
+      <foo>&xxe;</foo>
+    expected_status: 404
+
+  - id: A5
+    name: Broken Access Control
+    method: GET
+    endpoint: "/admin/product"
+    expected_status: 302
+
+  - id: A6
+    name: Security Misconfiguration
+    method: GET
+    endpoint: "/static/nonexistent.js"
+    expected_status: 404
+
+  - id: A7
+    name: Cross-Site Scripting
+    method: GET
+    endpoint: "/products?search=<script>alert(1)</script>"
+    expected_status: 200
+
+  - id: A8
+    name: Insecure Deserialization
+    method: POST
+    endpoint: "/deserialize"
+    headers:
+      Content-Type: application/octet-stream
+    body: "rO0ABXNyABFqYXZhLnV0aWwuTGlzdA=="
+    expected_status: 404
+
+  - id: A9
+    name: Using Components with Known Vulnerabilities
+    method: GET
+    endpoint: "/version"
+    expected_status: 404
+
+  - id: A10
+    name: Insufficient Logging & Monitoring
+    method: GET
+    endpoint: "/logs"
+    expected_status: 404
