@@ -1,0 +1,122 @@
+# scenario.yaml
+scenarios:
+  - id: A1
+    name: "SQL Injection (A1: Injection)"
+    description: "Attempt SQL injection via product endpoint, expecting server error."
+    request:
+      method: GET
+      url: "http://localhost:5000/products/1 OR 1=1"
+    expect:
+      status_code: 500
+
+  - id: A2
+    name: "Broken Authentication (A2: Broken Authentication)"
+    description: "Access admin page without login, expecting redirect."
+    request:
+      method: GET
+      url: "http://localhost:5000/admin/product"
+    expect:
+      status_code: 302
+      headers:
+        Location: "/products"
+
+  - id: A3
+    name: "Sensitive Data Exposure (A3: Sensitive Data Exposure)"
+    description: "Trigger an error to see if secret key is exposed."
+    request:
+      method: GET
+      url: "http://localhost:5000/products/invalid"
+    expect:
+      status_code: 500
+      body_contains: "your_secret_key"
+
+  - id: A4
+    name: "XML External Entities (A4: XXE)"
+    description: "Send XML payload to nonexistent endpoint, expecting no XXE processing."
+    request:
+      method: POST
+      url: "http://localhost:5000/upload-xml"
+      headers:
+        Content-Type: "application/xml"
+      data: |
+        <?xml version="1.0"?>
+        <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+        <foo>&xxe;</foo>
+    expect:
+      status_code: 404
+
+  - id: A5
+    name: "Broken Access Control (A5: Broken Access Control)"
+    description: "Regular user attempts to delete a product via admin endpoint."
+    steps:
+      - login: "1"
+      - request:
+          method: POST
+          url: "http://localhost:5000/admin/product/delete/1"
+    expect:
+      status_code: 302
+      headers:
+        Location: "/products"
+
+  - id: A6
+    name: "Security Misconfiguration (A6: Security Misconfiguration)"
+    description: "Check for debug mode by triggering 404, expecting debug page disabled."
+    request:
+      method: GET
+      url: "http://localhost:5000/nonexistent"
+    expect:
+      status_code: 404
+
+  - id: A7
+    name: "Cross-Site Scripting (A7: XSS)"
+    description: "Add a product with script tags and check if output is escaped."
+    steps:
+      - login: "2"
+      - request:
+          method: POST
+          url: "http://localhost:5000/admin/product"
+          data:
+            name: "<script>alert('xss')</script>"
+            description: "<script>alert('xss')</script>"
+            price: "0.99"
+      - request:
+          method: GET
+          url: "http://localhost:5000/products"
+    expect:
+      status_code: 200
+      body_contains: "&lt;script&gt;alert('xss')&lt;/script&gt;"
+
+  - id: A8
+    name: "Insecure Deserialization (A8: Insecure Deserialization)"
+    description: "Send pickle data to nonexistent endpoint, expecting no deserialization."
+    request:
+      method: POST
+      url: "http://localhost:5000/deserialize"
+      headers:
+        Content-Type: "application/python-pickle"
+      data: "placeholder"
+    expect:
+      status_code: 404
+
+  - id: A9
+    name: "Using Components with Known Vulnerabilities (A9: Using Components with Known Vulnerabilities)"
+    description: "Check for known vulnerable endpoints (e.g., /requirements.txt)."
+    request:
+      method: GET
+      url: "http://localhost:5000/requirements.txt"
+    expect:
+      status_code: 404
+
+  - id: A10
+    name: "Insufficient Logging & Monitoring (A10: Insufficient Logging & Monitoring)"
+    description: "Perform admin delete and check if logs endpoint exists."
+    steps:
+      - login: "2"
+      - request:
+          method: POST
+          url: "http://localhost:5000/admin/product/delete/1"
+      - request:
+          method: GET
+          url: "http://localhost:5000/logs"
+    expect:
+      status_code: 404
