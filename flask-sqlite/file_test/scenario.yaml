@@ -1,0 +1,120 @@
+# scenario.yaml
+base_url: http://127.0.0.1:5000
+
+tests:
+  - id: A1_SQLInjection
+    title: SQL 인젝션 (파일 다운로드 경로 조작)
+    login: user
+    endpoint: /download/1' OR '1'='1
+    method: GET
+    check:
+      type: content
+      should_not_contain: "sample file"
+      reason: "SQL 인젝션으로 파일 다운로드에 성공했거나 예외가 발생함"
+      
+  - id: A2_BrokenAuthentication
+    title: 인증 우회 (업로드 미인증 접근)
+    login: null
+    endpoint: /upload
+    method: POST
+    files:
+      file: ["dummy.txt", "test", "text/plain"]
+    form:
+      description: "unauth"
+    check:
+      type: status_code
+      expect: 401
+      reason: "인증 없이 업로드 가능"
+      
+  - id: A3_SensitiveDataExposure
+    title: 민감 데이터 노출 (관리자 전용 파일 다운로드)
+    login: user
+    endpoint: /download/2
+    method: GET
+    check:
+      type: status_code_in
+      expect: [403, 404]
+      reason: "일반 사용자가 관리자 전용 파일 다운로드 가능"
+
+  - id: A5_BrokenAccessControl
+    title: 접근 제어 우회 (다른 사용자의 파일 삭제)
+    login: user
+    endpoint: /delete/2
+    method: POST
+    check:
+      type: status_code
+      expect: 403
+      reason: "사용자가 다른 사용자의 파일을 삭제할 수 있음"
+
+  - id: A7_XSS
+    title: XSS (파일 설명 필드)
+    login: user
+    endpoint: /upload
+    method: POST
+    files:
+      file: ["dummy.txt", "ignored", "text/plain"]
+    form:
+      description: "<script>alert('XSS')</script>"
+    check:
+      type: db_entry
+      query: "SELECT id FROM files WHERE description = '<script>alert(''XSS'')</script>'"
+      reason: "DB에 악성 스크립트 삽입됨 (file_id: {0})"
+
+  - id: A9_InsufficientLogging
+    title: 신고 기능 악성 입력
+    login: user
+    endpoint: /report/2
+    method: POST
+    form:
+      reason: "<malicious input>"
+    check:
+      type: db_entry
+      query: "SELECT report_id, user_id FROM reports WHERE reason = '<malicious input>'"
+      reason: "악성 신고 내용이 DB에 저장됨 (report_id: {0}, user_id: {1})"
+  
+  - id: A4_InsecureDesign
+    title: 취약한 설계 (업로드된 모든 파일 열람 허용)
+    login: user
+    endpoint: /files
+    method: GET
+    check:
+      type: content
+      should_not_contain: "secret.pdf"
+      reason: "설계상 관리자 파일이 일반 사용자에게 노출됨"
+
+  - id: A6_VulnerableComponent
+    title: 취약한 컴포넌트 사용 (테스트용 API 노출)
+    login: user
+    endpoint: /debug
+    method: GET
+    check:
+      type: status_code
+      expect: 404
+      reason: "디버그용 엔드포인트가 외부에 노출됨"
+
+  - id: A8_SoftwareAndDataIntegrityFailure
+    title: 무결성 검증 실패 (업로드 시 파일명 필터링 없음)
+    login: user
+    endpoint: /upload
+    method: POST
+    files:
+      file: ["../../app.py", "print('bad')", "text/plain"]
+    form:
+      description: "경로 조작"
+    check:
+      type: db_entry
+      query: "SELECT id FROM files WHERE filename = '../../app.py'"
+      reason: "디렉토리 경로를 포함한 파일명 그대로 저장됨 (file_id: {0})"
+
+  - id: A10_ServerSideRequestForgery
+    title: SSRF 시도 (외부 요청 유도)
+    login: user
+    endpoint: /report/2
+    method: POST
+    form:
+      reason: "http://127.0.0.1:5000/admin"
+    check:
+      type: db_entry
+      query: "SELECT report_id FROM reports WHERE reason LIKE 'http://127.0.0.1%'"
+      reason: "서버가 내부 주소로 리디렉션 가능한 데이터를 수용함 (report_id: {0})"
+

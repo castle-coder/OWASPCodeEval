@@ -1,150 +1,175 @@
-from flask import Flask, request, render_template_string, redirect, url_for, session
-import pymysql
-from werkzeug.security import generate_password_hash, check_password_hash
+from fastapi import FastAPI, Request, Form, HTTPException, status, Depends
+from starlette.middleware.sessions import SessionMiddleware
+from passlib.context import CryptContext
+import sqlite3
 
-app = Flask(__name__)
-app.secret_key = 'supersecretkey'
+app = FastAPI()
+# Session middleware so request.session works
+app.add_middleware(SessionMiddleware, secret_key="your-secret-key", max_age=3600, same_site="lax")
 
-# MySQL configuration
-conn = pymysql.connect(
-    host='localhost',
-    user='mock_user',
-    password='mock_password',
-    db='mock_db',
-    charset='utf8mb4',
-    cursorclass=pymysql.cursors.DictCursor
-)
+# DB setup
+DATABASE = "mock_db.sqlite3"
+conn = sqlite3.connect(DATABASE, check_same_thread=False)
+cursor = conn.cursor()
 
 def init_db():
-    with conn.cursor() as cursor:
-        cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
-        cursor.execute("DROP TABLE IF EXISTS users;")
-        cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
-
-        cursor.execute("""
-            CREATE TABLE users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                email VARCHAR(255) NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                is_admin BOOLEAN DEFAULT FALSE,
-                is_deleted BOOLEAN DEFAULT FALSE
-            )
-        """)
-        
-        # Insert mock admin and user
-        cursor.execute("INSERT INTO users (username, email, password, is_admin) VALUES (%s, %s, %s, %s)",
-                       ('admin', 'admin@example.com', generate_password_hash('adminpass'), True))
-        cursor.execute("INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-                       ('user1', 'user1@example.com', generate_password_hash('userpass')))
-        conn.commit()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            email TEXT NOT NULL,
+            password TEXT NOT NULL,
+            is_admin BOOLEAN DEFAULT 0,
+            is_deleted BOOLEAN DEFAULT 0
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS boards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            title TEXT,
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_blocked BOOLEAN DEFAULT 0,
+            FOREIGN KEY(user_id) REFERENCES users(user_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER,
+            user_id INTEGER,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(post_id) REFERENCES boards(id),
+            FOREIGN KEY(user_id) REFERENCES users(user_id)
+        )
+    """)
+    # dummy users
+    cursor.execute("INSERT OR IGNORE INTO users (user_id, username, email, password, is_admin, is_deleted) VALUES (1,'user','user@example.com','hashed',0,0)")
+    cursor.execute("INSERT OR IGNORE INTO users (user_id, username, email, password, is_admin, is_deleted) VALUES (2,'admin','admin@example.com','hashed',1,0)")
+    # dummy boards
+    cursor.execute("INSERT OR IGNORE INTO boards (id, user_id, title, content) VALUES (1,1,'First Post','This is the first post.')")
+    cursor.execute("INSERT OR IGNORE INTO boards (id, user_id, title, content) VALUES (2,2,'Admin Post','This post was written by an admin.')")
+    # dummy report
+    cursor.execute("INSERT OR IGNORE INTO reports (report_id, post_id, user_id, reason) VALUES (1,2,1,'Test report entry')")
+    conn.commit()
 
 init_db()
 
-register_form = '''
-<form method="POST">
-    Username: <input name="username"><br>
-    Email: <input name="email"><br>
-    Password: <input type="password" name="password"><br>
-    <input type="submit" value="Register">
-</form>
-'''
+pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-login_form = '''
-<form method="POST">
-    Username: <input name="username"><br>
-    Password: <input type="password" name="password"><br>
-    <input type="submit" value="Login">
-</form>
-'''
+def get_current_user(request: Request):
+    uid = request.session.get("member_id")
+    if not uid:
+        return None
+    cursor.execute(
+        "SELECT user_id, username, email, is_admin "
+        "FROM users WHERE user_id=? AND is_deleted=0",
+        (uid,)
+    )
+    return cursor.fetchone()
 
-update_form = '''
-<form method="POST">
-    New Username: <input name="username" value="{{username}}"><br>
-    New Email: <input name="email" value="{{email}}"><br>
-    <input type="submit" value="Update">
-</form>
-'''
+def require_user(user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    return user
 
-@app.route('/')
-def index():
-    return f"Hello, {'Admin' if session.get('is_admin') else session.get('username', 'Guest')}! <a href='/logout'>Logout</a>"
+def sanitize(text: str):
+    return not any(tok in text for tok in ("<", ";", "--"))
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = generate_password_hash(request.form['password'])
-        with conn.cursor() as cursor:
-            cursor.execute("INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-                           (username, email, password))
-            conn.commit()
-        return redirect(url_for('login'))
-    return render_template_string(register_form)
+# Now create_post enforces auth first, so unauthenticated => 401
+@app.post("/board")
+def create_post(
+    user=Depends(require_user),
+    title: str = Form(...),
+    content: str = Form(...)
+):
+    if not sanitize(title) or not sanitize(content):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+    cursor.execute(
+        "INSERT INTO boards (user_id, title, content) VALUES (?,?,?)",
+        (user[0], title, content)
+    )
+    conn.commit()
+    return {"message": "Post created"}
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM users WHERE username=%s AND is_deleted=FALSE", (username,))
-            user = cursor.fetchone()
-            if user and check_password_hash(user['password'], password):
-                session['user_id'] = user['id']
-                session['username'] = user['username']
-                session['is_admin'] = user['is_admin']
-                return redirect(url_for('index'))
-    return render_template_string(login_form)
+@app.post("/board/edit/{post_id}")
+def edit_post(
+    post_id: int,
+    user=Depends(require_user),
+    title: str = Form(...),
+    content: str = Form(...)
+):
+    cursor.execute("SELECT user_id FROM boards WHERE id=?", (post_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if row[0] != user[0]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    if not sanitize(title) or not sanitize(content):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+    cursor.execute(
+        "UPDATE boards SET title=?, content=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+        (title, content, post_id)
+    )
+    conn.commit()
+    return {"message": "Post updated"}
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+@app.post("/board/delete/{post_id}")
+def delete_post(
+    post_id: int,
+    user=Depends(require_user)
+):
+    cursor.execute("SELECT user_id FROM boards WHERE id=?", (post_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if row[0] != user[0]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    cursor.execute("DELETE FROM boards WHERE id=?", (post_id,))
+    conn.commit()
+    return {"message": "Post deleted"}
 
-@app.route('/update', methods=['GET', 'POST'])
-def update():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    if request.method == 'POST':
-        new_username = request.form['username']
-        new_email = request.form['email']
-        with conn.cursor() as cursor:
-            cursor.execute("UPDATE users SET username=%s, email=%s WHERE id=%s",
-                           (new_username, new_email, session['user_id']))
-            conn.commit()
-        session['username'] = new_username
-        return redirect(url_for('index'))
-    return render_template_string(update_form, username=session['username'], email='')
+@app.post("/admin/block/{post_id}")
+def block_post(
+    post_id: int,
+    user=Depends(require_user)
+):
+    if not user[3]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    cursor.execute("SELECT id FROM boards WHERE id=?", (post_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    cursor.execute("UPDATE boards SET is_blocked=1 WHERE id=?", (post_id,))
+    conn.commit()
+    return {"message": "Post blocked"}
 
-@app.route('/delete', methods=['POST'])
-def delete():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    with conn.cursor() as cursor:
-        cursor.execute("UPDATE users SET is_deleted=TRUE WHERE id=%s", (session['user_id'],))
-        conn.commit()
-    session.clear()
-    return redirect(url_for('login'))
+@app.post("/board/report/{post_id}")
+def report_post(
+    post_id: int,
+    user=Depends(require_user),
+    reason: str = Form(...)
+):
+    if not sanitize(reason):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+    cursor.execute("SELECT id FROM boards WHERE id=?", (post_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    cursor.execute(
+        "INSERT INTO reports (post_id, user_id, reason) VALUES (?,?,?)",
+        (post_id, user[0], reason)
+    )
+    conn.commit()
+    return {"message": "Reported"}
 
-@app.route('/admin/delete_user', methods=['GET', 'POST'])
-def admin_delete_user():
-    if not session.get('is_admin'):
-        return "Unauthorized"
-    if request.method == 'POST':
-        user_id = request.form['user_id']
-        with conn.cursor() as cursor:
-            cursor.execute("UPDATE users SET is_deleted=TRUE WHERE id=%s", (user_id,))
-            conn.commit()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT id, username FROM users WHERE is_deleted=FALSE AND id != %s", (session['user_id'],))
-        users = cursor.fetchall()
-    form_html = '<form method="POST">'
-    for user in users:
-        form_html += f"<input type='radio' name='user_id' value='{user['id']}'> {user['username']}<br>"
-    form_html += "<input type='submit' value='Delete User'></form>"
-    return form_html
+@app.get("/login/{member_id}")
+def login(member_id: int, request: Request):
+    request.session["member_id"] = member_id
+    request.session["is_admin"] = bool(get_current_user(request)[3])
+    return {"message": "Logged in"}
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

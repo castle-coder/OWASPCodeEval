@@ -1,118 +1,74 @@
-import yaml
 import requests
-import pymysql
-from datetime import datetime
-
-BASE_URL = "http://127.0.0.1:5000"
-
-# DB 연결 정보
-db_config = {
-    'host': 'localhost',
-    'user': 'mock_user',
-    'password': 'mock_password',
-    'db': 'mock_db',
-    'cursorclass': pymysql.cursors.DictCursor
-}
-
-def load_scenarios(path="scenario.yaml"):
-    with open(path, 'r') as file:
-        return yaml.safe_load(file)
-
-def login(session, user_id):
-    if user_id is not None:
-        session.get(f"{BASE_URL}/login/{user_id}")
-
-def check_boards(title, user_id=None):
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            if user_id:
-                cursor.execute("SELECT * FROM boards WHERE title=%s AND user_id=%s", (title, user_id))
-            else:
-                cursor.execute("SELECT * FROM boards WHERE title=%s", (title,))
-            result = cursor.fetchone()
-        conn.close()
-        return result
-    except Exception as e:
-        print(f"DB 검사 중 오류 발생 (boards): {e}")
-        return None
-    
-def check_board_state(post_id):
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT title, content, is_blocked, updated_at FROM boards WHERE id=%s", (post_id,))
-            result = cursor.fetchone()
-        conn.close()
-        return result
-    except Exception as e:
-        print(f"DB 검사 중 오류 발생 (board state): {e}")
-        return None
+import yaml
+import sqlite3
 
 
-def check_reports(reason, user_id=None):
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            if user_id:
-                cursor.execute("SELECT * FROM reports WHERE reason=%s AND user_id=%s", (reason, user_id))
-            else:
-                cursor.execute("SELECT * FROM reports WHERE reason=%s", (reason,))
-            result = cursor.fetchone()
-        conn.close()
-        return result
-    except Exception as e:
-        print(f"DB 검사 중 오류 발생 (reports): {e}")
-        return None
-
-def run_scenario(scenario):
+def run_test(scenario, base_url, db_file):
+    test_id = scenario['id']
+    name = scenario['name']
     session = requests.Session()
-    login(session, scenario.get('login_user'))
 
-    response = session.post(f"{BASE_URL}{scenario['endpoint']}", data=scenario['data'])
-    print(f"[Test ID: {scenario['id']}] {scenario['description']}")
-    print(f"Status Code: {response.status_code}")
+    # HTTP Basic Auth 설정
+    auth = scenario.get('auth')
+    if auth:
+        session.auth = (auth['username'], auth['password'])
 
-    # 결과 판단
-    is_safe = True
-    reason = ""
+    url = base_url + scenario['endpoint']
+    method = scenario['method'].upper()
+    data = scenario.get('data', {})
+    resp = session.request(method, url, data=data, allow_redirects=False)
 
-    if response.status_code >= 500:
-        is_safe = False
-        reason = "서버 오류 발생"
-    elif 'check_db_title' in scenario:
-        result = check_boards(scenario['check_db_title'], scenario.get('login_user'))
-        if result:
-            is_safe = False
-            reason = f"DB에 악성 데이터가 삽입됨 (post_id: {result.get('post_id')}, user_id: {result.get('user_id')})"
-    elif 'check_report_reason' in scenario:
-        result = check_reports(scenario['check_report_reason'], scenario.get('login_user'))
-        if result:
-            is_safe = False
-            reason = f"악성 신고 내용이 DB에 저장됨 (report_id: {result.get('report_id')}, user_id: {result.get('user_id')})"
-    elif scenario.get('expect_db_unchanged'):
-        # 기본 게시물 상태 저장
-        pre_state = check_board_state(post_id=scenario['endpoint'].split('/')[-1])
-        
-        # 일정 시간 대기 후 재조회
-        import time
-        time.sleep(0.5)
-        post_state = check_board_state(post_id=scenario['endpoint'].split('/')[-1])
+    status_code = resp.status_code
+    expected = scenario.get('expected_status')
+    result = '✅ 안전' if status_code == expected else '❌ 취약'
+    reason = f"예상 상태 코드 {expected}이(가) 아님 (실제: {status_code})" if status_code != expected else "상태 코드가 예상과 일치함"
 
-        if pre_state != post_state:
-            is_safe = False
-            reason = f"게시글 내용이 변경됨 또는 차단 상태 변경됨: {pre_state} -> {post_state}"
+    # DB 검사
+    if 'check_db' in scenario and status_code == expected:
+        conn = sqlite3.connect(db_file)
+        cur = conn.cursor()
+        tbl = scenario['check_db']['table']
+        col = scenario['check_db']['column']
+        payload = scenario['check_db'].get('payload')
+
+        cur.execute(f"SELECT {col} FROM {tbl} ORDER BY report_id DESC LIMIT 1")
+        row = cur.fetchone()
+        if row and payload and row[0] == payload:
+            reason = f"{name}이(가) DB에 삽입됨 ({col}: {row[0]})"
+            result = '❌ 취약'
+        else:
+            reason = f"{name}이(가) DB에 삽입되지 않음"
+        conn.close()
+
+    # Header 검사
+    elif 'check_headers' in scenario and status_code == expected:
+        header = scenario['check_headers']['header']
+        must = scenario['check_headers']['must_contain']
+        hdr_val = resp.headers.get(header, '')
+        if must in hdr_val:
+            reason = f"{header}에 '{must}' 존재"
+        else:
+            reason = f"{header}에 '{must}' 없음"
+            result = '❌ 취약'
+
+    # 출력
+    print("--------------------------------------------------")
+    print(f"[Test ID: {test_id}] {name}")
+    print(f"Status Code: {status_code}")
+    print(f"결과: {result}")
+    print(f"이유: {reason}")
+    print("--------------------------------------------------\n")
 
 
-    print("결과:", "✅ 안전" if is_safe else "❌ 취약")
-    if reason:
-        print("이유:", reason)
-    print("-" * 50)
+if __name__ == "__main__":
+    # YAML 로드
+    with open("scenario.yaml", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
 
-def main():
-    scenarios = load_scenarios()
-    for s in scenarios['tests']:
-        run_scenario(s)
+    base_url = config['base_url']
+    db_file = config['db_file']
 
-if __name__ == '__main__':
-    main()
+    for scenario in config['scenarios']:
+        if scenario.get('skip'):
+            continue
+        run_test(scenario, base_url, db_file)

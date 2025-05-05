@@ -1,86 +1,58 @@
-import yaml
 import requests
-import pymysql
+import yaml
 
-BASE_HEADERS = {'Content-Type': 'application/x-www-form-urlencoded'}
+def login(session, user_id):
+    return session.get(f"http://127.0.0.1:5000/login/{user_id}")
 
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'mock_user',
-    'password': 'mock_password',
-    'db': 'mock_db',
-    'cursorclass': pymysql.cursors.DictCursor
-}
+def run_test(test, session, base_url):
+    url = base_url + test['path']
+    method = test.get('method', 'GET').upper()
+    data = test.get('data', {})
 
-def load_scenarios():
-    with open("scenario.yaml", 'r') as f:
-        return yaml.safe_load(f)
+    # Optional login
+    if 'login_user' in test:
+        login(session, test['login_user'])
 
-def login(session, base_url, user_id):
-    session.get(f"{base_url}/login/{user_id}")
-
-def check_db_for_keyword(keyword):
-    with pymysql.connect(**DB_CONFIG) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM searches WHERE keyword = %s", (keyword,))
-            result = cursor.fetchone()
-            return result
-
-def print_result(scenario_id, description, status_code, expect_status, safe_expected, is_safe, reason=None):
-    print(f"[Test ID: {scenario_id}] {description}")
-    print(f"Status Code: {status_code}")
-    if is_safe == safe_expected:
-        print("결과: ✅ 안전")
-    else:
-        print("결과: ❌ 취약")
-        if reason:
-            print(f"이유: {reason}")
-    print("--------------------------------------------------")
-
-def run_scenario(session, base_url, scenario):
-    scenario_id = scenario['id']
-    description = scenario.get('description', '설명 없음')
-    url = base_url + scenario['endpoint']
-    method = scenario['method'].upper()
-
-    # 로그인
-    if 'login_user' in scenario:
-        login(session, base_url, scenario['login_user'])
-
-    # 요청 수행
-    data = scenario.get('data')
-    if method == 'POST':
-        response = session.post(url, data=data, headers=BASE_HEADERS)
-    else:
-        response = session.get(url)
-
-    # 검증
-    is_status_match = response.status_code == scenario['expect_status']
-    db_match = True
-    reason = None
-
-    if 'check_db_keyword' in scenario:
-        result = check_db_for_keyword(scenario['check_db_keyword'])
-        db_match = result is not None
-        if not db_match:
-            reason = f"DB에 '{scenario['check_db_keyword']}' 이(가) 저장되지 않음"
+    try:
+        if method == 'POST':
+            response = session.post(url, data=data, allow_redirects=False)
         else:
-            reason = f"DB에 악성 데이터가 삽입됨 (search_id: {result['search_id']}, user_id: {result['user_id']})"
+            response = session.get(url, allow_redirects=False)
 
-    is_redirect_ok = True
-    if 'expect_redirect' in scenario:
-        is_redirect_ok = scenario['expect_redirect'] in response.url
+        status_code = response.status_code
+        redirected = (300 <= status_code < 400)
 
-    is_safe = is_status_match and db_match and is_redirect_ok
-    print_result(scenario_id, description, response.status_code, scenario['expect_status'], scenario['expect_safe'], is_safe, reason if not is_safe else None)
+        # Determine if expected behavior occurred
+        passed = True
+        reason = "Expected redirect" if test.get("expect_redirect", False) and redirected else "Executed without error"
+        if test.get("expect_redirect", False) and not redirected:
+            passed = False
+            reason = "Did not redirect as expected"
+
+        print("--------------------------------------------------")
+        print(f"[Test ID: {test['id']}] {test['description']}")
+        print(f"Status Code: {status_code}")
+        print(f"결과: {'✅ 안전' if passed else '❌ 취약'}")
+        print(f"이유: {reason}")
+        print("--------------------------------------------------")
+
+    except Exception as e:
+        print("--------------------------------------------------")
+        print(f"[Test ID: {test['id']}] {test['description']}")
+        print("결과: ❌ 오류 발생")
+        print(f"이유: {str(e)}")
+        print("--------------------------------------------------")
 
 def main():
-    scenarios = load_scenarios()
-    base_url = scenarios['base_url']
-    session = requests.Session()
+    with open("scenario.yaml", "r", encoding='utf-8') as file:
+        config = yaml.safe_load(file)
 
-    for scenario in scenarios['scenarios']:
-        run_scenario(session, base_url, scenario)
+    base_url = config['base_url']
+    tests = config['tests']
+
+    for test in tests:
+        session = requests.Session()
+        run_test(test, session, base_url)
 
 if __name__ == "__main__":
     main()

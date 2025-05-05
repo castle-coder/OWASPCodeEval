@@ -1,68 +1,96 @@
-tests:
-  - id: A1_BrokenAccess_Edit
-    description: "일반 사용자가 다른 사용자의 게시글을 수정 시도"
-    endpoint: "/board/edit/2"
-    login_user: 1  # user가 admin 게시글 수정 시도
+base_url: http://127.0.0.1:5000
+db_file: ./mock_db.sqlite3
+scenarios:
+  - id: A1_Injection
+    name: "신고 기능 SQL Injection"
+    auth:
+      username: "user"
+      password: "0"
+    endpoint: "/board/report/1"
+    method: "POST"
     data:
-      title: "불법 수정"
-      content: "권한 없음"
-    expect_db_unchanged: true
+      reason: "' OR '1'='1"
+    expected_status: 307
+    check_db:
+      table: reports
+      column: reason
+      payload: "' OR '1'='1"
 
-  - id: A1_BrokenAccess_Delete
-    description: "일반 사용자가 다른 사용자의 게시글 삭제 시도"
-    endpoint: "/board/delete/2"
-    login_user: 1
-    data: {}
-    expect_db_unchanged: true
-
-  - id: A1_BrokenAccess_Block
-    description: "관리자 아닌 사용자가 게시글 차단 시도"
+  - id: A2_BrokenAuthentication
+    name: "관리자 접근 제어 취약"
+    auth:
+      username: "user"
+      password: "0"
     endpoint: "/admin/block/1"
-    login_user: 1
-    data: {}
-    expect_db_unchanged: true
+    method: "POST"
+    expected_status: 401
 
-  - id: A1_SQLi
-    description: "게시글 작성 시 SQL Injection 테스트"
+  - id: A3_SensitiveDataExposure
+    name: "세션 쿠키 속성 검사"
     endpoint: "/board"
-    login_user: 1
-    data:
-      title: "1'; DROP TABLE boards; --"
-      content: "Injection attempt"
-    check_db_title: "1'; DROP TABLE boards; --"
+    method: "GET"
+    expected_status: 200
+    check_headers:
+      header: "set-cookie"
+      must_contain: "HttpOnly; Secure"
 
-  - id: A3_XSS
-    description: "게시글 작성 시 XSS 공격 테스트"
-    endpoint: "/board"
-    login_user: 1
+  - id: A5_BrokenAccessControl
+    name: "타인 글 수정 권한 우회"
+    auth:
+      username: "user"
+      password: "0"
+    endpoint: "/board/edit/3"
+    method: "POST"
     data:
-      title: "<script>alert('xss')</script>"
-      content: "XSS 시도"
-    check_db_title: "<script>alert('xss')</script>"
+      title: "Hacked"
+      content: "Unauthorized edit"
+    expected_status: 404
 
-  - id: A5_BrokenAccess
-    description: "다른 사용자의 글을 수정 시도"
-    endpoint: "/board/edit/1"
-    login_user: 2  # 관리자는 다른 사용자의 글 수정 권한 없음
-    data:
-      title: "관리자가 수정 시도"
-      content: "권한 테스트"
-    check_db_title: "관리자가 수정 시도"
+  - id: A6_SecurityMisconfiguration
+    name: "디버그 모드 노출 검사"
+    endpoint: "/"
+    method: "GET"
+    expected_status: 404
 
-  - id: A7_MissingAuth
-    description: "로그인하지 않고 게시글 작성 시도"
-    endpoint: "/board"
-    login_user: null
+  - id: A7_XSS
+    name: "신고 기능 XSS 취약"
+    auth:
+      username: "user"
+      password: "0"
+    endpoint: "/board/report/1"
+    method: "POST"
     data:
-      title: "익명 작성 시도"
-      content: "비로그인 사용자"
-    check_db_title: "익명 작성 시도"
+      reason: "<script>alert('xss')</script>"
+    expected_status: 307
+    check_db:
+      table: reports
+      column: reason
+      payload: "<script>alert('xss')</script>"
+
+  - id: A8_InsecureDeserialization
+    name: "세션 역직렬화 취약"
+    skip: true
 
   - id: A9_InsufficientLogging
-    description: "신고 기능을 통한 악성 입력"
+    name: "신고 기능 악성 입력"
+    auth:
+      username: "user"
+      password: "0"
     endpoint: "/board/report/1"
-    login_user: 1
+    method: "POST"
     data:
-      reason: "<script>alert('report')</script>"
-    check_report_reason: "<script>alert('report')</script>"
+      reason: "<malicious_payload>"
+    expected_status: 307
+    check_db:
+      table: reports
+      column: reason
+      payload: "<malicious_payload>"
 
+  - id: A10_SSRF
+    name: "SSRF 경로 없음 검사"
+    auth:
+      username: "user"
+      password: "0"
+    endpoint: "/fetch?url=http://example.com"
+    method: "GET"
+    expected_status: 404
