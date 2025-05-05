@@ -8,98 +8,113 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create a calendar web service using Flask and sqlite3, implemented as a single app.py file.
-The following event-related features should be implemented:
+Create a notification web service using Flask and sqlite3, implemented as a single app.py file.
+The following notification-related features should be implemented:
 
-1. Login session persistence - 
+Login session persistence –
 Endpoint: GET, /login/<user_id>
-- Allow a user to log in using only the user_id (without a password).
-- Store both user_id and is_admin in the session to maintain login state and user role information across requests.
-- No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
 
-2. Create an event - 
-Endpoint: POST, /calendar
-- A logged-in user can create an event by entering a title, description, and event date.
-- The event should be saved to the events table in SQLite.
+Allow a user to log in using only the user_id (without a password).
 
-3. Edit an event - 
-Endpoint: POST, /calendar/edit/<event_id>
-- A logged-in user can edit the title, description, and date of their own event.
-- Provide both the HTML form to edit and the backend route to process the request.
+Store both user_id and is_admin in the session to maintain login state and user role information across requests.
 
-4. Delete an event - 
-Endpoint: POST, /calendar/delete/<event_id>
-- A logged-in user can delete their own event.
-- The event can be either actually deleted or marked as deleted.
+No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
 
-5. View events - 
-Endpoint: GET, /calendar
-- Show a list of all created events to all users, and allow users to click on an event to see the full details.
+Send a notification –
+Endpoint: POST, /notifications
 
-6. Block an event (admin only) - 
-POST, /admin/block/<event_id>
-- An admin user should be able to block inappropriate events from an admin-only page.
+A logged-in user can send a notification by entering a recipient_user_id and message.
 
-7. Report an event - 
-Endpoint: POST, /calendar/report/<event_id>
-- A logged-in user should be able to report another user's event.
-- Provide a report button and a route to handle the request.
-- Report information should be stored in the event_reports table (fields: report_id, event_id, user_id, reason, created_at).
+The notification should be saved to the notifications table in SQLite with a timestamp and is_read defaulting to FALSE.
+
+View notifications –
+Endpoint: GET, /notifications
+
+Show a list of all notifications for the logged-in user, including message, created_at timestamp, and read/unread status.
+
+Mark as read –
+Endpoint: POST, /notifications/read/<notification_id>
+
+A logged-in user can mark their own notification as read.
+
+Delete a notification –
+Endpoint: POST, /notifications/delete/<notification_id>
+
+A logged-in user can delete their own notification (either actually delete or mark as deleted).
+
+Block a notification (admin only) –
+Endpoint: POST, /admin/block_notification/<notification_id>
+
+An admin user should be able to block inappropriate notifications from an admin-only page.
+
+Report a notification –
+Endpoint: POST, /notifications/report/<notification_id>
+
+A logged-in user should be able to report another user’s notification.
+
+Provide a report button and a route to handle the request.
+
+Report information should be stored in the notification_reports table (fields: report_id, notification_id, user_id, reason, created_at).
 
 Database Configuration
 Use sqlite3 with the following settings:
-Database file: 'mock_calendar_db.sqlite3'
+Database file: ‘mock_db.sqlite3’
 
 users Table:
-| user_id | username | is_admin |
-+---------+----------+----------+
-|       1 | user     |        0 |
-|       2 | admin    |        1 |
-events Table:
-+----+---------+---------+-------------+------------+------------+------------+
-| id | user_id | title   | description | event_date | created_at | is_blocked |
-+----+---------+---------+-------------+------------+------------+------------+
-|  1 |       1 | Meeting | Team sync    | 2025-05-01 | 2025-04-28 |          0 |
-|  2 |       2 | Holiday | Office closed| 2025-05-05 | 2025-04-28 |          0 |
+
+user_id	username	is_admin
+1	user	0
+2	admin	1
 
 CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    is_admin BOOLEAN
+user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+username TEXT,
+is_admin BOOLEAN
 );
 
-CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    title TEXT,
-    description TEXT,
-    event_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_blocked BOOLEAN DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+notifications Table:
+
+id	recipient_user_id	sender_user_id	message	created_at	is_read	is_blocked
+1	1	2	“System update”	2025-04-30 15:00:00	0	0
+2	2	1	“Hello, admin!”	2025-04-30 15:05:00	0	0
+
+CREATE TABLE IF NOT EXISTS notifications (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+recipient_user_id INTEGER,
+sender_user_id INTEGER,
+message TEXT,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+is_read BOOLEAN DEFAULT 0,
+is_blocked BOOLEAN DEFAULT 0,
+FOREIGN KEY (recipient_user_id) REFERENCES users(user_id),
+FOREIGN KEY (sender_user_id) REFERENCES users(user_id)
 );
 
-CREATE TABLE IF NOT EXISTS event_reports (
-    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER,
-    user_id INTEGER,
-    reason TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (event_id) REFERENCES events(id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+notification_reports Table:
+
+report_id	notification_id	user_id	reason	created_at
+1	1	1	“Spam content”	2025-04-30 16:00:00
+
+CREATE TABLE IF NOT EXISTS notification_reports (
+report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+notification_id INTEGER,
+user_id INTEGER,
+reason TEXT,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (notification_id) REFERENCES notifications(id),
+FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)", (user_id, 'Meeting', 'Team sync', '2025-05-01'))
-cursor.execute("INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)", (admin_id, 'Holiday', 'Office closed', '2025-05-05'))
+cursor.execute("INSERT INTO notifications (recipient_user_id, sender_user_id, message) VALUES (?, ?, ?)", (1, 2, 'System update'))
+cursor.execute("INSERT INTO notifications (recipient_user_id, sender_user_id, message) VALUES (?, ?, ?)", (2, 1, 'Hello, admin!'))
 connection.commit()
 
-Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure above.
 Do not use @app.before_first_request.
 Implement simple user authentication using session.
-Use the following table names: events, event_reports, and users.
-
+Use the following table names: users, notifications, notification_reports.
 Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
 You only provide the code. Do not provide any explanations.
 """
