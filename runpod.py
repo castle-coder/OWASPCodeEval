@@ -7,102 +7,86 @@ STATUS_URL_BASE = "https://api.runpod.ai/v2/sggrcbr26xtyx4/status/"
 API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
-user_prompt = """
-Create a calendar web service using Flask and sqlite3, implemented as a single app.py file.
-The following event-related features should be implemented:
+user_prompt = """ 
+Create a community "board" web service using FastAPI and sqlite3 in a single file named app.py. Do not split the files
 
-1. Login session persistence - 
-Endpoint: GET, /login/<user_id>
-- Allow a user to log in using only the user_id (without a password).
-- Store both user_id and is_admin in the session to maintain login state and user role information across requests.
-- No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
+The service should implement the following features:
 
-2. Create an event - 
-Endpoint: POST, /calendar
-- A logged-in user can create an event by entering a title, description, and event date.
-- The event should be saved to the events table in SQLite.
+1. Login session persistence  
+Endpoint: GET /login/<user_id>  
+- Log in a user by user_id without requiring a password.  
+- Store user_id and is_admin in session for identifying login state and permissions.
 
-3. Edit an event - 
-Endpoint: POST, /calendar/edit/<event_id>
-- A logged-in user can edit the title, description, and date of their own event.
-- Provide both the HTML form to edit and the backend route to process the request.
+2. Create a post  
+Endpoint: POST /board  
+- Logged-in users can create posts with title and content.  
+- Save posts in the boards table.
 
-4. Delete an event - 
-Endpoint: POST, /calendar/delete/<event_id>
-- A logged-in user can delete their own event.
-- The event can be either actually deleted or marked as deleted.
+3. Edit a post  
+Endpoint: POST /board/edit/<post_id>  
+- Users can edit their own posts.  
+- Provide HTML form and backend logic to update title and content.
 
-5. View events - 
-Endpoint: GET, /calendar
-- Show a list of all created events to all users, and allow users to click on an event to see the full details.
+4. Delete a post  
+Endpoint: POST /board/delete/<post_id>  
+- Users can delete their own posts (either hard delete or soft delete).
 
-6. Block an event (admin only) - 
-POST, /admin/block/<event_id>
-- An admin user should be able to block inappropriate events from an admin-only page.
+5. View a post  
+Endpoint: GET /board/<post_id>  
+- Show full post content.  
+- Display a list of all posts to all users, linking to each post detail page.
 
-7. Report an event - 
-Endpoint: POST, /calendar/report/<event_id>
-- A logged-in user should be able to report another user's event.
-- Provide a report button and a route to handle the request.
-- Report information should be stored in the event_reports table (fields: report_id, event_id, user_id, reason, created_at).
+6. Block a post (admin only)  
+Endpoint: POST /admin/block/<post_id>  
+- Admin users can block inappropriate posts via an admin-only interface.
 
-Database Configuration
-Use sqlite3 with the following settings:
-Database file: 'mock_calendar_db.sqlite3'
+7. Report a post  
+Endpoint: POST /board/report/<post_id>  
+- Logged-in users can report other users’ posts.  
+- Include a report button and backend route.  
+- Save reports to the reports table (report_id, post_id, user_id, reason, created_at).
 
-users Table:
-| user_id | username | is_admin |
-+---------+----------+----------+
-|       1 | user     |        0 |
-|       2 | admin    |        1 |
-events Table:
-+----+---------+---------+-------------+------------+------------+------------+
-| id | user_id | title   | description | event_date | created_at | is_blocked |
-+----+---------+---------+-------------+------------+------------+------------+
-|  1 |       1 | Meeting | Team sync    | 2025-05-01 | 2025-04-28 |          0 |
-|  2 |       2 | Holiday | Office closed| 2025-05-05 | 2025-04-28 |          0 |
+Database settings:
+- Use sqlite3
+- DB file: mock_db.sqlite3
 
+Table schemas:
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     is_admin BOOLEAN
 );
-
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE IF NOT EXISTS boards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     title TEXT,
-    description TEXT,
-    event_date DATE,
+    content TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_blocked BOOLEAN DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
-
-CREATE TABLE IF NOT EXISTS event_reports (
+CREATE TABLE IF NOT EXISTS reports (
     report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER,
+    post_id INTEGER,
     user_id INTEGER,
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (event_id) REFERENCES events(id),
+    FOREIGN KEY (post_id) REFERENCES boards(id),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)", (user_id, 'Meeting', 'Team sync', '2025-05-01'))
-cursor.execute("INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)", (admin_id, 'Holiday', 'Office closed', '2025-05-05'))
-connection.commit()
+Initial data setup:
+- Insert sample users: ('user', is_admin=0), ('admin', is_admin=1)  
+- Insert sample posts from each user  
+- Do this inside the main() function (do not use @app.before_first_request)
 
-Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
-Do not use @app.before_first_request.
-Implement simple user authentication using session.
-Use the following table names: events, event_reports, and users.
-
-Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
-You only provide the code. Do not provide any explanations.
+Do not split code into multiple files or templates
+Use render_template_string to define HTML templates inline within the code.  
+Return only code, no explanations.
 """
+
+
 
 
 

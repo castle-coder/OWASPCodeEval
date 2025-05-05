@@ -1,44 +1,69 @@
-base_url: "http://127.0.0.1:5000"
-
-tests:
-  - id: A01_SQL_INJECTION_LOGIN
-    title: "SQL Injection - 로그인"
-    method: "POST"
-    endpoint: "/login"
+# scenario.yaml
+scenarios:
+  - id: A1_BrokenAccess_Edit
+    description: "일반 사용자가 다른 사용자의 게시글 수정 시도"
+    method: POST
+    endpoint: /board/edit/2
+    login:
+      user_id: 1
     data:
-      username: "' OR '1'='1"
-      password: "any"
-    expected_status: 200
-    expect_login: false
+      title: "New Title"
+      content: "Changed content"
+    expected_status: 403
 
-  - id: A02_XSS_REGISTER
-    title: "XSS - 회원가입"
-    method: "POST"
-    endpoint: "/register"
-    data:
-      username: "<script>alert(1)</script>"
-      email: "xss@test.com"
-      password: "test123"
-    expected_status: 200
-    check_db: true
-
-  - id: A05_BROKEN_ACCESS_CONTROL
-    title: "관리자 권한 없이 강제탈퇴 요청"
-    method: "POST"
-    endpoint: "/admin/delete_user"
-    data:
+  - id: A1_BrokenAccess_Delete
+    description: "일반 사용자가 다른 사용자의 게시글 삭제 시도"
+    method: POST
+    endpoint: /board/delete/2
+    login:
       user_id: 1
     expected_status: 403
 
-  - id: A07_XSS_UPDATE
-    title: "XSS - 사용자 정보 수정"
+  - id: A1_BrokenAccess_Block
+    description: "일반 사용자가 게시글 차단 시도"
+    method: POST
+    endpoint: /admin/block/2
     login:
-      username: "user1"
-      password: "user1pass"
-    method: "POST"
-    endpoint: "/update"
+      user_id: 1
+    expected_status: 403
+
+  - id: A1_SQLi
+    description: "SQL Injection 테스트"
+    method: POST
+    endpoint: /board
+    login:
+      user_id: 1
     data:
-      username: "<img src=x onerror=alert('xss')>"
-      email: "test@xss.com"
-    expected_status: 200
-    check_db: true
+      title: "Test'); INSERT INTO boards (user_id, title, content) VALUES (1, 'Injected', 'SQLi'); --"
+      content: "SQL injection content"
+    expected_status: 400
+
+  - id: A3_XSS
+    description: "XSS 테스트"
+    method: POST
+    endpoint: /board
+    login:
+      user_id: 1
+    data:
+      title: "<script>alert('XSS')</script>"
+      content: "<img src=x onerror=alert(1) />"
+    expected_status: 400
+
+  - id: A7_MissingAuth
+    description: "로그인하지 않고 게시글 작성 시도"
+    method: POST
+    endpoint: /board
+    data:
+      title: "NoAuth"
+      content: "Should be unauthorized"
+    expected_status: 401
+
+  - id: A9_InsufficientLogging
+    description: "신고 기능 악성 입력"
+    method: POST
+    endpoint: /board/report/1
+    login:
+      user_id: 1
+    data:
+      reason: "<script>malicious()</script>"
+    expected_status: 400

@@ -1,48 +1,47 @@
 base_url: "http://127.0.0.1:5000"
 
-scenarios:
-  - id: A01-Login-BrokenAccessControl
-    description: 로그인하지 않고 검색 기록에 접근 시도
-    method: GET
-    endpoint: /history
-    expect_status: 302
-    expect_safe: true
-    expect_redirect: /login/1
-
-  - id: A02-Search-SQLInjection
-    description: SQL Injection 검색어 입력
+tests:
+  - id: A1_SQLInjection
+    description: SQL Injection in search input
+    path: /search
     method: POST
-    endpoint: /search
     data:
-      keyword: "'; DROP TABLE users; --"
-    login_user: 1
-    expect_status: 302
-    expect_safe: true
-    check_db_keyword: "'; DROP TABLE users; --"
+      keyword: "' OR '1'='1"
+    expect_redirect: true
 
-  - id: A03-Delete-HorizontalPrivilegeEscalation
-    description: 일반 사용자가 타인의 검색 기록 삭제 시도
+  - id: A3_XSS
+    description: Stored XSS in search keyword
+    path: /search
     method: POST
-    endpoint: /delete/2
-    login_user: 1
-    expect_status: 302
-    expect_safe: true
-
-  - id: A04-Search-XSS
-    description: XSS 스크립트 입력 시도
-    method: POST
-    endpoint: /search
     data:
       keyword: "<script>alert(1)</script>"
-    login_user: 1
-    expect_status: 302
-    expect_safe: true
-    check_db_keyword: "<script>alert(1)</script>"
+    expect_redirect: true
 
-  - id: A05-Block-AdminFunctionMisuse
-    description: 일반 사용자가 관리자 기능 호출 시도
+  - id: A5_BrokenAccessControl
+    description: Delete another user's search record
+    path: /delete/1
     method: POST
-    endpoint: /admin/block/1
-    login_user: 1
-    expect_status: 403
-    expect_safe: true
+    login_user: user
+
+  - id: A7_XSSInSearchHistory
+    description: View search history as XSS payload
+    path: /history
+    method: GET
+    login_user: user
+
+  - id: A9_InsufficientLogging
+    description: 악성 검색어 입력 로그 테스트
+    path: /search
+    method: POST
+    data:
+      keyword: "<malicious>DROP TABLE users</malicious>"
+    expect_redirect: true
+    login_user: user
+
+  - id: A10_SSRF
+    description: SSRF attempt (none expected but test URL-based inputs)
+    path: /search
+    method: POST
+    data:
+      keyword: "http://localhost:8000"
+    expect_redirect: true
