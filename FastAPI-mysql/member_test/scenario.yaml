@@ -1,0 +1,87 @@
+base_url: "http://127.0.0.1:5000"
+
+tests:
+  - id: A1_BrokenAccessControl
+    name: 일반 사용자가 다른 사용자 정보 조회
+    method: GET
+    endpoint: "/members/2"
+    session_login: 1
+    expected_status: 403
+
+  - id: A2_CryptographicFailures
+    name: 비밀번호 평문 저장 확인
+    method: POST
+    endpoint: "/members/register"
+    data:
+      username: "crypto_test"
+      email: "crypto@example.com"
+      password: "plaintext123"
+    expected_status: 200
+    validate:
+      not_contains: "plaintext123"
+
+  - id: A3_Injection
+    name: SQL 인젝션 시도 (회원 조회)
+    method: GET
+    endpoint: "/members/1%20OR%201=1"
+    expected_status: 404
+
+  - id: A4_InsecureDesign
+    name: 인증 없이 관리자 비활성화 기능 접근
+    method: POST
+    endpoint: "/admin/deactivate_member/1"
+    expected_status: 403
+
+  - id: A5_SecurityMisconfiguration
+    name: 존재하지 않는 URL 접근 시 에러 확인
+    method: GET
+    endpoint: "/nonexistent"
+    expected_status: 404
+
+  - id: A6_VulnerableComponents
+    name: bcrypt 알고리즘 존재 여부 테스트
+    method: POST
+    endpoint: "/members/register"
+    data:
+      username: "bcrypt_test"
+      email: "bcrypt@example.com"
+      password: "secure123!"
+    expected_status: 200
+
+  - id: A7_IdentificationAndAuthenticationFailures
+    name: 잘못된 사용자로 로그인 시도
+    method: GET
+    endpoint: "/login/9999"
+    expected_status: 403
+
+  - id: A8_SoftwareAndDataIntegrityFailures
+    name: 세션 탈취 후 업데이트 시도
+    method: POST
+    endpoint: "/members/update"
+    session_login: 2
+    data:
+      username: "hacked_user"
+      email: "hacked@example.com"
+    expected_status: 403
+
+  - id: A9_SecurityLoggingMonitoring
+    name: 악성 입력 시도 후 저장 확인
+    method: POST
+    endpoint: "/members/register"
+    data:
+      username: "<script>alert('xss')</script>"
+      email: "xss@attack.com"
+      password: "attack123"
+    expected_status: 200
+    validate:
+      not_contains: "<script>alert('xss')</script>"
+
+  - id: A10_ServerSideRequestForgery
+    name: SSRF 가능성 테스트 (외부 주소 삽입)
+    method: POST
+    endpoint: "/members/register"
+    data:
+      username: "ssrf_test"
+      email: "http://127.0.0.1:5000/admin"
+      password: "ssrf"
+    expected_status: 200
