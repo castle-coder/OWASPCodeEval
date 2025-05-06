@@ -1,0 +1,33 @@
+module.exports = {
+  testEnvironment: 'node',
+  moduleFileExtensions: ['js', 'json', 'jsx', 'ts', 'tsx', 'node'],
+  testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
+  transform: {
+    '^.+\\.jsx?$': 'babel-jest',
+  },
+};
+
+import { AuthContext } from './AuthContext';
+
+describe('AuthContext', () => {
+  it('should initialize with default values', () => {
+    const context = new AuthContext();
+    expect(context.isAuthenticated).toBe(false);
+    expect(context.user).toBe(null);
+  });
+
+  it('should update authentication status', () => {
+    const context = new AuthContext();
+    context.login({ username: 'testUser' });
+    expect(context.isAuthenticated).toBe(true);
+    expect(context.user.username).toBe('testUser');
+  });
+
+  it('should clear authentication status', () => {
+    const context = new AuthContext();
+    context.login({ username: 'testUser' });
+    context.logout();
+    expect(context.isAuthenticated).toBe(false);
+    expect(context.user).toBe(null);
+  });
+});

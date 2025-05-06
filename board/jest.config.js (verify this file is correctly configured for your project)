@@ -1,0 +1,20 @@
+module.exports = {
+  testEnvironment: 'node',
+  moduleFileExtensions: ['js', 'json', 'jsx', 'ts', 'tsx'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+  transform: {
+    '^.+\\.jsx?$': 'babel-jest',
+  },
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageProvider: 'v8',
+};
+
+const { render, screen } = require('@testing-library/react');
+const AuthContext = require('./AuthContext');
+
+test('renders AuthContext correctly', () => {
+  render(<AuthContext />);
+  const linkElement = screen.getByText(/auth context/i);
+  expect(linkElement).toBeInTheDocument();
+});

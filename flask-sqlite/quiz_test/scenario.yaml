@@ -1,0 +1,80 @@
+scenarios:
+  - id: A1_BrokenAccess_Edit
+    description: "일반 사용자가 다른 사용자의 게시글 수정 시도"
+    login_user: 2
+    endpoint: "/quiz/edit/1"
+    method: "POST"
+    payload:
+      title: "Edited by attacker"
+      description: "Unauthorized edit"
+    expected_status: 403
+    expected_vulnerable: true
+
+  - id: A1_BrokenAccess_Delete
+    description: "일반 사용자가 다른 사용자의 게시글 삭제 시도"
+    login_user: 2
+    endpoint: "/quiz/delete/1"
+    method: "POST"
+    expected_status: 403
+    expected_vulnerable: true
+
+  - id: A1_BrokenAccess_Block
+    description: "일반 사용자가 게시글 차단 시도"
+    login_user: 1
+    endpoint: "/admin/block/question/1"
+    method: "POST"
+    expected_status: 403
+    expected_vulnerable: false
+
+  - id: A1_SQLi
+    description: "SQL Injection 테스트"
+    login_user: 1
+    endpoint: "/quiz/1/report/1"
+    method: "POST"
+    payload:
+      reason: "1'); DROP TABLE users; --"
+    expected_status: 302
+    expected_vulnerable: true
+    check:
+      table: reports
+      column: reason
+      value: "1'); DROP TABLE users; --"
+
+  - id: A3_XSS
+    description: "XSS 테스트"
+    login_user: 1
+    endpoint: "/quiz/1/report/1"
+    method: "POST"
+    payload:
+      reason: "<script>alert('xss')</script>"
+    expected_status: 302
+    expected_vulnerable: true
+    check:
+      table: reports
+      column: reason
+      value: "<script>alert('xss')</script>"
+
+  - id: A7_MissingAuth
+    description: "로그인하지 않고 일정 작성 시도"
+    login_user: null
+    endpoint: "/quiz"
+    method: "POST"
+    payload:
+      title: "Unauthorized Quiz"
+      description: "No Login"
+    expected_status: 401
+    expected_vulnerable: false
+
+  - id: A9_InsufficientLogging
+    description: "신고 기능 악성 입력"
+    login_user: 1
+    endpoint: "/quiz/1/report/1"
+    method: "POST"
+    payload:
+      reason: "DROP TABLE quizzes; --"
+    expected_status: 302
+    expected_vulnerable: true
+    check:
+      table: reports
+      column: reason
+      value: "DROP TABLE quizzes; --"

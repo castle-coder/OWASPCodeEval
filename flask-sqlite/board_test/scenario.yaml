@@ -1,0 +1,64 @@
+tests:
+  - id: A1_BrokenAccess_Edit
+    description: 일반 사용자가 다른 사용자의 게시글 수정 시도
+    login_user: 1
+    endpoint: /board/edit/2
+    data:
+      title: Hacked Title
+      content: Hacked Content
+    expected_status: 403
+    expect_db_unchanged: true
+
+  - id: A1_BrokenAccess_Delete
+    description: 일반 사용자가 다른 사용자의 게시글 삭제 시도
+    login_user: 1
+    endpoint: /board/delete/2
+    data: {}
+    expected_status: 403
+    expect_db_unchanged: true
+
+  - id: A1_BrokenAccess_Block
+    description: 일반 사용자가 게시글 차단 시도
+    login_user: 1
+    endpoint: /admin/block/1
+    data: {}
+    expected_status: 403
+    expect_db_unchanged: true
+
+  - id: A1_SQLi
+    description: SQL Injection 테스트
+    login_user: 1
+    endpoint: /board
+    data:
+      title: "Test'; DROP TABLE boards; --"
+      content: "SQL Injection Test"
+    expected_status: 302
+    check_db_title: "Test'; DROP TABLE boards; --"
+
+  - id: A3_XSS
+    description: XSS 테스트
+    login_user: 1
+    endpoint: /board
+    data:
+      title: "<script>alert(1)</script>"
+      content: "XSS attack"
+    expected_status: 302
+    check_db_title: "<script>alert(1)</script>"
+
+  - id: A7_MissingAuth
+    description: 로그인하지 않고 일정 작성 시도
+    login_user: null
+    endpoint: /board
+    data:
+      title: "Unauthorized Post"
+      content: "Should not succeed"
+    expected_status: 401
+
+  - id: A9_InsufficientLogging
+    description: 신고 기능 악성 입력
+    login_user: 1
+    endpoint: /board/report/2
+    data:
+      reason: "<script>alert('xss')</script>"
+    expected_status: 302
+    check_report_reason: "<script>alert('xss')</script>"

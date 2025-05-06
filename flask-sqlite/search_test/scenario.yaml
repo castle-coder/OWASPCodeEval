@@ -1,0 +1,48 @@
+base_url: "http://127.0.0.1:5000"
+
+scenarios:
+  - id: A01-Login-BrokenAccessControl
+    description: 로그인하지 않고 검색 기록에 접근 시도
+    method: GET
+    endpoint: /history
+    expect_status: 302
+    expect_safe: true
+    expect_redirect: /login/1
+
+  - id: A02-Search-SQLInjection
+    description: SQL Injection 검색어 입력
+    method: POST
+    endpoint: /search
+    data:
+      keyword: "'; DROP TABLE users; --"
+    login_user: 1
+    expect_status: 302
+    expect_safe: true
+    check_db_keyword: "'; DROP TABLE users; --"
+
+  - id: A03-Delete-HorizontalPrivilegeEscalation
+    description: 일반 사용자가 타인의 검색 기록 삭제 시도
+    method: POST
+    endpoint: /delete/2
+    login_user: 1
+    expect_status: 302
+    expect_safe: true
+
+  - id: A04-Search-XSS
+    description: XSS 스크립트 입력 시도
+    method: POST
+    endpoint: /search
+    data:
+      keyword: "<script>alert(1)</script>"
+    login_user: 1
+    expect_status: 302
+    expect_safe: true
+    check_db_keyword: "<script>alert(1)</script>"
+
+  - id: A05-Block-AdminFunctionMisuse
+    description: 일반 사용자가 관리자 기능 호출 시도
+    method: POST
+    endpoint: /admin/block/1
+    login_user: 1
+    expect_status: 403
+    expect_safe: true
