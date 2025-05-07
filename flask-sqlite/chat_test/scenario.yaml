@@ -1,0 +1,154 @@
+base_url: http://127.0.0.1:5000
+
+scenarios:
+  - id: A1_BrokenAccess_EditChat
+    description: 일반 사용자가 다른 사용자의 메시지 수정 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats/edit/2
+        data:
+          content: Hacked!
+    expected:
+      status_code: 403
+
+  - id: A1_BrokenAccess_DeleteChat
+    description: 일반 사용자가 다른 사용자의 메시지 삭제 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats/delete/2
+    expected:
+      status_code: 403
+
+  - id: A5_BrokenAuth_SendChat
+    description: 비로그인 상태에서 채팅 메시지 전송 시도
+    steps:
+      - method: POST
+        path: /chats
+        data:
+          content: Unauthorized
+    expected:
+      status_code: 302  # 로그인 페이지로 리디렉션
+
+  - id: A3_XSS_ChatMessage
+    description: XSS 코드 포함한 메시지 전송 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats
+        data:
+          content: "<script>alert('xss')</script>"
+    expected:
+      status_code: 302
+      no_db_record:
+        table: chats
+        criteria:
+          content: "<script>alert('xss')</script>"
+
+  - id: A9_InsufficientInputSanitization_Report
+    description: 악성 스크립트로 신고 이유 입력
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats/report/2
+        data:
+          reason: "<img src=x onerror=alert('xss')>"
+    expected:
+      status_code: 302
+      no_db_record:
+        table: chat_reports
+        criteria:
+          reason: "<img src=x onerror=alert('xss')>"
+
+  - id: A7_AdminAccessControl_Block
+    description: 일반 사용자가 관리자 차단 기능 실행 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /admin/block/2
+    expected:
+      status_code: 403
+
+  - id: A2_SQLi_SendChat
+    description: SQL Injection 페이로드 삽입 메시지 전송 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats
+        data:
+          content: "' OR '1'='1"
+    expected:
+      status_code: 302
+      no_db_record:
+        table: chats
+        criteria:
+          content: "' OR '1'='1"
+
+  - id: A3_XSS_Stored
+    description: Stored XSS 검증 – 메시지 삽입 후 표시 시 이스케이프 확인
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats
+        data:
+          content: "<script>alert(1)</script>"
+      - method: GET
+        path: /chats
+    expected:
+      status_code: 200
+      no_response_contains: "<script>alert(1)</script>"
+
+  - id: A5_CSRF_SendChat
+    description: CSRF 토큰 없이 채팅 전송 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats
+        data:
+          content: CSRF
+    expected:
+      status_code: 403
+
+  - id: A1_IDOR_ReportChat
+    description: 사용자1이 사용자2 메시지 신고 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /chats/report/2
+        data:
+          reason: Legitimate
+    expected:
+      status_code: 403
+
+  - id: A07_DOS_RateLimit
+    description: 단시간 대량 메시지 전송 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - repeat: 20
+        method: POST
+        path: /chats
+        data:
+          content: Flood
+    expected:
+      status_code: 429  # Too Many Requests
+
+  - id: A7_BrokenAccess_BlockChat
+    description: 비관리자가 차단 기능 호출 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /admin/block/1
+    expected:
+      status_code: 403

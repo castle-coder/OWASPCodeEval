@@ -1,0 +1,161 @@
+base_url: http://127.0.0.1:5000
+
+scenarios:
+  - id: A1-1
+    name: sql_injection_login
+    description: "Attempt SQL injection on login endpoint"
+    steps:
+      - method: GET
+        path: "/login/1' OR '1'='1"
+    expected:
+      status_code: 302
+      redirect: "/notifications"
+      session:
+        user_id: null
+
+  - id: A1-2
+    name: sql_injection_send_notification
+    description: "Attempt SQL injection in notification message"
+    preconditions:
+      - login: 1
+    steps:
+      - method: POST
+        path: /notifications
+        data:
+          recipient_user_id: 1
+          message: "Test'); DROP TABLE users;--"
+    expected:
+      status_code: 302
+      redirect: "/notifications"
+      db_integrity:
+        table_should_exist: users
+
+  - id: A2-1
+    name: session_fixation
+    description: "Ensure session fixation protection"
+    setup:
+      - set_cookie:
+          name: session
+          value: "fixedsessionid"
+    steps:
+      - method: GET
+        path: /login/1
+    expected:
+      status_code: 302
+      cookie:
+        name: session
+        value_changed: true
+
+  - id: A2-2
+    name: unauthenticated_access
+    description: "Redirect unauthenticated user to login"
+    steps:
+      - method: GET
+        path: /notifications
+    expected:
+      status_code: 302
+      redirect: "/login/1"
+
+  - id: A5-1
+    name: unauthorized_delete
+    description: "User attempts to delete another user's notification"
+    preconditions:
+      - login: 1
+      - create_notification:
+          recipient_user_id: 2
+          sender_user_id: 2
+          message: "OtherUserNote"
+    steps:
+      - method: POST
+        path: /notifications/delete/{notification_id}
+    expected:
+      status_code: 302
+      db:
+        table: notifications
+        filter:
+          id: "{notification_id}"
+        record_exists: true
+
+  - id: A5-2
+    name: unauthorized_admin_block
+    description: "Non-admin attempts to block a notification"
+    preconditions:
+      - login: 1
+      - create_notification:
+          recipient_user_id: 1
+          sender_user_id: 2
+          message: "BlockAttempt"
+    steps:
+      - method: POST
+        path: /admin/block_notification/{notification_id}
+    expected:
+      status_code: 403
+
+  - id: A6-1
+    name: method_not_allowed
+    description: "PUT method is not allowed on notifications"
+    preconditions:
+      - login: 1
+    steps:
+      - method: PUT
+        path: /notifications
+    expected:
+      status_code: 405
+
+  - id: A7-1
+    name: stored_xss_in_message
+    description: "Test stored XSS payload in notification message"
+    preconditions:
+      - login: 1
+    steps:
+      - method: POST
+        path: /notifications
+        data:
+          recipient_user_id: 1
+          message: "<script>alert(1)</script>"
+      - method: GET
+        path: /notifications
+    expected:
+      status_code: 200
+      body_not_contains:
+        - "<script>alert(1)</script>"
+      body_contains:
+        - "&lt;script&gt;alert(1)&lt;/script&gt;"
+
+  - id: A7-2
+    name: reflected_xss_in_report
+    description: "Test reflected XSS payload in report reason field"
+    preconditions:
+      - login: 1
+      - create_notification:
+          recipient_user_id: 1
+          sender_user_id: 2
+          message: "XSSReportTest"
+    steps:
+      - method: POST
+        path: /notifications/report/{notification_id}
+        data:
+          reason: "<img src=x onerror=alert(1)>"
+      - method: GET
+        path: /notifications
+    expected:
+      status_code: 200
+      body_not_contains:
+        - "<img src=x onerror=alert(1)>"
+      body_contains:
+        - "&lt;img src=x onerror=alert(1)&gt;"
+
+  - id: A6-2
+    name: error_handling_generic
+    description: "Trigger SQL error and verify generic error page"
+    preconditions:
+      - login: 1
+    steps:
+      - method: GET
+        path: "/login/abc"
+    expected:
+      status_code: 500
+      body_contains:
+        - "Internal Server Error"
+      body_not_contains:
+        - "sqlite3"
