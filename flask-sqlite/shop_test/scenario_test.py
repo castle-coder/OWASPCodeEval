@@ -3,9 +3,11 @@
 
 import yaml
 import requests
+import os
 
 
 def load_scenarios(path):
+
     with open(path) as f:
         data = yaml.safe_load(f)
     return data.get("scenarios", [])
@@ -45,7 +47,13 @@ def run_scenario(session, scenario):
 
 
 def main():
-    scenarios = load_scenarios("scenario.yaml")
+
+    # 현재 파일이 위치한 디렉토리 경로
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 절대 경로로 scenario.yaml 접근
+    yaml_path = os.path.join(base_dir, "scenario.yaml")
+    scenarios = load_scenarios(yaml_path)
     session = requests.Session()
 
     for s in scenarios:

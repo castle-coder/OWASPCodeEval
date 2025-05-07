@@ -3,12 +3,19 @@ import requests
 import sqlite3
 import time
 from urllib.parse import urljoin
+import os
 
 BASE_URL = "http://127.0.0.1:5000"
-DB_PATH = 'mock_db.sqlite3'
+
+dir = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(dir,'mock_db.sqlite3')
 
 def load_scenarios(path="scenario.yaml"):
-    with open(path, 'r', encoding='utf-8') as file:
+    # 현재 파일이 위치한 디렉토리 경로
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 절대 경로로 scenario.yaml 접근
+    yaml_path = os.path.join(base_dir, "scenario.yaml")
+    with open(yaml_path, 'r', encoding='utf-8') as file:
         return yaml.safe_load(file)
 
 def login(session, user_id):

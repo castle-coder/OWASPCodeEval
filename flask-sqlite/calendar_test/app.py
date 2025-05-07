@@ -1,273 +1,127 @@
-from flask import Flask, request, session, render_template_string, redirect, url_for, abort
+from flask import Flask, request, session, render_template_string, redirect, url_for
 import sqlite3
-import html
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-def init_db():
-    conn = sqlite3.connect('mock_db.sqlite3')
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            is_admin BOOLEAN
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            title TEXT,
-            description TEXT,
-            event_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_blocked BOOLEAN DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS event_reports (
-            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_id INTEGER,
-            user_id INTEGER,
-            reason TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (event_id) REFERENCES events(id),
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
-        )
-    ''')
-    # 초기 사용자/이벤트 삽입 (중복 방지)
-    c.execute("DELETE FROM users")
-    c.execute("DELETE FROM events")
-    c.execute("DELETE FROM event_reports")
-    c.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-    c.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-    c.execute(
-        "INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)",
-        (1, 'Meeting', 'Team sync', '2025-05-01')
-    )
-    c.execute(
-        "INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)",
-        (2, 'Holiday', 'Office closed', '2025-05-05')
-    )
-    conn.commit()
-    conn.close()
+DATABASE = 'mock_db.sqlite3'
 
-init_db()
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 @app.route('/login/<user_id>')
 def login(user_id):
     session['user_id'] = user_id
-    session['is_admin'] = 1 if user_id == 'admin' else 0
-    return redirect(url_for('calendar'))
+    session['is_admin'] = user_id == 'admin'
+    return redirect(url_for('board'))
 
-@app.route('/calendar', methods=['GET', 'POST'])
-def calendar():
-    # 인증 확인
+@app.route('/board', methods=['GET', 'POST'])
+def board():
     if 'user_id' not in session:
-        if request.method == 'POST':
-            abort(401)
         return redirect(url_for('login', user_id='user'))
-
-    user_id = int(session['user_id'])
-    is_admin = bool(session.get('is_admin'))
-
     if request.method == 'POST':
-        # 입력 값 HTML 이스케이프
-        title = html.escape(request.form.get('title', ''), quote=True)
-        description = html.escape(request.form.get('description', ''), quote=True)
-        event_date = request.form.get('event_date', '')
-
-        try:
-            conn = sqlite3.connect('mock_db.sqlite3')
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO events (user_id, title, description, event_date) VALUES (?, ?, ?, ?)",
-                (user_id, title, description, event_date)
-            )
-            conn.commit()
-        except sqlite3.Error:
-            pass
-        finally:
-            conn.close()
-        return redirect(url_for('calendar'))
-
-    # GET: 모든 이벤트 조회
-    conn = sqlite3.connect('mock_db.sqlite3')
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM events")
-    events = cur.fetchall()
+        title = request.form['title']
+        content = request.form['content']
+        conn = get_db_connection()
+        conn.execute('INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)', (session['user_id'], title, content))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('board'))
+    conn = get_db_connection()
+    posts = conn.execute('SELECT * FROM boards WHERE is_blocked = 0').fetchall()
     conn.close()
-
     return render_template_string('''
-        <!doctype html>
-        <h1>Calendar</h1>
-        <form method="POST">
-            <label>Title:</label><br>
-            <input type="text" name="title"><br>
-            <label>Description:</label><br>
-            <textarea name="description"></textarea><br>
-            <label>Event Date:</label><br>
-            <input type="date" name="event_date"><br>
-            <input type="submit" value="Create Event">
+        <h1>Board</h1>
+        <form method="post">
+            <input type="text" name="title" placeholder="Title" required>
+            <textarea name="content" placeholder="Content" required></textarea>
+            <button type="submit">Create Post</button>
         </form>
         <ul>
-        {% for ev in events %}
-            <li>
-                <h2>{{ ev[2] }}</h2>
-                <p>{{ ev[3] }}</p>
-                <p>{{ ev[4] }}</p>
-                <a href="{{ url_for('event_details', event_id=ev[0]) }}">Details</a>
-                {% if is_admin %}
-                <form method="POST" action="{{ url_for('block_event', event_id=ev[0]) }}" style="display:inline">
-                    <button type="submit">Block</button>
-                </form>
-                {% endif %}
-                <form method="POST" action="{{ url_for('report_event', event_id=ev[0]) }}" style="display:inline">
-                    <button type="submit">Report</button>
-                </form>
-            </li>
-        {% endfor %}
+            {% for post in posts %}
+                <li><a href="/board/{{ post.id }}">{{ post.title }}</a></li>
+            {% endfor %}
         </ul>
-    ''', events=events, is_admin=is_admin)
+    ''', posts=posts)
 
-@app.route('/calendar/details/<int:event_id>')
-def event_details(event_id):
+@app.route('/board/edit/<post_id>', methods=['GET', 'POST'])
+def edit_post(post_id):
     if 'user_id' not in session:
-        abort(401)
-    user_id = int(session['user_id'])
-    is_admin = bool(session.get('is_admin'))
-
-    conn = sqlite3.connect('mock_db.sqlite3')
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM events WHERE id=?", (event_id,))
-    ev = cur.fetchone()
-    conn.close()
-
-    if not ev or ev[6]:
-        abort(404)
-    if not is_admin and ev[1] != user_id:
-        abort(403)
-
-    return render_template_string('''
-        <!doctype html>
-        <h1>{{ ev[2] }}</h1>
-        <p>{{ ev[3] }}</p>
-        <p>{{ ev[4] }}</p>
-        <a href="{{ url_for('calendar') }}">Back</a>
-    ''', ev=ev)
-
-@app.route('/calendar/edit/<int:event_id>', methods=['GET', 'POST'])
-def edit_event(event_id):
-    if 'user_id' not in session:
-        abort(401)
-    user_id = int(session['user_id'])
-    is_admin = bool(session.get('is_admin'))
-
-    conn = sqlite3.connect('mock_db.sqlite3')
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM events WHERE id=?", (event_id,))
-    ev = cur.fetchone()
-    conn.close()
-
-    if not ev or ev[6]:
-        abort(404)
-    if not is_admin and ev[1] != user_id:
-        abort(403)
-
+        return redirect(url_for('login', user_id='user'))
     if request.method == 'POST':
-        title = html.escape(request.form.get('title', ''), quote=True)
-        description = html.escape(request.form.get('description', ''), quote=True)
-        event_date = request.form.get('event_date', '')
-
-        conn = sqlite3.connect('mock_db.sqlite3')
-        cur = conn.cursor()
-        cur.execute(
-            "UPDATE events SET title=?, description=?, event_date=? WHERE id=?",
-            (title, description, event_date, event_id)
-        )
+        title = request.form['title']
+        content = request.form['content']
+        conn = get_db_connection()
+        conn.execute('UPDATE boards SET title = ?, content = ?, updated_at = ? WHERE id = ?', (title, content, datetime.now(), post_id))
         conn.commit()
         conn.close()
-        return redirect(url_for('calendar'))
-
+        return redirect(url_for('board'))
+    conn = get_db_connection()
+    post = conn.execute('SELECT * FROM boards WHERE id = ?', (post_id,)).fetchone()
+    conn.close()
     return render_template_string('''
-        <!doctype html>
-        <h1>Edit Event</h1>
-        <form method="POST">
-            <label>Title:</label><br>
-            <input type="text" name="title" value="{{ ev[2] }}"><br>
-            <label>Description:</label><br>
-            <textarea name="description">{{ ev[3] }}</textarea><br>
-            <label>Event Date:</label><br>
-            <input type="date" name="event_date" value="{{ ev[4] }}"><br>
-            <input type="submit" value="Update Event">
+        <h1>Edit Post</h1>
+        <form method="post">
+            <input type="text" name="title" value="{{ post.title }}" required>
+            <textarea name="content" required>{{ post.content }}</textarea>
+            <button type="submit">Update Post</button>
         </form>
-    ''', ev=ev)
+    ''', post=post)
 
-@app.route('/calendar/delete/<int:event_id>', methods=['POST'])
-def delete_event(event_id):
+@app.route('/board/delete/<post_id>', methods=['POST'])
+def delete_post(post_id):
     if 'user_id' not in session:
-        abort(401)
-    user_id = int(session['user_id'])
-    is_admin = bool(session.get('is_admin'))
-
-    conn = sqlite3.connect('mock_db.sqlite3')
-    cur = conn.cursor()
-    cur.execute("SELECT user_id FROM events WHERE id=?", (event_id,))
-    ev = cur.fetchone()
-    conn.close()
-
-    if not ev:
-        abort(404)
-    if not is_admin and ev[0] != user_id:
-        abort(403)
-
-    conn = sqlite3.connect('mock_db.sqlite3')
-    cur = conn.cursor()
-    cur.execute("UPDATE events SET is_blocked=1 WHERE id=?", (event_id,))
+        return redirect(url_for('login', user_id='user'))
+    conn = get_db_connection()
+    conn.execute('UPDATE boards SET is_blocked = 1 WHERE id = ?', (post_id,))
     conn.commit()
     conn.close()
-    return redirect(url_for('calendar'))
+    return redirect(url_for('board'))
 
-@app.route('/admin/block/<int:event_id>', methods=['POST'])
-def block_event(event_id):
-    if 'user_id' not in session:
-        abort(401)
-    if not session.get('is_admin'):
-        abort(403)
+@app.route('/board/<post_id>')
+def view_post(post_id):
+    conn = get_db_connection()
+    post = conn.execute('SELECT * FROM boards WHERE id = ?', (post_id,)).fetchone()
+    conn.close()
+    return render_template_string('''
+        <h1>{{ post.title }}</h1>
+        <p>{{ post.content }}</p>
+        <a href="/board">Back to Board</a>
+    ''', post=post)
 
-    conn = sqlite3.connect('mock_db.sqlite3')
-    cur = conn.cursor()
-    cur.execute("UPDATE events SET is_blocked=1 WHERE id=?", (event_id,))
+@app.route('/admin/block/<post_id>', methods=['POST'])
+def block_post(post_id):
+    if 'user_id' not in session or not session['is_admin']:
+        return redirect(url_for('login', user_id='user'))
+    conn = get_db_connection()
+    conn.execute('UPDATE boards SET is_blocked = 1 WHERE id = ?', (post_id,))
     conn.commit()
     conn.close()
-    return redirect(url_for('calendar'))
+    return redirect(url_for('board'))
 
-@app.route('/calendar/report/<int:event_id>', methods=['POST'])
-def report_event(event_id):
+@app.route('/board/report/<post_id>', methods=['POST'])
+def report_post(post_id):
     if 'user_id' not in session:
-        abort(401)
-    user_id = int(session['user_id'])
-
-    # 공격적 입력 이스케이프
-    reason = html.escape(request.form.get('reason', ''), quote=True)
-
-    try:
-        conn = sqlite3.connect('mock_db.sqlite3')
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO event_reports (event_id, user_id, reason) VALUES (?, ?, ?)",
-            (event_id, user_id, reason)
-        )
-        conn.commit()
-    except sqlite3.Error:
-        pass
-    finally:
-        conn.close()
-
-    return redirect(url_for('calendar'))
+        return redirect(url_for('login', user_id='user'))
+    reason = request.form['reason']
+    conn = get_db_connection()
+    conn.execute('INSERT INTO reports (post_id, user_id, reason) VALUES (?, ?, ?)', (post_id, session['user_id'], reason))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('board'))
 
 if __name__ == '__main__':
+    conn = get_db_connection()
+    conn.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, is_admin BOOLEAN)')
+    conn.execute('CREATE TABLE IF NOT EXISTS boards (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, title TEXT, content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, is_blocked BOOLEAN DEFAULT 0, FOREIGN KEY (user_id) REFERENCES users(user_id))')
+    conn.execute('CREATE TABLE IF NOT EXISTS reports (report_id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, user_id INTEGER, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (post_id) REFERENCES boards(id), FOREIGN KEY (user_id) REFERENCES users(user_id))')
+    conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+    conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+    conn.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (1, 'First Post', 'This is the first post.'))
+    conn.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (2, 'Admin Post', 'This post was written by an admin.'))
+    conn.commit()
+    conn.close()
     app.run(debug=True)

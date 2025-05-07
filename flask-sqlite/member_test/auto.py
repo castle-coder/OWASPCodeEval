@@ -1,5 +1,8 @@
 import requests
 import time
+import os
+import re
+import subprocess
 
 # RunPod API 설정
 RUN_URL = "https://api.runpod.ai/v2/sggrcbr26xtyx4/run"
@@ -70,11 +73,6 @@ You only provide the code. Do not provide any explanations.
 
 
 
-
-
-
-
-
 # 요청 payload
 payload = {
     "input": {
@@ -101,6 +99,20 @@ headers = {
     "Authorization": f"Bearer {API_KEY}"
 }
 
+# 저장 경로 설정
+save_dir = os.path.dirname(os.path.abspath(__file__))
+app_path = os.path.join(save_dir, "app.py")
+db_path = os.path.join(save_dir, "mock_db.sqlite3")
+test_path = os.path.join(save_dir, "security_test.py")
+
+# 기존 파일 제거
+os.makedirs(save_dir, exist_ok=True)
+if os.path.exists(app_path):
+    os.remove(app_path)
+if os.path.exists(db_path):
+    os.remove(db_path)
+
+
 # 1단계: Run 요청 보내기
 run_response = requests.post(RUN_URL, headers=headers, json=payload)
 if run_response.status_code != 200:
@@ -108,7 +120,6 @@ if run_response.status_code != 200:
     exit()
 
 job_id = run_response.json().get("id")
-print(f"⏳ 작업 제출 완료! Job ID: {job_id}")
 
 # 2단계: 상태 확인 (비동기 완료 대기)
 while True:
@@ -121,15 +132,33 @@ while True:
             # 마크다운 텍스트 추출 및 출력
             tokens = status_data["output"][0]["choices"][0]["tokens"]
             markdown_output = tokens[0] if tokens else ""
-            print("\n✅ 마크다운 응답 결과:\n")
-            print(markdown_output)
+            
+            # 코드 추출
+            parsed_code = markdown_output[10:-3].strip()
+
+            # app.py 저장
+            with open(app_path, "w", encoding="utf-8") as f:
+                f.write(parsed_code)
+                
+            app_process = subprocess.Popen(["python3", "app.py"], cwd=save_dir, stdin=subprocess.DEVNULL)
+            
+            time.sleep(3)  # 서버 시작 대기
+            
+            # security_test.py가 존재하면 실행
+            if os.path.exists(test_path):
+                subprocess.run(["python3", test_path], check=True)
+            else:
+                print("⚠️ security_test.py 파일이 존재하지 않습니다.")
+                
+            
+            
+            app_process.terminate()
+            app_process.wait()
         except Exception as e:
-            print("⚠️ 결과 파싱 오류:", e)
-            print("전체 응답:", status_data)
+            print("오류:", e)
         break
     elif status == "FAILED":
         print("❌ 작업 실패:", status_data)
         break
     else:
-        print("⌛ 처리 중... 다시 확인")
         time.sleep(1.5)

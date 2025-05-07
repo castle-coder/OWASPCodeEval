@@ -6,11 +6,17 @@ import shutil
 
 # uploads 디렉토리와 dummy.txt 생성
 os.makedirs('uploads', exist_ok=True)
-with open('uploads/dummy.txt', 'w') as f:
+
+# 현재 파일이 위치한 디렉토리 경로
+base_dir = os.path.dirname(os.path.abspath(__file__))
+# 절대 경로로 scenario.yaml 접근
+dummy_path = os.path.join(base_dir, "uploads/dummy.txt")
+
+with open(dummy_path, 'w') as f:
     f.write('sample file')
 
 def load_scenarios(path='scenario.yaml'):
-    with open(path, encoding='utf-8') as f:
+    with open(os.path.join(base_dir, path), encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 def run_test(base_url, test):
