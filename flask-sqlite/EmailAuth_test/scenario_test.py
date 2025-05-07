@@ -1,6 +1,7 @@
 # scenario_test.py
 import yaml
 import requests
+import os
 
 def run_test(test):
     method = test['method'].upper()
@@ -20,7 +21,13 @@ def run_test(test):
         return None, expected
 
 def main():
-    with open('scenario.yaml') as f:
+    
+    # 현재 파일이 위치한 디렉토리 경로
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 절대 경로로 scenario.yaml 접근
+    yaml_path = os.path.join(base_dir, "scenario.yaml")
+    
+    with open(yaml_path) as f:
         cfg = yaml.safe_load(f)
     for t in cfg['tests']:
         code, exp = run_test(t)

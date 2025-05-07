@@ -1,0 +1,135 @@
+# scenario.yaml
+base_url: "http://127.0.0.1:5000"
+db_path: "mock_db.sqlite3"
+
+scenarios:
+  # A1: Broken Access Control
+  - id: "A1_BrokenAccess_Edit"
+    name: "일반 사용자가 다른 사용자의 일정 수정 시도"
+    description: "일반 사용자는 다른 사용자의 일정을 수정할 수 없어야 합니다"
+    method: "POST"
+    path: "/calendar/edit/2"
+    login_path: "/login/1"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    data:
+      title: "Hacked"
+      description: "Hacked"
+      start_time: "2025-05-10 10:00:00"
+      end_time: "2025-05-10 11:00:00"
+    expected_status: 403
+    check_db: false
+
+  # A2: Broken Authentication
+  - id: "A2_BrokenAuth_AnyPassword"
+    name: "HTTPBasic 인증 우회"
+    description: "비밀번호 검증 없이 아무 비밀번호로도 로그인 가능해서는 안 됩니다"
+    method: "GET"
+    path: "/login/1"
+    # HTTPBasic 미사용이므로 실제론 로그인만으로 세션이 걸리면 취약
+    expected_status: 307    # Redirect to /calendar
+    check_db: false
+
+  # A3: Injection (SQL Injection)
+  - id: "A3_SQLInjection_CreateEvent"
+    name: "이벤트 생성 SQL 인젝션"
+    description: "이벤트 생성 시 SQL Injection이 발생하면 안 됩니다"
+    method: "POST"
+    path: "/calendar"
+    login_path: "/login/1"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    data:
+      title: "'; DROP TABLE users;--"
+      description: "test"
+      start_time: "2025-06-01 09:00:00"
+      end_time: "2025-06-01 10:00:00"
+    expected_status: 302
+    check_db: true
+    db_query: "SELECT title FROM events ORDER BY id DESC LIMIT 1;"
+
+  # A4: Insecure Design (No Rate Limiting)
+  - id: "A4_InsecureDesign_NoRateLimit"
+    name: "로그인 무한 시도 방어 부재"
+    description: "로그인 시도에 대한 rate-limit 또는 lockout이 있어야 합니다"
+    method: "GET"
+    path: "/login/1"
+    # 반복 20회 시, 일정 시간 후 차단이 있어야 하나 없는 경우를 감지
+    loop: 20
+    expected_status: 307
+    check_db: false
+
+  # A5: Security Misconfiguration
+  - id: "A5_SecurityMisconfig_Debug"
+    name: "디버그 모드 활성화 확인"
+    description: "애플리케이션이 디버그 모드로 실행 중이면 안 됩니다"
+    method: "GET"
+    path: "/"
+    expected_status: 404   # 디버그가 켜져 있으면 500 혹은 디버그 화면이 뜰 수 있음
+    check_db: false
+
+  # A6: Vulnerable and Outdated Components
+  - id: "A6_Outdated_SQLite"
+    name: "SQLite 버전 확인"
+    description: "알려진 취약점 있는 오래된 SQLite 버전을 사용 중인지 검사"
+    method: "SQLITE_VERSION"
+    path: "" 
+    expected_version_min: "3.30.0"
+    check_db: false
+
+  # A7: Cross-Site Scripting (XSS)
+  - id: "A7_XSS_EventDescription"
+    name: "이벤트 설명 XSS"
+    description: "이벤트 설명에 스크립트 태그가 저장/표출되어서는 안 됩니다"
+    method: "POST"
+    path: "/calendar"
+    login_path: "/login/1"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    data:
+      title: "test"
+      description: "<script>alert(1)</script>"
+      start_time: "2025-06-02 09:00:00"
+      end_time: "2025-06-02 10:00:00"
+    expected_status: 302
+    check_db: true
+    db_query: "SELECT description FROM events ORDER BY id DESC LIMIT 1;"
+
+  # A8: Insecure Deserialization (Session Hijack)
+  - id: "A8_InsecureDeserial_Session"
+    name: "세션 쿠키 변조 시도"
+    description: "세션 쿠키를 변조해 다른 사용자로 위장할 수 없어야 합니다"
+    method: "GET"
+    path: "/calendar"
+    tamper_cookie:
+      session: "tampered_value"
+    expected_status: 401
+    check_db: false
+
+  # A9: Security Logging and Monitoring Failures
+  - id: "A9_InsufficientLogging"
+    name: "신고 기능 악성 입력"
+    description: "신고 기능에 악성 입력이 DB에 저장되지 않아야 합니다"
+    method: "POST"
+    path: "/report"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    data:
+      content: "<script>alert(1)</script>"
+    expected_status: 302
+    check_db: true
+    db_query: "SELECT report_id, user_id, content FROM reports ORDER BY report_id DESC LIMIT 1;"
+
+  # A10: SSRF (Server-Side Request Forgery)
+  - id: "A10_SSRF_AdminCancel"
+    name: "관리자 취소 SSRF 시도"
+    description: "관리자 전용 취소 엔드포인트에 내부 메타데이터 URL을 요청해선 안 됩니다"
+    method: "POST"
+    path: "/admin/cancel/1"
+    login_path: "/login/2"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    # SSRF 공격 시나리오: payload 대신 단순 호출
+    data: {}
+    expected_status: 403
+    check_db: false

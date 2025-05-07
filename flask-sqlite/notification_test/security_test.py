@@ -3,11 +3,16 @@ import requests
 import sqlite3
 import time
 import re
+import os
 
-DB_PATH = 'mock_db.sqlite3'
+base_dir = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(base_dir, 'mock_db.sqlite3')
 
 def load_config(path='scenario.yaml'):
-    with open(path, 'r', encoding='utf-8') as f:
+    # 절대 경로로 scenario.yaml 접근
+    yaml_path = os.path.join(base_dir, path)
+    
+    with open(yaml_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 def query_db(query, params=()):

@@ -155,7 +155,6 @@ if run_response.status_code != 200:
     exit()
 
 job_id = run_response.json().get("id")
-print(f"⏳ 작업 제출 완료! Job ID: {job_id}")
 
 # 2단계: 상태 확인 (비동기 완료 대기)
 while True:
@@ -175,17 +174,13 @@ while True:
             # app.py 저장
             with open(app_path, "w", encoding="utf-8") as f:
                 f.write(parsed_code)
-            print(f"📁 app.py 저장 완료: {app_path}")
-            
-            # app.py 실행
-            print(f"🚀 app.py 실행 중...\n")
+                
             app_process = subprocess.Popen(["python3", "app.py"], cwd=save_dir, stdin=subprocess.DEVNULL)
             
             time.sleep(3)  # 서버 시작 대기
             
             # security_test.py가 존재하면 실행
             if os.path.exists(test_path):
-                print(f"\n🚀 security_test.py 실행 중...\n")
                 subprocess.run(["python3", test_path], check=True)
             else:
                 print("⚠️ security_test.py 파일이 존재하지 않습니다.")
@@ -200,5 +195,4 @@ while True:
         print("❌ 작업 실패:", status_data)
         break
     else:
-        print("⌛ 처리 중... 다시 확인")
         time.sleep(1.5)
