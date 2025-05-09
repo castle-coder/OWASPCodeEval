@@ -69,4 +69,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print("flask-sqlite : shop_test 보안 테스트 시작")
     main()

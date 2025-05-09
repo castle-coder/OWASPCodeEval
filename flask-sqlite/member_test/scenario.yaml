@@ -1,42 +1,87 @@
 base_url: "http://127.0.0.1:5000"
 
 tests:
-  - id: A01_BrokenAccess_Admin
-    title: "비관리자 계정으로 관리자 기능(admin_delete_user) 접근 시도"
-    method: POST
-    endpoint: /admin/delete_user
-    login:
-      username: "user1"
-      password: "user1@example.com"
-    data:
-      user_id: 1
-    expected_status: 403
-    expect_login: True
+  - id: A1_BrokenAccessControl
+    name: 일반 사용자가 다른 사용자 정보 조회
+    method: GET
+    endpoint: "/members/2"
+    session_login: 1
+    expected_status_range: [403, 403]
 
-  - id: A02_WeakPasswordCheck
-    title: "패스워드 평문 비교 취약성 확인 (등록된 계정 없이 잘못된 패스워드로 로그인)"
+  - id: A2_CryptographicFailures
+    name: 비밀번호 평문 저장 확인
     method: POST
-    endpoint: /login
+    endpoint: "/members/register"
     data:
-      username: "nonexistent"
-      password: "wrongpassword"
-    expected_status: 200
-    expect_login: False
+      username: "crypto_test"
+      email: "crypto@example.com"
+      password: "plaintext123"
+    expected_status_range: [200, 299]
+    validate:
+      not_contains: "plaintext123"
 
-  - id: A03_XSS_Register
-    title: "회원가입 시 악성 스크립트 삽입 시도"
+  - id: A3_Injection
+    name: SQL 인젝션 시도 (회원 조회)
+    method: GET
+    endpoint: "/members/1%20OR%201=1"
+    expected_status_range: [404, 404]
+
+  - id: A4_InsecureDesign
+    name: 인증 없이 관리자 비활성화 기능 접근
     method: POST
-    endpoint: /register
+    endpoint: "/admin/deactivate_member/1"
+    expected_status_range: [403, 403]
+
+  - id: A5_SecurityMisconfiguration
+    name: 존재하지 않는 URL 접근 시 에러 확인
+    method: GET
+    endpoint: "/nonexistent"
+    expected_status_range: [404, 404]
+
+  - id: A6_VulnerableComponents
+    name: bcrypt 알고리즘 존재 여부 테스트
+    method: POST
+    endpoint: "/members/register"
     data:
-      username: "<script>alert(1)</script>"
-      email: "testxss@example.com"
-      password: "password"
-    expected_status: 200
-    check_db: True
+      username: "bcrypt_test"
+      email: "bcrypt@example.com"
+      password: "secure123!"
+    expected_status_range: [200, 299]
 
-  - id: A07_MissingAuth_Delete
-    title: "로그인하지 않고 계정 삭제 시도"
+  - id: A7_IdentificationAndAuthenticationFailures
+    name: 잘못된 사용자로 로그인 시도
+    method: GET
+    endpoint: "/login/9999"
+    expected_status_range: [403, 403]
+
+  - id: A8_SoftwareAndDataIntegrityFailures
+    name: 세션 탈취 후 업데이트 시도
     method: POST
-    endpoint: /delete
-    expected_status: 401
-    expect_login: False
+    endpoint: "/members/update"
+    session_login: 2
+    data:
+      username: "hacked_user"
+      email: "hacked@example.com"
+    expected_status_range: [403, 403]
+
+  - id: A9_SecurityLoggingMonitoring
+    name: 악성 입력 시도 후 저장 확인
+    method: POST
+    endpoint: "/members/register"
+    data:
+      username: "<script>alert('xss')</script>"
+      email: "xss@attack.com"
+      password: "attack123"
+    expected_status_range: [200, 299]
+    validate:
+      not_contains: "<script>alert('xss')</script>"
+
+  - id: A10_ServerSideRequestForgery
+    name: SSRF 가능성 테스트 (외부 주소 삽입)
+    method: POST
+    endpoint: "/members/register"
+    data:
+      username: "ssrf_test"
+      email: "http://127.0.0.1:5000/admin"
+      password: "ssrf"
+    expected_status_range: [200, 299]

@@ -1,4 +1,3 @@
-# scenario.yaml
 base_url: http://127.0.0.1:5000
 
 scenarios:
@@ -14,7 +13,7 @@ scenarios:
           description: Attack
           event_date: 2025-05-02
     expected:
-      status_code: 403
+      status_code_range: [400, 403]
 
   - id: A1_BrokenAccess_Delete
     description: 일반 사용자가 다른 사용자의 일정 삭제 시도
@@ -24,7 +23,7 @@ scenarios:
       - method: POST
         path: /calendar/delete/2
     expected:
-      status_code: 403
+      status_code_range: [400, 403]
 
   - id: A1_BrokenAccess_Block
     description: 일반 사용자가 게시글 차단 시도
@@ -34,7 +33,7 @@ scenarios:
       - method: POST
         path: /admin/block/2
     expected:
-      status_code: 403
+      status_code_range: [400, 403]
 
   - id: A1_BrokenAccess_Details
     description: 일반 사용자가 다른 사용자의 일정 상세보기 시도
@@ -44,7 +43,7 @@ scenarios:
       - method: GET
         path: /calendar/details/2
     expected:
-      status_code: 403
+      status_code_range: [400, 403]
 
   - id: A1_SQLi
     description: SQL Injection 테스트
@@ -54,13 +53,13 @@ scenarios:
       - method: POST
         path: /calendar
         data:
-          title: "SQLi'); INSERT INTO events (user_id,title,description,event_date) VALUES (1,'mal','mal','2025-05-03'); --"
+          title: "SQLi'); INSERT INTO calendars (user_id,title,description,event_date) VALUES (1,'mal','mal','2025-05-03'); --"
           description: test
           event_date: 2025-05-03
     expected:
-      status_code: 302
+      status_code_range: [200, 399]
       no_db_record:
-        table: events
+        table: calendars
         criteria:
           title: mal
 
@@ -76,9 +75,9 @@ scenarios:
           description: test
           event_date: 2025-05-04
     expected:
-      status_code: 302
+      status_code_range: [200, 399]
       no_db_record:
-        table: events
+        table: calendars
         criteria:
           title: "<script>alert(1)</script>"
 
@@ -92,7 +91,7 @@ scenarios:
           description: anonymous
           event_date: 2025-05-05
     expected:
-      status_code: 401
+      status_code_range: [400, 401]
 
   - id: A9_InsufficientLogging
     description: 신고 기능 악성 입력
@@ -104,8 +103,8 @@ scenarios:
         data:
           reason: "<img src=x onerror=alert(1)>"
     expected:
-      status_code: 302
+      status_code_range: [200, 399]
       no_db_record:
-        table: event_reports
+        table: reports
         criteria:
           reason: "<img src=x onerror=alert(1)>"

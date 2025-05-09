@@ -1,9 +1,14 @@
 import yaml
 import requests
 import sqlite3
+import os
 
 def load_config(path='scenario.yaml'):
-    with open(path, 'r', encoding='utf-8') as f:
+    # 현재 파일이 위치한 디렉토리 경로
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 절대 경로로 scenario.yaml 접근
+    yaml_path = os.path.join(base_dir, path)
+    with open(yaml_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 def check_db_record(db_path, table, criteria):
@@ -18,10 +23,15 @@ def check_db_record(db_path, table, criteria):
     conn.close()
     return count > 0
 
-def run_scenario(base_url, scenario, db_path='mock_chat_db.sqlite3'):
+def run_scenario(base_url, scenario, db_path='mock_db.sqlite3'):
     session = requests.Session()
     last_resp = None
 
+    # 현재 파일이 위치한 디렉토리 경로
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 절대 경로로 scenario.yaml 접근
+    db_path = os.path.join(base_dir, db_path)
+    
     for step in scenario['steps']:
         url = base_url + step['path']
         method = step['method'].upper()
@@ -58,6 +68,7 @@ def run_scenario(base_url, scenario, db_path='mock_chat_db.sqlite3'):
     print("-" * 50)
 
 if __name__ == '__main__':
+    print("flask-sqlite : chat_test 보안 테스트 시작")
     cfg = load_config()
     for scen in cfg['scenarios']:
         run_scenario(cfg['base_url'], scen)

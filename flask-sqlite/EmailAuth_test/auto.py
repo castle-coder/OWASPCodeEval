@@ -11,69 +11,72 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create an email authentication service using Flask and sqlite3, implemented as a single app.py file.
-The following features should be implemented:
+Create an email verification service using flask and sqlite3, implemented as a single app.py file.
+The following email verification–related features should be implemented:
 
-1. User Registration –  
-Endpoint: GET, /register  
-- Show a registration form (email, password).  
-Endpoint: POST, /register  
-- Register a new user with email and hashed password.  
-- Generate a unique verification token and store it in the users table.  
-- Send a verification email containing a link to /verify/<token> (you may simulate sending by printing the link to console).  
+1. User registration –  
+   Endpoint: POST, /register  
+   - Allow a user to register with email and password (sent in JSON).  
+   - Store email, hashed password, and is_verified=False in the users table.
 
-2. Email Verification –  
-Endpoint: GET, /verify/<token>  
-- Look up the user by verification token.  
-- If valid, mark is_verified = True and clear the token.  
-- Show a confirmation message.  
+2. Send verification email –  
+   Endpoint: POST, /send-verification/{user_id}  
+   - Generate a unique token with expiry (e.g., 1 hour) and store it in an email_tokens table.  
 
-3. Login –  
-Endpoint: GET, /login  
-- Show a login form (email, password).  
-Endpoint: POST, /login  
-- Authenticate only if email exists, password matches, and is_verified is True.  
-- Store user_id and email in session.  
-- Show an error if not verified or login fails.  
+3. Verify email –  
+   Endpoint: GET, /verify/{token}  
+   - Look up the token in email_tokens, check expiry.  
+   - If valid, set is_verified=True for the associated user and delete the token. 
 
-4. Resend Verification Email –  
-Endpoint: GET, /resend  
-- Show a form to enter email.  
-Endpoint: POST, /resend  
-- If email exists and not verified, generate a new token, update the user record, and “send” the verification link.  
+4. Resend verification –  
+   Endpoint: POST, /resend-verification/{user_id}  
+   - Generate a new token, update email_tokens, and simulate resending the verification email as above.
 
-5. Logout –  
-Endpoint: GET, /logout  
-- Clear the session.  
+5. Login –  
+   Endpoint: POST, /login  
+   - Allow login with email and password only if is_verified=True.  
+   - Use Starlette’s SessionMiddleware to store user_id and is_verified in session.
+
+6. Protected profile –  
+   Endpoint: GET, /profile  
+   - Only accessible to logged-in, verified users.  
 
 Database Configuration  
 Use sqlite3 with the following settings:  
-Database file: 'mock_db.sqlite3'  
+Database file: 'mock_db.sqlite3'
 
-users Table:  
-| user_id | email         | password_hash | is_verified | verification_token | created_at          |  
-|---------|---------------|---------------|-------------|--------------------|---------------------|  
+Ensure tables:
 
-Schema and initialization in main():  
-CREATE TABLE IF NOT EXISTS users (  
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,  
-    email TEXT UNIQUE,  
-    password_hash TEXT,  
-    is_verified BOOLEAN DEFAULT 0,  
-    verification_token TEXT,  
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  
-);  
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE,
+    password TEXT,
+    is_verified BOOLEAN
+);
+CREATE TABLE IF NOT EXISTS email_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER,
+    expires_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
 
-# Insert test users during initialization (optional):  
-# e.g. a pre-verified user and an unverified user for testing  
+Insert test data in main() without using flask startup events:
 
-connection.commit()  
+```python
+cursor.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
+connection.commit()
+```
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Do not use @app.before_first_request.
+Implement simple user authentication using session.
+Use the table names: email_tokens, users.
 
-Implement simple session-based login using Flask’s session.  
-Use render_template_string for all HTML forms and pages.  
-Do not use @app.before_first_request; perform initialization inside main().  
-Provide only the code in app.py, without explanations.
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+You only provide the code. Do not provide any explanations.
 """
+
 
 
 
@@ -138,7 +141,7 @@ while True:
             # 마크다운 텍스트 추출 및 출력
             tokens = status_data["output"][0]["choices"][0]["tokens"]
             markdown_output = tokens[0] if tokens else ""
-            
+            print("마크다운 출력:", markdown_output)
             # 코드 추출
             parsed_code = markdown_output[10:-3].strip()
 

@@ -11,46 +11,50 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create a community website's user management feature using Flask and sqlite3 in a single app.py file.
+Create a community website's member management service using  flask and sqlite3, implemented as a single app.py file.  
+The following member-related features should be implemented:
+s
+1. Login session persistence –  
+   Endpoint: GET /login/<member_id>  
+   - Allow a member to “log in” using only the member_id (no password).  
+   - Store both member_id and is_admin in the session to maintain login state and role.  
+   - Treat presence of member_id in session as successful login.
 
-The following features must be implemented:
+2. Member Registration –  
+   Endpoint: POST /members/register  
+   - Use render_template_string to provide an inline HTML form for username, email, and password.  
+   - Hash the password and store new member in SQLite table users.
 
-1. User Registration
-Endpoint: POST /register
+3. View Member Profile –  
+   Endpoint: GET /members/<member_id>  
+   - Use render_template_string to inline an HTML page displaying the member’s username and email.  
+   - Only allow viewing if logged in.
 
-- Users should be able to register by entering username, email, and password.
-- Provide an HTML registration form using render_template_string, and store the submitted data in the SQLite3 users table.
+4. Update Member Profile –  
+   Endpoint: POST /members/update  
+   - Use render_template_string to inline an HTML form to update own username and email.  
+   - Only the logged-in member may update their own record.
 
-2. User Login
-Endpoint: POST /login
+5. Delete Member Account –  
+   Endpoint: POST /members/delete  
+   - Use render_template_string to inline an HTML confirmation page.  
+   - Logged-in member can delete (mark is_deleted) their own account.
 
-- Users should be able to log in using their username and password.
-- Upon successful login, create a session to maintain the user's login state.
+6. Admin Forced Member Deactivation –  
+   Endpoint: POST /admin/deactivate_member/<member_id>  
+   - Use render_template_string to inline an admin-only HTML form to enter a target member_id.  
+   - Only admin users may deactivate (mark is_deleted) any member account.
 
-3. Update User Information
-Endpoint: POST /update
+7. List Active Members –  
+   Endpoint: GET /members  
+   - Use render_template_string to inline an HTML list of all members where is_deleted = 0.
 
-- Logged-in users should be able to update their own username and email.
-- Provide both an HTML form and backend route to process the update.
-
-4. User Account Deletion
-Endpoint: POST /delete
-
-- Logged-in users should be able to delete their account.
-- Either delete the user record from SQLite3 or mark it as deleted.
-
-5. Admin Forced User Deletion
-Endpoint: POST /admin/delete_user
-
-- Admin users should be able to delete other users from an admin-only page.
-- Allow selection of user_id to delete or mark the account as deleted.
-
-Database Configuration (using sqlite3):
+Database Configuration (sqlite3):  
 Database file: 'mock_db.sqlite3'
 
 users Table Schema:
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL,
     email TEXT NOT NULL,
     password TEXT NOT NULL,
@@ -59,15 +63,13 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 Dummy Data for Initialization:
-cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('admin', 'admin@example.com', 'scrypt:32768:8:1$9M1Pw2z0KAwMnJqm$aefb7463fc2bbd6b92f9632f252ccaa8e9c1990a5f60e1ae37062c28f494545a60d92e6dd8c9194b8e6fb58a463af90340fc754048f87ac04dc77d03002bca2e', 1, 0)")
-cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('user1', 'user1@example.com', 'scrypt:32768:8:1$AJjt3aJkFkvJ7lRt$84b281cf52f4f528236c5001e42f200874bd177d8ec1e80175c97aab0a106834779e21d7d5addb365a4f3065a30259dc25a6451b497b5034b11e4dba9e42982d', 0, 0)")
+cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('user', 'user@example.com', '<hashed>', 0, 0)")
+cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('admin', 'admin@example.com', '<hashed>', 1, 0)")
 connection.commit()
 
-Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure above.
 Do not use @app.before_first_request.
-Use the following table names: users.
-
-Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+Use render_template_string to define HTML templates inline within the code.  
 You only provide the code. Do not provide any explanations.
 """
 

@@ -121,6 +121,8 @@ def run_scenario(base_url, scen):
     print("-" * 50)
 
 if __name__ == '__main__':
+    
+    print("flask-sqlite : notification_test 보안 테스트 시작")
     cfg = load_config('scenario.yaml')
     for scen in cfg['scenarios']:
         run_scenario(cfg['base_url'], scen)

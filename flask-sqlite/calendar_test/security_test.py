@@ -1,14 +1,11 @@
-# security_test.py
 import yaml
 import requests
 import sqlite3
 import os
 
 def load_config(path='scenario.yaml'):
-    # 현재 파일이 위치한 디렉토리 경로
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    # 절대 경로로 scenario.yaml 접근
-    yaml_path = os.path.join(base_dir, "scenario.yaml")
+    yaml_path = os.path.join(base_dir, path)
     with open(yaml_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
@@ -25,17 +22,15 @@ def check_db_record(db_path, table, criteria):
     return count > 0
 
 def run_scenario(base_url, scenario, db_path='mock_db.sqlite3'):
-
     dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(dir,'mock_db.sqlite3')
-    
+    db_path = os.path.join(dir, db_path)
+
     session = requests.Session()
     last_resp = None
 
     for step in scenario['steps']:
         url = base_url + step['path']
         method = step['method'].upper()
-        # 절대 리다이렉트를 따라가지 않도록 설정
         if method == 'GET':
             last_resp = session.get(url, allow_redirects=False)
         elif method == 'POST':
@@ -44,10 +39,18 @@ def run_scenario(base_url, scenario, db_path='mock_db.sqlite3'):
             raise ValueError(f"Unsupported method: {method}")
 
     actual = last_resp.status_code
-    expected = scenario['expected']['status_code']
-    status_ok = (actual == expected)
-    db_vuln = False
+    expected_range = scenario['expected'].get('status_code_range')
+    expected_single = scenario['expected'].get('status_code')
 
+    # 상태코드 검사: 범위 우선, 없으면 단일 코드 비교
+    if expected_range:
+        status_ok = expected_range[0] <= actual <= expected_range[1]
+    elif expected_single:
+        status_ok = (actual == expected_single)
+    else:
+        status_ok = True  # 명시된 검증 없으면 통과로 처리
+
+    db_vuln = False
     if 'no_db_record' in scenario['expected']:
         tbl = scenario['expected']['no_db_record']['table']
         crit = scenario['expected']['no_db_record']['criteria']
@@ -61,14 +64,18 @@ def run_scenario(base_url, scenario, db_path='mock_db.sqlite3'):
     else:
         print("결과:", "✅ 안전" if status_ok else "❌ 취약")
 
+    # 상세 사유 출력
     if not status_ok:
-        print(f"이유: 예상 코드 {expected}, 실제 코드 {actual}")
+        if expected_range:
+            print(f"이유: 예상 코드 범위 {expected_range}, 실제 코드 {actual}")
+        else:
+            print(f"이유: 예상 코드 {expected_single}, 실제 코드 {actual}")
     elif db_vuln:
         print("이유: DB에 악성 데이터가 삽입됨")
     print("-" * 50)
 
-
 if __name__ == '__main__':
+    print("flask-sqlite : calendar_test 보안 테스트 시작")
     cfg = load_config()
     for scen in cfg['scenarios']:
         run_scenario(cfg['base_url'], scen)

@@ -44,6 +44,7 @@ def run_test(test, session, base_url):
         print("--------------------------------------------------")
 
 def main():
+    
     with open("scenario.yaml", "r", encoding='utf-8') as file:
         config = yaml.safe_load(file)
 

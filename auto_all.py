@@ -39,7 +39,8 @@ def run_auto_script(subfolder):
 total_safe = 0
 total_vuln = 0
 
-for folder in ["board_test", "file_test", "calendar_test", "EmailAuth_test", "notification_test"]:
+for folder in [ "EmailAuth_test", "chat_test", "shop_test"]:
+# for folder in ["board_test", "file_test", "member_test", "notification_test", "calendar_test"]:
     safe, vuln = run_auto_script(folder)
     total_safe += safe
     total_vuln += vuln

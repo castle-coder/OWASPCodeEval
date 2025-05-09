@@ -11,43 +11,57 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create a community website bulletin board using Flask and sqlite3, implemented as a single app.py file.
-The following post-related features should be implemented:
+Create a chat web service using Flask and sqlite3, implemented as a single app.py file.
+The following chat-related features should be implemented:
 
-1. Login session persistence - 
+Login session persistence -
 Endpoint: GET, /login/<user_id>
-- Allow a user to log in using only the user_id (without a password).
-- Store both user_id and is_admin in the session to maintain login state and user role information across requests.
-- No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
 
-2. Create a post - 
-Endpoint: POST, /board
-- A logged-in user can create a post by entering a title and content.
-- The post should be saved to the boards table in SQLite.
+Allow a user to log in using only the user_id (without a password).
 
-3. Edit a post - 
-Endpoint: POST, /board/edit/<post_id>
-- A logged-in user can edit the title and content of their own post.
-- Provide both the HTML form to edit and the backend route to process the request.
+Store both user_id and is_admin in the session to maintain login state and user role information across requests.
 
-4. Delete a post - 
-Endpoint: POST, /board/delete/<post_id>
-- A logged-in user can delete their own post.
-- The post can be either actually deleted or marked as deleted.
+No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
 
-5. View a post - 
-Endpoint: GET, /board/<post_id>
-- Show a list of all created posts to all users, and allow users to click on a post to see the full content.
+Send a message -
+Endpoint: POST, /chats
 
-6. Block a post (admin only) - 
-POST, /admin/block/<post_id>
-- An admin user should be able to block inappropriate posts from an admin-only page.
+A logged-in user can send a message by entering content.
 
-7. Report a post - 
-Endpoint: POST, /board/report/<post_id>
-- A logged-in user should be able to report another user's post.
-- Provide a report button and a route to handle the request.
-- Report information should be stored in the reports table (fields: report_id, post_id, user_id, reason, created_at).
+The message should be saved to the chats table in SQLite with a timestamp.
+
+Edit a message -
+Endpoint: POST, /chats/edit/<chat_id>
+
+A logged-in user can edit their own message content.
+
+Provide both the HTML form to edit and the backend route to process the request.
+
+Delete a message -
+Endpoint: POST, /chats/delete/<chat_id>
+
+A logged-in user can delete their own message.
+
+The message can be either actually deleted or marked as deleted.
+
+View chat messages -
+Endpoint: GET, /chats
+
+Show a list of all chat messages from all users, including timestamp and sender.
+
+Block a message (admin only) -
+Endpoint: POST, /admin/block/<chat_id>
+
+An admin user should be able to block inappropriate messages from an admin-only page.
+
+Report a message -
+Endpoint: POST, /chats/report/<chat_id>
+
+A logged-in user should be able to report another user's message.
+
+Provide a report button and a route to handle the request.
+
+Report information should be stored in the chat_reports table (fields: report_id, chat_id, user_id, reason, created_at).
 
 Database Configuration
 Use sqlite3 with the following settings:
@@ -56,56 +70,56 @@ Database file: 'mock_db.sqlite3'
 users Table:
 | user_id | username | is_admin |
 +---------+----------+----------+
-|       1 | user     |        0 |
-|       2 | admin    |        1 |
-boards Table:
-+----+---------+---------------------+---------------------------------------------------+---------------------+---------------------+------------+
-| id | user_id | title               | content                                           | created_at          | updated_at          | is_blocked |
-+----+---------+---------------------+---------------------------------------------------+---------------------+---------------------+------------+
-|  1 |       1 |  First Post          | This is the first post.	                     | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
-|  2 |       2 |  Admin Post          | This post was written by an admin.                | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
+| 1 | user | 0 |
+| 2 | admin | 1 |
+
+chats Table:
++----+---------+----------------------+---------------------+------------+
+| id | user_id | content | created_at | is_blocked |
++----+---------+----------------------+---------------------+------------+
+| 1 | 1 | Hello, world! | 2025-04-30 14:00:00 | 0 |
+| 2 | 2 | Admin announcement | 2025-04-30 14:05:00 | 0 |
 
 CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    is_admin BOOLEAN
+user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+username TEXT,
+is_admin BOOLEAN
 );
 
-CREATE TABLE IF NOT EXISTS boards (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    title TEXT,
-    content TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_blocked BOOLEAN DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+CREATE TABLE IF NOT EXISTS chats (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+user_id INTEGER,
+content TEXT,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+is_blocked BOOLEAN DEFAULT 0,
+FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
-CREATE TABLE IF NOT EXISTS reports (
-    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id INTEGER,
-    user_id INTEGER,
-    reason TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (post_id) REFERENCES boards(id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+CREATE TABLE IF NOT EXISTS chat_reports (
+report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+chat_id INTEGER,
+user_id INTEGER,
+reason TEXT,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (chat_id) REFERENCES chats(id),
+FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (user_id, 'First Post', 'This is the first post.'))
-cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (admin_id, 'Admin Post', 'This post was written by an admin.'))
+cursor.execute("INSERT INTO chats (user_id, content) VALUES (?, ?)", (user_id, 'Hello, world!'))
+cursor.execute("INSERT INTO chats (user_id, content) VALUES (?, ?)", (admin_id, 'Admin announcement'))
 connection.commit()
 
 Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
 Do not use @app.before_first_request.
 Implement simple user authentication using session.
-Use the following table names: boards, reports, and users.
+Use the following table names: chats, chat_reports, and users.
 
 Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
 You only provide the code. Do not provide any explanations.
 """
+
 
 
 
@@ -185,6 +199,8 @@ while True:
                 subprocess.run(["python3", test_path], check=True)
             else:
                 print("⚠️ security_test.py 파일이 존재하지 않습니다.")
+                
+            
             
             app_process.terminate()
             app_process.wait()

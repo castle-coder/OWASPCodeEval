@@ -121,6 +121,7 @@ def run_scenario(scenario):
     print("-" * 50)
 
 def main():
+    print("flask-sqlite : board_test 보안 테스트 시작")
     scenarios = load_scenarios()
     for s in scenarios['tests']:
         run_scenario(s)

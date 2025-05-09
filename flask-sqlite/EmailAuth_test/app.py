@@ -1,135 +1,113 @@
-from flask import Flask, request, render_template_string, redirect, url_for, session, flash
+from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+from datetime import datetime, timedelta
 import sqlite3
-import os
-import secrets
-from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.config['SECRET_KEY'] = 'your_secret_key'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mock_db.sqlite3'
+db = SQLAlchemy(app)
 
-DATABASE = 'mock_db.sqlite3'
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    is_verified = db.Column(db.Boolean, default=False)
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+class EmailToken(db.Model):
+    token = db.Column(db.String(120), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
 
-@app.before_request
-def before_request():
-    if 'user_id' in session:
-        g.user = get_db_connection().execute('SELECT * FROM users WHERE user_id = ?', (session['user_id'],)).fetchone()
-    else:
-        g.user = None
+def init_db():
+    with app.app_context():
+        db.create_all()
+        cursor = db.session.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
+        db.session.commit()
 
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['POST'])
 def register():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        conn = get_db_connection()
-        if conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone() is not None:
-            flash('Email already registered.')
-        else:
-            password_hash = generate_password_hash(password)
-            token = secrets.token_urlsafe()
-            conn.execute('INSERT INTO users (email, password_hash, verification_token) VALUES (?, ?, ?)', (email, password_hash, token))
-            conn.commit()
-            print(f"Verification link: {url_for('verify', token=token, _external=True)}")
-            flash('Registration successful. Please check your email for verification.')
-        conn.close()
-        return redirect(url_for('register'))
-    return render_template_string('''
-        <form method="post">
-            Email: <input type="email" name="email"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Register">
-        </form>
-    ''')
+    data = request.get_json()
+    new_user = User(email=data['email'], password=data['password'], is_verified=False)
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({'message': 'User registered successfully'}), 201
+
+@app.route('/send-verification/<int:user_id>', methods=['POST'])
+def send_verification(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    token = generate_verification_token(user.id)
+    email_token = EmailToken(token=token, user_id=user.id, expires_at=datetime.utcnow() + timedelta(hours=1))
+    db.session.add(email_token)
+    db.session.commit()
+    # Simulate sending email
+    return jsonify({'message': 'Verification email sent'}), 200
 
 @app.route('/verify/<token>', methods=['GET'])
 def verify(token):
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE verification_token = ?', (token,)).fetchone()
-    if user is not None:
-        conn.execute('UPDATE users SET is_verified = 1, verification_token = NULL WHERE user_id = ?', (user['user_id'],))
-        conn.commit()
-        flash('Email verified successfully.')
+    try:
+        user_id = verify_token(token)
+        user = User.query.get(user_id)
+        if user:
+            user.is_verified = True
+            db.session.commit()
+            return jsonify({'message': 'Email verified successfully'}), 200
+        else:
+            return jsonify({'message': 'User not found'}), 404
+    except SignatureExpired:
+        return jsonify({'message': 'Token expired'}), 400
+
+@app.route('/resend-verification/<int:user_id>', methods=['POST'])
+def resend_verification(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    token = generate_verification_token(user.id)
+    email_token = EmailToken.query.filter_by(user_id=user.id).first()
+    if email_token:
+        email_token.token = token
+        email_token.expires_at = datetime.utcnow() + timedelta(hours=1)
     else:
-        flash('Invalid verification token.')
-    conn.close()
-    return redirect(url_for('login'))
+        email_token = EmailToken(token=token, user_id=user.id, expires_at=datetime.utcnow() + timedelta(hours=1))
+        db.session.add(email_token)
+    db.session.commit()
+    # Simulate sending email
+    return jsonify({'message': 'Verification email resent'}), 200
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-        if user is not None and check_password_hash(user['password_hash'], password) and user['is_verified']:
-            session['user_id'] = user['user_id']
-            session['email'] = user['email']
-            flash('Login successful.')
-        else:
-            flash('Invalid email, password, or not verified.')
-        conn.close()
-        return redirect(url_for('login'))
-    return render_template_string('''
-        <form method="post">
-            Email: <input type="email" name="email"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Login">
-        </form>
-    ''')
+    data = request.get_json()
+    user = User.query.filter_by(email=data['email'], password=data['password']).first()
+    if user and user.is_verified:
+        session['user_id'] = user.id
+        session['is_verified'] = user.is_verified
+        return jsonify({'message': 'Login successful'}), 200
+    else:
+        return jsonify({'message': 'Invalid credentials or not verified'}), 401
 
-@app.route('/resend', methods=['GET', 'POST'])
-def resend():
-    if request.method == 'POST':
-        email = request.form['email']
-        conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE email = ? AND is_verified = 0', (email,)).fetchone()
-        if user is not None:
-            token = secrets.token_urlsafe()
-            conn.execute('UPDATE users SET verification_token = ? WHERE user_id = ?', (token, user['user_id']))
-            conn.commit()
-            print(f"Verification link: {url_for('verify', token=token, _external=True)}")
-            flash('Verification email resent.')
-        else:
-            flash('Email not found or already verified.')
-        conn.close()
-        return redirect(url_for('resend'))
-    return render_template_string('''
-        <form method="post">
-            Email: <input type="email" name="email"><br>
-            <input type="submit" value="Resend Verification Email">
-        </form>
-    ''')
+@app.route('/profile', methods=['GET'])
+def profile():
+    if 'user_id' in session and session['is_verified']:
+        user = User.query.get(session['user_id'])
+        return jsonify({'email': user.email, 'is_verified': user.is_verified}), 200
+    else:
+        return jsonify({'message': 'Unauthorized'}), 401
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('Logged out successfully.')
-    return redirect(url_for('login'))
+def generate_verification_token(user_id):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.dumps(user_id, salt='email-verification')
+
+def verify_token(token):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    try:
+        user_id = serializer.loads(token, salt='email-verification', max_age=3600)
+        return user_id
+    except SignatureExpired:
+        raise SignatureExpired('Token expired')
 
 if __name__ == '__main__':
-    if not os.path.exists(DATABASE):
-        conn = get_db_connection()
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE,
-                password_hash TEXT,
-                is_verified BOOLEAN DEFAULT 0,
-                verification_token TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.execute('''
-            INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)
-        ''', ('admin@example.com', generate_password_hash('admin123'), True))
-        conn.execute('''
-            INSERT INTO users (email, password_hash, verification_token)
-        ''', ('user@example.com', generate_password_hash('user123'), secrets.token_urlsafe()))
-        conn.commit()
-        conn.close()
+    init_db()
     app.run(debug=True)

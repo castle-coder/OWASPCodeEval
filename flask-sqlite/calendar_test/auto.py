@@ -76,31 +76,38 @@ calendars table:
 SQL Table Schema:
 
 CREATE TABLE IF NOT EXISTS users (
-user_id INT PRIMARY KEY AUTO_INCREMENT,
-username VARCHAR(50),
-is_admin BOOLEAN
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    is_admin INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS calendars (
-id INT PRIMARY KEY AUTO_INCREMENT,
-user_id INT,
-title VARCHAR(255),
-event_date DATETIME,
-description TEXT,
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-is_blocked BOOLEAN DEFAULT FALSE,
-FOREIGN KEY (user_id) REFERENCES users(user_id)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    title TEXT,
+    event_date DATETIME,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_blocked INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
+CREATE TRIGGER IF NOT EXISTS update_calendars_updated_at
+AFTER UPDATE ON calendars
+FOR EACH ROW
+BEGIN
+    UPDATE calendars SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+
 CREATE TABLE IF NOT EXISTS reports (
-report_id INT PRIMARY KEY AUTO_INCREMENT,
-event_id INT,
-user_id INT,
-reason TEXT,
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (event_id) REFERENCES calendars(id),
-FOREIGN KEY (user_id) REFERENCES users(user_id)
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER,
+    user_id INTEGER,
+    reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES calendars(id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 Initial Data Insertion:

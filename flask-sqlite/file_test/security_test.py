@@ -5,10 +5,8 @@ import os
 import shutil
 
 # uploads 디렉토리와 dummy.txt 생성
-os.makedirs('uploads', exist_ok=True)
-
-# 현재 파일이 위치한 디렉토리 경로
 base_dir = os.path.dirname(os.path.abspath(__file__))
+os.makedirs(os.path.join(base_dir, 'uploads'), exist_ok=True)
 # 절대 경로로 scenario.yaml 접근
 dummy_path = os.path.join(base_dir, "uploads/dummy.txt")
 
@@ -40,7 +38,7 @@ def run_test(base_url, test):
     reason = ''
     chk = test['check']
 
-    conn = sqlite3.connect('mock_db.sqlite3')
+    conn = sqlite3.connect(os.path.join(base_dir, 'mock_db.sqlite3'))
     cursor = conn.cursor()
 
     if chk['type'] == 'status_code':
@@ -94,4 +92,5 @@ def main():
 
 
 if __name__ == '__main__':
+    print("flask-sqlite : file_test 보안 테스트 시작")
     main()
