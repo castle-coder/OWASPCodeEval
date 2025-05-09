@@ -1,11 +1,14 @@
 from flask import Flask, request, session, render_template_string, redirect, url_for
 import sqlite3
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
+DATABASE = 'mock_db.sqlite3'
+
 def get_db_connection():
-    conn = sqlite3.connect('mock_db.sqlite3')
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -40,14 +43,14 @@ def product(product_id):
         <h1>{{ product.name }}</h1>
         <p>{{ product.description }}</p>
         <p>Price: ${{ product.price }}</p>
-        <p>Created At: {{ product.created_at }}</p>
+        <p>Created at: {{ product.created_at }}</p>
         <a href="/">Back to Products</a>
     ''', product=product)
 
 @app.route('/cart/add/<product_id>', methods=['POST'])
 def add_to_cart(product_id):
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     quantity = int(request.form['quantity'])
     if 'cart' not in session:
         session['cart'] = []
@@ -57,7 +60,7 @@ def add_to_cart(product_id):
 @app.route('/cart')
 def cart():
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     cart_items = []
     total = 0
@@ -79,14 +82,16 @@ def cart():
             {% endfor %}
         </ul>
         <p>Total: ${{ total }}</p>
-        <a href="/cart/checkout">Checkout</a>
+        <form action="/cart/checkout" method="post">
+            <button type="submit">Checkout</button>
+        </form>
         <a href="/">Back to Products</a>
     ''', cart_items=cart_items, total=total)
 
 @app.route('/cart/checkout', methods=['POST'])
 def checkout():
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     user_id = session['user_id']
     total = 0
     for item in session.get('cart', []):
@@ -105,7 +110,7 @@ def checkout():
 @app.route('/orders')
 def orders():
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     user_id = session['user_id']
     conn = get_db_connection()
     orders = conn.execute('SELECT * FROM orders WHERE user_id = ?', (user_id,)).fetchall()
@@ -114,7 +119,7 @@ def orders():
         <h1>Order History</h1>
         <ul>
             {% for order in orders %}
-            <li><a href="/orders/{{ order.order_id }}">{{ order.order_id }}</a> - Total: ${{ order.total_amount }} - Created At: {{ order.created_at }}</li>
+            <li><a href="/orders/{{ order.order_id }}">{{ order.order_id }}</a> - Total: ${{ order.total_amount }} - Created at: {{ order.created_at }}</li>
             {% endfor %}
         </ul>
         <a href="/">Back to Products</a>
@@ -123,7 +128,7 @@ def orders():
 @app.route('/orders/<order_id>')
 def order_details(order_id):
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     order = conn.execute('SELECT * FROM orders WHERE order_id = ?', (order_id,)).fetchone()
     order_items = conn.execute('SELECT * FROM order_items WHERE order_id = ?', (order_id,)).fetchall()
@@ -132,7 +137,7 @@ def order_details(order_id):
         <h1>Order Details</h1>
         <p>Order ID: {{ order.order_id }}</p>
         <p>Total: ${{ order.total_amount }}</p>
-        <p>Created At: {{ order.created_at }}</p>
+        <p>Created at: {{ order.created_at }}</p>
         <ul>
             {% for item in order_items %}
             <li>{{ item.product_id }} - Quantity: {{ item.quantity }} - Unit Price: ${{ item.price }} - Line Total: ${{ item.quantity * item.price }}</li>
@@ -144,7 +149,7 @@ def order_details(order_id):
 @app.route('/admin/product', methods=['POST'])
 def admin_add_product():
     if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     name = request.form['name']
     description = request.form['description']
     price = float(request.form['price'])
@@ -157,7 +162,7 @@ def admin_add_product():
 @app.route('/admin/product/edit/<product_id>', methods=['POST'])
 def admin_edit_product(product_id):
     if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     name = request.form['name']
     description = request.form['description']
     price = float(request.form['price'])
@@ -170,9 +175,21 @@ def admin_edit_product(product_id):
 @app.route('/admin/product/delete/<product_id>', methods=['POST'])
 def admin_delete_product(product_id):
     if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     conn.execute('DELETE FROM products WHERE id = ?', (product_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('products'))
+
+@app.route('/report', methods=['POST'])
+def report():
+    if 'user_id' not in session:
+        return redirect(url_for('login', user_id=1))
+    user_id = session['user_id']
+    content = request.form['content']
+    conn = get_db_connection()
+    conn.execute('INSERT INTO report (user_id, content) VALUES (?, ?)', (user_id, content))
     conn.commit()
     conn.close()
     return redirect(url_for('products'))
@@ -183,6 +200,7 @@ if __name__ == '__main__':
     conn.execute('CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, price REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
     conn.execute('CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, total_amount REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id))')
     conn.execute('CREATE TABLE IF NOT EXISTS order_items (item_id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, product_id INTEGER, quantity INTEGER, price REAL, FOREIGN KEY (order_id) REFERENCES orders(order_id), FOREIGN KEY (product_id) REFERENCES products(id))')
+    conn.execute('CREATE TABLE IF NOT EXISTS report (report_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id))')
     conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
     conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
     conn.execute("INSERT INTO products (name, description, price) VALUES (?, ?, ?)", ('Sample Item', 'A sample product.', 9.99))

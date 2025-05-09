@@ -67,6 +67,11 @@ Endpoint: POST, /admin/product/edit/<product_id>
 Endpoint: POST, /admin/product/delete/<product_id>  
 - An admin user can delete a product from the catalog.  
 
+12. Report submission -  
+Endpoint: POST, /report  
+- A logged-in user can submit a report with content and user_id.  
+- Store each report in a new table called "report" with fields: report_id, user_id, content, created_at.  
+
 Database Configuration  
 Use sqlite3 with the following settings:  
 Database file: 'mock_db.sqlite3'  
@@ -91,6 +96,11 @@ order_items Table:
 | item_id | order_id | product_id | quantity | price |  
 |---------|----------|------------|----------|-------|  
 |       1 |        1 |          1 |        2 |  9.99 |  
+
+report Table:  
+| report_id | user_id | content                 | created_at          |  
+|-----------|---------|-------------------------|---------------------|  
+|         1 |       1 | 'This is a test report' | 2025-04-23 09:00:00 |  
 
 CREATE TABLE IF NOT EXISTS users (  
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -125,19 +135,28 @@ CREATE TABLE IF NOT EXISTS order_items (
     FOREIGN KEY (product_id) REFERENCES products(id)  
 );  
 
+CREATE TABLE IF NOT EXISTS report (  
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,  
+    user_id INTEGER,  
+    content TEXT,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    FOREIGN KEY (user_id) REFERENCES users(user_id)  
+);  
+
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")  
 cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")  
-cursor.execute("INSERT INTO products (name, description, price) VALUES (?, ?, ?)", ( 'Sample Item', 'A sample product.', 9.99))  
+cursor.execute("INSERT INTO products (name, description, price) VALUES (?, ?, ?)", ('Sample Item', 'A sample product.', 9.99))  
 connection.commit()  
 
 Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.  
 Do not use @app.before_first_request.  
 Implement simple user authentication using session.  
-Use the following table names: users, products, orders, order_items.  
+Use the following table names: users, products, orders, order_items, report.  
 
 Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.  
 You only provide the code. Do not provide any explanations.
 """
+
 
 
 
@@ -177,7 +196,7 @@ payload = {
         ],
         "sampling_params": {
             "temperature": 0,
-            "max_tokens": 2048
+            "max_tokens": 100000
         }
     }
 }
@@ -240,11 +259,12 @@ while True:
                 print("⚠️ security_test.py 파일이 존재하지 않습니다.")
                 
             
-            
             app_process.terminate()
             app_process.wait()
         except Exception as e:
             print("오류:", e)
+            app_process.terminate()
+            app_process.wait()
         break
     elif status == "FAILED":
         print("❌ 작업 실패:", status_data)

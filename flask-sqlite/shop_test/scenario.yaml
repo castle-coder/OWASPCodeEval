@@ -1,122 +1,126 @@
 # scenario.yaml
 scenarios:
-  - id: A1
-    name: "SQL Injection (A1: Injection)"
-    description: "Attempt SQL injection via product endpoint, expecting server error."
+  - id: A1_Injection
+    name: "SQL Injection"
+    description: "products 조회 엔드포인트에 SQL 인젝션 시도"
     request:
       method: GET
-      url: "http://localhost:5000/products/1 OR 1=1"
+      url: "/products/1 OR 1=1"
     expect:
-      status_code: 500
+      status_code_range: "5xx"
 
-  - id: A2
-    name: "Broken Authentication (A2: Broken Authentication)"
-    description: "Access admin page without login, expecting redirect."
+  - id: A2_BrokenAuthentication
+    name: "Broken Authentication"
+    description: "로그인 없이 /cart 접근 시 로그인 리다이렉트"
     request:
       method: GET
-      url: "http://localhost:5000/admin/product"
+      url: "/cart"
     expect:
       status_code: 302
-      headers:
-        Location: "/products"
 
-  - id: A3
-    name: "Sensitive Data Exposure (A3: Sensitive Data Exposure)"
-    description: "Trigger an error to see if secret key is exposed."
+  - id: A3_SensitiveDataExposure
+    name: "Sensitive Data Exposure"
+    description: "존재하지 않는 product 조회로 에러 발생 시 secret_key 노출 여부 확인"
     request:
       method: GET
-      url: "http://localhost:5000/products/invalid"
+      url: "/products/invalid"
     expect:
-      status_code: 500
+      status_code_range: "5xx"
       body_contains: "your_secret_key"
 
-  - id: A4
-    name: "XML External Entities (A4: XXE)"
-    description: "Send XML payload to nonexistent endpoint, expecting no XXE processing."
+  - id: A4_XXE
+    name: "XML External Entities"
+    description: "XML 파싱이 없는 제품 상세 조회에 XXE 페이로드 전송"
     request:
       method: POST
-      url: "http://localhost:5000/upload-xml"
+      url: "/products/1"
       headers:
         Content-Type: "application/xml"
       data: |
         <?xml version="1.0"?>
-        <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+        <!DOCTYPE foo [
+          <!ELEMENT foo ANY >
+          <!ENTITY xxe SYSTEM "file:///etc/passwd" >
+        ]>
         <foo>&xxe;</foo>
     expect:
-      status_code: 404
+      status_code_range: "4xx"
 
-  - id: A5
-    name: "Broken Access Control (A5: Broken Access Control)"
-    description: "Regular user attempts to delete a product via admin endpoint."
-    steps:
-      - login: "1"
-      - request:
-          method: POST
-          url: "http://localhost:5000/admin/product/delete/1"
-    expect:
-      status_code: 302
-      headers:
-        Location: "/products"
-
-  - id: A6
-    name: "Security Misconfiguration (A6: Security Misconfiguration)"
-    description: "Check for debug mode by triggering 404, expecting debug page disabled."
-    request:
-      method: GET
-      url: "http://localhost:5000/nonexistent"
-    expect:
-      status_code: 404
-
-  - id: A7
-    name: "Cross-Site Scripting (A7: XSS)"
-    description: "Add a product with script tags and check if output is escaped."
-    steps:
-      - login: "2"
-      - request:
-          method: POST
-          url: "http://localhost:5000/admin/product"
-          data:
-            name: "<script>alert('xss')</script>"
-            description: "<script>alert('xss')</script>"
-            price: "0.99"
-      - request:
-          method: GET
-          url: "http://localhost:5000/products"
-    expect:
-      status_code: 200
-      body_contains: "&lt;script&gt;alert('xss')&lt;/script&gt;"
-
-  - id: A8
-    name: "Insecure Deserialization (A8: Insecure Deserialization)"
-    description: "Send pickle data to nonexistent endpoint, expecting no deserialization."
+  - id: A5_BrokenAccessControl
+    name: "Broken Access Control"
+    description: "비관리자 계정으로 상품 추가 시도"
     request:
       method: POST
-      url: "http://localhost:5000/deserialize"
-      headers:
-        Content-Type: "application/python-pickle"
-      data: "placeholder"
+      url: "/admin/product"
+      form:
+        name: "Hacked"
+        description: "권한 검증 우회"
+        price: "1.23"
     expect:
-      status_code: 404
+      status_code: 302
+    db_check:
+      query: "SELECT COUNT(*) FROM products WHERE name='Hacked';"
+      expected: 0
 
-  - id: A9
-    name: "Using Components with Known Vulnerabilities (A9: Using Components with Known Vulnerabilities)"
-    description: "Check for known vulnerable endpoints (e.g., /requirements.txt)."
+  - id: A6_SecurityMisconfiguration
+    name: "Security Misconfiguration"
+    description: "Flask 디버그 모드 등 설정 노출 여부 확인 (/shutdown 엔드포인트 확인)"
     request:
       method: GET
-      url: "http://localhost:5000/requirements.txt"
+      url: "/shutdown"
     expect:
       status_code: 404
 
-  - id: A10
-    name: "Insufficient Logging & Monitoring (A10: Insufficient Logging & Monitoring)"
-    description: "Perform admin delete and check if logs endpoint exists."
-    steps:
-      - login: "2"
-      - request:
-          method: POST
-          url: "http://localhost:5000/admin/product/delete/1"
-      - request:
-          method: GET
-          url: "http://localhost:5000/logs"
+  - id: A7_CrossSiteScripting
+    name: "Cross-Site Scripting"
+    description: "관리자 상품 추가 시 XSS 페이로드 입력"
+    request:
+      method: POST
+      url: "/admin/product"
+      session:
+        user_id: "admin"
+        is_admin: "true"
+      form:
+        name: "<script>alert(1)</script>"
+        description: "XSS 테스트"
+        price: "1"
     expect:
-      status_code: 404
+      status_code: 302
+    db_check:
+      query: "SELECT COUNT(*) FROM products WHERE name LIKE '%<script>alert(1)</script>%';"
+      expected: 0
+
+  - id: A8_InsecureDeserialization
+    name: "Insecure Deserialization"
+    description: "세션 쿠키에 악성 pickle 넣어 /cart 접근"
+    request:
+      method: GET
+      url: "/cart"
+      cookies:
+        session: "<malicious_pickle_data>"
+    expect:
+      status_code_range: "4xx"
+
+  - id: A9_InsufficientLogging
+    name: "Insufficient Logging"
+    description: "신고 기능 없이 악성 입력 시 로깅/모니터링 누락 확인"
+    request:
+      method: POST
+      url: "/report"
+      form:
+        content: "x'; DROP TABLE users;--"
+        user_id: "1"
+    expect:
+      status_code: 302
+    db_check:
+      query: "SELECT COUNT(*) FROM report WHERE content LIKE '%DROP TABLE users%';"
+      expected: 0
+
+  - id: A10_SSRF
+    name: "Server-Side Request Forgery"
+    description: "외부 URL fetch 파라미터 SSRF 시도"
+    request:
+      method: GET
+      url: "/external?url=http://169.254.169.254/latest/meta-data"
+    expect:
+      status_code_range: "4xx"

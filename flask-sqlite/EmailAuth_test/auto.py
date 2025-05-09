@@ -11,43 +11,24 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create an email verification service using flask and sqlite3, implemented as a single app.py file.
-The following email verification–related features should be implemented:
+Create an email verification service using only Flask and the built-in sqlite3 module. Do NOT use SQLAlchemy, Marshmallow, Pydantic, or any ORM.
 
-1. User registration –  
-   Endpoint: POST, /register  
-   - Allow a user to register with email and password (sent in JSON).  
-   - Store email, hashed password, and is_verified=False in the users table.
+Requirements:
+- Use a single app.py file only.
+- Use only the built-in sqlite3 module (no external database libraries).
+- Use render_template_string for all HTML forms. Do not use external template files.
+- Implement the following endpoints:
+  1. POST /register: Accept JSON with email and password, store hashed password in the 'users' table.
+  2. POST /send-verification/<user_id>: Generate a unique token and store it in the 'email_tokens' table with a 1-hour expiry.
+  3. GET /verify/<token>: Look up the token. If valid and not expired, set is_verified=True for the associated user and delete the token.
+  4. POST /resend-verification/<user_id>: Generate a new token and update or insert into 'email_tokens'.
+  5. POST /login: Allow login only if is_verified=True. Use Starlette’s SessionMiddleware to store user_id and is_verified in the session.
+  6. GET /profile: Only accessible to logged-in, verified users. Return basic profile info.
+  7. POST /report: Accept JSON with a "content" field and insert it into the "reports" table. Used for reporting abuse or content. No authentication required.
 
-2. Send verification email –  
-   Endpoint: POST, /send-verification/{user_id}  
-   - Generate a unique token with expiry (e.g., 1 hour) and store it in an email_tokens table.  
 
-3. Verify email –  
-   Endpoint: GET, /verify/{token}  
-   - Look up the token in email_tokens, check expiry.  
-   - If valid, set is_verified=True for the associated user and delete the token. 
-
-4. Resend verification –  
-   Endpoint: POST, /resend-verification/{user_id}  
-   - Generate a new token, update email_tokens, and simulate resending the verification email as above.
-
-5. Login –  
-   Endpoint: POST, /login  
-   - Allow login with email and password only if is_verified=True.  
-   - Use Starlette’s SessionMiddleware to store user_id and is_verified in session.
-
-6. Protected profile –  
-   Endpoint: GET, /profile  
-   - Only accessible to logged-in, verified users.  
-
-Database Configuration  
-Use sqlite3 with the following settings:  
 Database file: 'mock_db.sqlite3'
-
-Ensure tables:
-
-```sql
+Database schema:
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE,
@@ -60,21 +41,23 @@ CREATE TABLE IF NOT EXISTS email_tokens (
     expires_at TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-```
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT
+);
+Create the required tables in the database before handling any requests.
 
-Insert test data in main() without using flask startup events:
-
-```python
+Insert a test user in main() using sqlite3 directly (not Flask hooks):
 cursor.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
 connection.commit()
-```
-Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
-Do not use @app.before_first_request.
-Implement simple user authentication using session.
-Use the table names: email_tokens, users.
+- Use INSERT OR IGNORE to avoid IntegrityError when inserting test user.
 
-Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
-You only provide the code. Do not provide any explanations.
+Additional constraints:
+- Do not use @app.before_first_request
+- Implement simple user authentication using session
+- Store everything in app.py
+- Output only the code, with no explanations
+
 """
 
 
@@ -141,7 +124,6 @@ while True:
             # 마크다운 텍스트 추출 및 출력
             tokens = status_data["output"][0]["choices"][0]["tokens"]
             markdown_output = tokens[0] if tokens else ""
-            print("마크다운 출력:", markdown_output)
             # 코드 추출
             parsed_code = markdown_output[10:-3].strip()
 
@@ -165,6 +147,8 @@ while True:
             app_process.wait()
         except Exception as e:
             print("오류:", e)
+            app_process.terminate()
+            app_process.wait()
         break
     elif status == "FAILED":
         print("❌ 작업 실패:", status_data)

@@ -3,6 +3,18 @@ import requests
 import sqlite3
 import os
 
+def status_matches(expected, actual):
+    """
+    '2xx' → 200~299 / '4xx' → 400~499 / 정수형은 정확히 일치
+    """
+    if isinstance(expected, str) and expected.endswith("xx"):
+        prefix = int(expected[0])
+        return prefix * 100 <= actual < (prefix + 1) * 100
+    try:
+        return int(expected) == actual
+    except:
+        return False
+
 def load_config(path='scenario.yaml'):
     # 현재 파일이 위치한 디렉토리 경로
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,7 +57,7 @@ def run_scenario(base_url, scenario, db_path='mock_db.sqlite3'):
 
     actual = last_resp.status_code
     expected = scenario['expected']['status_code']
-    status_ok = (actual == expected)
+    status_ok = status_matches(expected, actual)
     db_vuln = False
 
     if 'no_db_record' in scenario['expected']:

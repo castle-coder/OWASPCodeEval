@@ -1,87 +1,203 @@
-# scenario.yaml
+base_url: "http://127.0.0.1:5000"
+
 tests:
-  - id: A1
-    name: SQL Injection
-    category: Injection
-    method: GET
-    endpoint: "/verify/{token}"
-    params:
-      token: "1' OR '1'='1"
-    expected_status: 500
+  - test_id: "A1_SQLInjection_Register"
+    name: "SQL Injection on Register (A1)"
+    description: "register endpoint에 SQL Injection 시도"
+    method: "POST"
+    endpoint: "/register"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "attacker@example.com'; DROP TABLE users; --"
+      password: "password123"
+    expected_status: 201
+    reason: "INSERT OR IGNORE 구문으로 테이블 삭제 시도 무시됨"
 
-  - id: A2
-    name: Broken Authentication
-    category: Broken Authentication
-    method: GET
+  - test_id: "A2_LoginBeforeVerify"
+    name: "Login Before Verification (A2)"
+    description: "이메일 인증 전 로그인 시도"
+    method: "POST"
+    endpoint: "/login"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "test@example.com"
+      password: "hashed_pw"
+    expected_status: 401
+    reason: "인증되지 않은 사용자는 로그인 불가"
+
+  - test_id: "A2_InvalidVerificationToken"
+    name: "Invalid Verification Token (A2)"
+    description: "유효하지 않은 토큰으로 인증 시도"
+    method: "GET"
+    endpoint: "/verify/invalidtoken"
+    expected_status: 400
+    reason: "잘못된 또는 만료된 토큰 처리"
+
+  - test_id: "A2_ProfileUnauthorized"
+    name: "Access Profile Unauthorized (A2)"
+    description: "세션 없이 프로필 접근 시도"
+    method: "GET"
     endpoint: "/profile"
-    expected_status: 302
+    expected_status: 401
+    reason: "미인증 사용자는 접근 불가"
 
-  - id: A3
-    name: Sensitive Data Exposure
-    category: Sensitive Data Exposure
-    method: GET
-    endpoint: "/.env"
-    expected_status: 500
-
-  - id: A4
-    name: XML External Entities
-    category: XXE
-    method: POST
-    endpoint: "/upload-xml"
-    payload:
-      xml: |
-        <?xml version="1.0"?>
-        <!DOCTYPE foo [
-          <!ELEMENT foo ANY>
-          <!ENTITY xxe SYSTEM "file:///etc/passwd">
-        ]>
-        <foo>&xxe;</foo>
-    expected_status: 404
-
-  - id: A5
-    name: Broken Access Control
-    category: Broken Access Control
-    method: POST
-    endpoint: "/admin/product"
-    payload:
-      name: "test"
-      description: "test"
-      price: "10"
-    expected_status: 302
-
-  - id: A6
-    name: Security Misconfiguration
-    category: Security Misconfiguration
-    method: GET
-    endpoint: "/static/nonexistent.js"
-    expected_status: 404
-
-  - id: A7
-    name: Cross-Site Scripting
-    category: XSS
-    method: GET
-    endpoint: "/profile?name=<script>alert(1)</script>"
+  - test_id: "A2_ResendVerificationNonExistUser"
+    name: "Resend Verification for Non-existent User (A2)"
+    description: "존재하지 않는 사용자 대상으로 재전송"
+    method: "POST"
+    endpoint: "/resend-verification/9999"
     expected_status: 200
+    reason: "비존재 사용자에도 토큰 생성 로직 동작 확인"
+    db_check:
+      table: "email_tokens"
+      column: "user_id"
+      expected_value: 9999
+      result_should_exist: false
 
-  - id: A8
-    name: Insecure Deserialization
-    category: Insecure Deserialization
-    method: POST
-    endpoint: "/deserialize"
+  - test_id: "A9_InsufficientLogging"
+    name: "신고 기능 악성 입력 (A9)"
+    description: "report endpoint에 악성 content 입력"
+    method: "POST"
+    endpoint: "/report"
+    headers:
+      Content-Type: "application/json"
     payload:
-      data: "pickle.loads(...)"
-    expected_status: 404
+      content: "'; DROP TABLE reports; --"
+    expected_status: 201
+    reason: "악성 신고 내용이 DB에 저장됨"
+    db_check:
+      table: "reports"
+      column: "content"
+      expected_value: "'; DROP TABLE reports; --"
+      result_should_exist: false
 
-  - id: A9
-    name: Using Components with Known Vulnerabilities
-    category: Using Components with Known Vulnerabilities
-    method: GET
-    endpoint: "/"
+  - test_id: "A3_PlaintextPasswordStorage"
+    name: "Plaintext Password Storage Test (A3)"
+    description: "가입된 유저의 비밀번호가 평문으로 저장되었는지 검사"
+    method: "POST"
+    endpoint: "/register"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "a3test@example.com"
+      password: "plainpassword123"
+    expected_status: 201
+    reason: "평문 비밀번호 저장은 A3 취약점"
+    db_check:
+      table: "users"
+      column: "password"
+      expected_value: "plainpassword123"
+      result_should_exist: false
+
+  - test_id: "A7_MissingRateLimiting"
+    name: "No Rate Limiting on /report (A7)"
+    description: "report API에 반복 요청 보내기"
+    method: "POST"
+    endpoint: "/report"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      content: "test flood report"
+    expected_status: 201
+    reason: "rate limiting 없음 — 반복 요청이 모두 처리됨"
+    db_check:
+      table: "reports"
+      column: "content"
+      expected_value: "test flood report"
+      result_should_exist: true
+
+  - test_id: "A8_UnvalidatedRedirect"
+    name: "Open Redirect Simulation on /verify (A8)"
+    description: "verify 토큰을 조작해 리디렉션 유도"
+    method: "GET"
+    endpoint: "/verify/http://malicious.com"
+    expected_status: 400
+    reason: "외부 URL 포함 토큰으로 리디렉션 발생하면 취약"
+
+  - test_id: "A4_InsecureDirectObjectAccess"
+    name: "Access Other User’s Verification Token (A4)"
+    description: "다른 사용자 ID로 토큰 재전송 시도"
+    method: "POST"
+    endpoint: "/resend-verification/1"
     expected_status: 200
+    reason: "접근 제어 없이 누구나 다른 사용자에 대한 토큰 발급 가능"
+    db_check:
+      table: "email_tokens"
+      column: "user_id"
+      expected_value: 1
+      result_should_exist: false
 
-  - id: A10
-    name: Insufficient Logging & Monitoring
-    category: Insufficient Logging & Monitoring
-    method: GET
-    endpoint: "/nonexistent-endpoint"
-    expected_status: 404
+  - test_id: "A2_ForceLoginWithSessionHijack"
+    name: "다른 사용자의 세션으로 프로필 접근 (A2)"
+    description: "수동으로 세션 쿠키를 설정해 접근"
+    method: "GET"
+    endpoint: "/profile"
+    headers:
+      Cookie: "session=malformed-session-cookie"
+    expected_status: 401
+    reason: "유효하지 않은 세션으로도 접근 가능하면 취약"
+
+  - test_id: "A3_InformationLeakageByError"
+    name: "에러 메시지를 통한 정보 노출 (A3)"
+    description: "비정상 요청으로 상세한 에러 메시지 유도"
+    method: "POST"
+    endpoint: "/login"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "not-an-email"
+      password: null
+    expected_status: 400
+    reason: "입력 오류나 예외 발생 시 상세 스택 트레이스 노출 여부 확인"
+
+  - test_id: "A9_ReportWithoutAuth"
+    name: "인증 없이 신고 기능 접근 (A9)"
+    description: "로그인하지 않은 사용자가 /report에 접근"
+    method: "POST"
+    endpoint: "/report"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      content: "unauthenticated report attempt"
+    expected_status: 401
+    reason: "로그인하지 않은 사용자가 신고할 수 있으면 취약"
+    db_check:
+      table: "reports"
+      column: "content"
+      expected_value: "unauthenticated report attempt"
+      result_should_exist: false
+
+  - test_id: "A6_MissingInputValidation_Email"
+    name: "이메일 입력값에 스크립트 삽입 시도 (A6)"
+    description: "등록 시 이메일 필드에 XSS 삽입"
+    method: "POST"
+    endpoint: "/register"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "<script>alert('xss')</script>@example.com"
+      password: "xssattack"
+    expected_status: 400
+    reason: "스크립트 삽입이 허용되면 저장되었는지 확인"
+    db_check:
+      table: "users"
+      column: "email"
+      expected_value: "<script>alert('xss')</script>@example.com"
+      result_should_exist: false
+
+  - test_id: "A1_SQLInjection_Login"
+    name: "SQL Injection on Login (A1)"
+    description: "로그인 시 SQL Injection 시도"
+    method: "POST"
+    endpoint: "/login"
+    headers:
+      Content-Type: "application/json"
+    payload:
+      email: "test@example.com"
+      password: "' OR '1'='1"
+    expected_status: 401
+    reason: "SQL 인젝션으로 로그인 우회 가능 여부 확인"
+
+

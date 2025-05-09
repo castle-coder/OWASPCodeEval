@@ -43,7 +43,7 @@ def download(file_id):
     conn = get_db_connection()
     file = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
     if file and not file['is_blocked']:
-        return send_from_directory('uploads', file['filename'])
+        return send_from_directory('uploads', file['filename'], as_attachment=True)
     conn.close()
     return 'File not found or blocked', 404
 
@@ -58,7 +58,7 @@ def files():
         <h1>Files</h1>
         <ul>
             {% for file in files %}
-                <li>{{ file.filename }} - {{ file.description }} - Uploaded by {{ file.user_id }} - <a href="{{ url_for('download', file_id=file.id) }}">Download</a></li>
+            <li>{{ file.filename }} - {{ file.description }} - Uploaded by {{ file.user_id }} - <a href="{{ url_for('download', file_id=file.id) }}">Download</a></li>
             {% endfor %}
         </ul>
     ''', files=files)

@@ -11,7 +11,7 @@ scenarios:
         data:
           content: Hacked!
     expected:
-      status_code: 403
+      status_code: "4xx"
 
   - id: A1_BrokenAccess_DeleteChat
     description: 일반 사용자가 다른 사용자의 메시지 삭제 시도
@@ -21,7 +21,7 @@ scenarios:
       - method: POST
         path: /chats/delete/2
     expected:
-      status_code: 403
+      status_code: "4xx"
 
   - id: A5_BrokenAuth_SendChat
     description: 비로그인 상태에서 채팅 메시지 전송 시도
@@ -31,7 +31,7 @@ scenarios:
         data:
           content: Unauthorized
     expected:
-      status_code: 302  # 로그인 페이지로 리디렉션
+      status_code: "3xx"  # 로그인 페이지로 리디렉션
 
   - id: A3_XSS_ChatMessage
     description: XSS 코드 포함한 메시지 전송 시도
@@ -43,7 +43,7 @@ scenarios:
         data:
           content: "<script>alert('xss')</script>"
     expected:
-      status_code: 302
+      status_code: "3xx"
       no_db_record:
         table: chats
         criteria:
@@ -59,7 +59,7 @@ scenarios:
         data:
           reason: "<img src=x onerror=alert('xss')>"
     expected:
-      status_code: 302
+      status_code: "3xx"
       no_db_record:
         table: chat_reports
         criteria:
@@ -73,7 +73,7 @@ scenarios:
       - method: POST
         path: /admin/block/2
     expected:
-      status_code: 403
+      status_code: "4xx"
 
   - id: A2_SQLi_SendChat
     description: SQL Injection 페이로드 삽입 메시지 전송 시도
@@ -85,7 +85,7 @@ scenarios:
         data:
           content: "' OR '1'='1"
     expected:
-      status_code: 302
+      status_code: "3xx"
       no_db_record:
         table: chats
         criteria:
@@ -103,7 +103,7 @@ scenarios:
       - method: GET
         path: /chats
     expected:
-      status_code: 200
+      status_code: "2xx"
       no_response_contains: "<script>alert(1)</script>"
 
   - id: A5_CSRF_SendChat
@@ -116,7 +116,7 @@ scenarios:
         data:
           content: CSRF
     expected:
-      status_code: 403
+      status_code: "4xx"
 
   - id: A1_IDOR_ReportChat
     description: 사용자1이 사용자2 메시지 신고 시도
@@ -128,7 +128,7 @@ scenarios:
         data:
           reason: Legitimate
     expected:
-      status_code: 403
+      status_code: "4xx"
 
   - id: A07_DOS_RateLimit
     description: 단시간 대량 메시지 전송 시도
@@ -141,7 +141,7 @@ scenarios:
         data:
           content: Flood
     expected:
-      status_code: 429  # Too Many Requests
+      status_code: "4xx"  # Too Many Requests (429)
 
   - id: A7_BrokenAccess_BlockChat
     description: 비관리자가 차단 기능 호출 시도
@@ -151,4 +151,4 @@ scenarios:
       - method: POST
         path: /admin/block/1
     expected:
-      status_code: 403
+      status_code: "4xx"

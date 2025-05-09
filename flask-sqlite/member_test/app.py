@@ -13,7 +13,7 @@ def get_db_connection():
 @app.route('/login/<member_id>', methods=['GET'])
 def login(member_id):
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE user_id = ? AND is_deleted = 0', ㄷ(member_id,)).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE user_id = ? AND is_deleted = 0', (member_id,)).fetchone()
     conn.close()
     if user:
         session['member_id'] = user['user_id']
