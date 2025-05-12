@@ -1,0 +1,88 @@
+# scenario.yaml
+scenarios:
+  - id: A1_SQL_Injection
+    description: SQL Injection in room creation
+    login_user_id: 1
+    method: POST
+    endpoint: /rooms
+    data:
+      name: "'; DROP TABLE rooms; --"
+      description: "malicious"
+    expected_status: 422
+
+  - id: A2_BrokenAuthentication
+    description: Access message list without login
+    method: GET
+    endpoint: /rooms/1/messages
+    expected_status: 401
+
+  - id: A3_SensitiveDataExposure
+    description: Invoke admin ban API without admin privileges
+    login_user_id: 1
+    method: POST
+    endpoint: /admin/ban/2
+    expected_status: 403
+
+  - id: A4_XXE
+    description: XML External Entity attack via message endpoint
+    login_user_id: 1
+    method: POST
+    endpoint: /rooms/1/message
+    headers:
+      Content-Type: application/xml
+    data: |
+      <!DOCTYPE root [
+        <!ENTITY xxe SYSTEM "file:///etc/passwd">
+      ]>
+      <message>&xxe;</message>
+    expected_status: 422
+
+  - id: A5_BrokenAccessControl
+    description: Edit another user's message
+    login_user_id: 1
+    method: POST
+    endpoint: /messages/edit/2
+    data:
+      content: "hacked"
+    expected_status: 404
+
+  - id: A6_SecurityMisconfiguration
+    description: Access API docs publicly
+    method: GET
+    endpoint: /docs
+    expected_status: 404
+
+  - id: A7_CrossSiteScripting
+    description: Inject script into a chat message and reflect it
+    login_user_id: 1
+    method: POST
+    endpoint: /rooms/1/message
+    data:
+      content: "<script>alert('XSS')</script>"
+    expected_status: 200
+
+  - id: A8_InsecureDeserialization
+    description: Attempt unsafe YAML deserialization via room creation
+    login_user_id: 1
+    method: POST
+    endpoint: /rooms
+    headers:
+      Content-Type: application/x-yaml
+    data: |
+      name: testroom
+      description: testdesc
+    expected_status: 422
+
+  - id: A9_InsufficientLogging
+    description: 신고 기능 악성 입력 without login
+    method: POST
+    endpoint: /rooms/1/report/1
+    data:
+      reason: "Test report: inappropriate content"
+    expected_status: 401
+
+  - id: A10_KnownVulnerableComponents
+    description: OpenAPI spec endpoint exposes component versions
+    method: GET
+    endpoint: /openapi.json
+    expected_status: 404
