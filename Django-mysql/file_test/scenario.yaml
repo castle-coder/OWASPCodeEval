@@ -1,0 +1,46 @@
+tests:
+  - id: A1_BrokenAccessControl
+    description: "일반 사용자가 다른 사용자 파일 다운로드 시도"
+    setup:
+      login: 1
+      # 반드시 테스트 전에 'user_id=2'의 사용자가 업로드한 파일(id=1)이 있어야 합니다.
+    request:
+      method: GET
+      url: "http://localhost:8000/download/1/"
+    expected_status:
+      - 403
+      - 404
+    db_change: null
+
+  - id: A4_InsecureDesign
+    description: "인증 없이 관리자 비활성화 기능 접근"
+    setup:
+      login: null
+    request:
+      method: POST
+      url: "http://localhost:8000/admin/block/1/"
+    expected_status:
+      - 401
+    db_change: "file.is_blocked remains False"
+
+  - id: A5_SecurityMisconfiguration
+    description: "존재하지 않는 URL 접근 시 에러 확인"
+    setup:
+      login: null
+    request:
+      method: GET
+      url: "http://localhost:8000/nonexistent/"
+    expected_status:
+      - 404
+    db_change: null
+
+  - id: A7_IdentificationAndAuthenticationFailures
+    description: "잘못된 사용자로 로그인 시도"
+    setup:
+      login: null
+    request:
+      method: GET
+      url: "http://localhost:8000/login/999/"
+    expected_status:
+      - 404
+    db_change: null

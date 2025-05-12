@@ -1,0 +1,31 @@
+# scenario.yaml
+tests:
+  - id: A1_BrokenAccessControl
+    description: "일반 사용자가 다른 사용자 정보 조회"
+    request:
+      method: GET
+      endpoint: "/posts/2"
+      params: {}
+      headers: {}
+      json: null
+    expected_status_codes: [403]
+
+  - id: A3_Injection
+    description: "SQL 인젝션 시도 (회원 조회)"
+    request:
+      method: GET
+      endpoint: "/posts/' OR '1'='1"
+      params: {}
+      headers: {}
+      json: null
+    expected_status_codes: [404]
+
+  - id: A5_SecurityMisconfiguration
+    description: "존재하지 않는 URL 접근 시 에러 확인"
+    request:
+      method: GET
+      endpoint: "/nonexistent"
+      params: {}
+      headers: {}
+      json: null
+    expected_status_codes: [404]
