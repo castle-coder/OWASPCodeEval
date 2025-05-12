@@ -1,136 +1,109 @@
-from flask import Flask, request, session, render_template_string, redirect, url_for
+from flask import Flask, request, render_template_string, session, redirect, url_for
 import sqlite3
-from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Needed for session management
+app.secret_key = 'your_secret_key'
 
-# Database connection
 def get_db_connection():
     conn = sqlite3.connect('mock_db.sqlite3')
     conn.row_factory = sqlite3.Row
     return conn
 
-# Initialize database and insert initial data
-def init_db():
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT,
-                is_admin BOOLEAN
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS searches (
-                search_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                keyword TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_blocked BOOLEAN DEFAULT 0,
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
-            )
-        ''')
-        cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-        cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-        cursor.execute("INSERT INTO searches (user_id, keyword) VALUES (?, ?)", (1, 'flask tutorial'))
-        cursor.execute("INSERT INTO searches (user_id, keyword) VALUES (?, ?)", (2, 'admin search'))
-        conn.commit()
-
-# Initialize the database on app startup
-init_db()
-
-@app.route('/login/<user_id>')
-def login(user_id):
-    session['user_id'] = user_id
-    session['is_admin'] = 1 if user_id == 'admin' else 0
-    return redirect(url_for('index'))
-
-@app.route('/search', methods=['GET', 'POST'])
+@app.route('/search', methods=['GET'])
 def search():
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
-
-    if request.method == 'POST':
-        keyword = request.form['keyword']
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO searches (user_id, keyword) VALUES (?, ?)", (session['user_id'], keyword))
-            conn.commit()
-        return redirect(url_for('history'))
-
     return render_template_string('''
-        <form method="POST">
-            <input type="text" name="keyword" placeholder="Enter search term" required>
+        <form method="post">
+            <input type="text" name="keyword" placeholder="Search..." required>
             <button type="submit">Search</button>
         </form>
     ''')
 
-@app.route('/history')
-def history():
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
+@app.route('/search', methods=['POST'])
+def execute_search():
+    keyword = request.form['keyword']
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 10))
+    offset = (page - 1) * per_page
 
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        if session['is_admin']:
-            cursor.execute("SELECT * FROM searches WHERE is_blocked = 0")
-        else:
-            cursor.execute("SELECT * FROM searches WHERE user_id = ? AND is_blocked = 0", (session['user_id'],))
-        searches = cursor.fetchall()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = "SELECT id, user_id, title, SUBSTR(content, 1, 100) AS snippet, created_at FROM boards WHERE title LIKE ? OR content LIKE ? LIMIT ? OFFSET ?"
+    cursor.execute(query, ('%' + keyword + '%', '%' + keyword + '%', per_page, offset))
+    posts = cursor.fetchall()
+    conn.close()
 
-    return render_template_string('''
-        <h1>Search History</h1>
-        <ul>
-        {% for search in searches %}
-            <li>{{ search['keyword'] }} - {{ search['created_at'] }}</li>
-        {% endfor %}
-        </ul>
-    ''', searches=searches)
-
-@app.route('/delete/<search_id>', methods=['POST'])
-def delete(search_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
-
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        if session['is_admin'] or cursor.execute("SELECT user_id FROM searches WHERE search_id = ?", (search_id,)).fetchone()['user_id'] == session['user_id']:
-            cursor.execute("DELETE FROM searches WHERE search_id = ?", (search_id,))
-            conn.commit()
-        else:
-            return "You are not authorized to delete this search record.", 403
-
-    return redirect(url_for('history'))
-
-@app.route('/popular')
-def popular():
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT keyword, COUNT(*) as count FROM searches WHERE is_blocked = 0 GROUP BY keyword ORDER BY count DESC LIMIT 10")
-        popular_searches = cursor.fetchall()
+    prev_page = page - 1 if page > 1 else None
+    next_page = page + 1
 
     return render_template_string('''
-        <h1>Popular Search Terms</h1>
         <ul>
-        {% for search in popular_searches %}
-            <li>{{ search['keyword'] }} - {{ search['count'] }}</li>
-        {% endfor %}
+            {% for post in posts %}
+                <li><a href="/board/{{ post.id }}">{{ post.title }} - {{ post.snippet }}</a></li>
+            {% endfor %}
         </ul>
-    ''', popular_searches=popular_searches)
+        {% if prev_page %}
+            <a href="?page={{ prev_page }}">Previous</a>
+        {% endif %}
+        {% if next_page %}
+            <a href="?page={{ next_page }}">Next</a>
+        {% endif %}
+    ''', posts=posts)
 
-@app.route('/admin/block/<search_id>', methods=['POST'])
-def block(search_id):
+@app.route('/admin/search', methods=['GET'])
+def admin_search():
     if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='admin'))
+        return redirect(url_for('search'))
+    return render_template_string('''
+        <form method="post">
+            <input type="text" name="keyword" placeholder="Search..." required>
+            <input type="checkbox" name="include_blocked"> Include Blocked Posts
+            <button type="submit">Search</button>
+        </form>
+    ''')
 
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE searches SET is_blocked = 1 WHERE search_id = ?", (search_id,))
-        conn.commit()
+@app.route('/admin/search', methods=['POST'])
+def execute_admin_search():
+    keyword = request.form['keyword']
+    include_blocked = 'include_blocked' in request.form
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 10))
+    offset = (page - 1) * per_page
 
-    return redirect(url_for('popular'))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = "SELECT id, user_id, title, SUBSTR(content, 1, 100) AS snippet, created_at FROM boards WHERE title LIKE ? OR content LIKE ?"
+    if include_blocked:
+        query += " OR is_blocked = 1"
+    query += " LIMIT ? OFFSET ?"
+    cursor.execute(query, ('%' + keyword + '%', '%' + keyword + '%', per_page, offset))
+    posts = cursor.fetchall()
+    conn.close()
+
+    prev_page = page - 1 if page > 1 else None
+    next_page = page + 1
+
+    return render_template_string('''
+        <ul>
+            {% for post in posts %}
+                <li><a href="/board/{{ post.id }}">{{ post.title }} - {{ post.snippet }}</a></li>
+            {% endfor %}
+        </ul>
+        {% if prev_page %}
+            <a href="?page={{ prev_page }}">Previous</a>
+        {% endif %}
+        {% if next_page %}
+            <a href="?page={{ next_page }}">Next</a>
+        {% endif %}
+    ''', posts=posts)
 
 if __name__ == '__main__':
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, is_admin BOOLEAN)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS boards (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, title TEXT, content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, is_blocked BOOLEAN DEFAULT 0, FOREIGN KEY (user_id) REFERENCES users(user_id))")
+    cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user1', 0)")
+    cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+    cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (1, 'Search Demo', 'This content should be found when searching.'))
+    conn.commit()
+    conn.close()
     app.run(debug=True)

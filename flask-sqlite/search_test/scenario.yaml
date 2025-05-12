@@ -1,47 +1,31 @@
-base_url: "http://127.0.0.1:5000"
-
-tests:
-  - id: A1_SQLInjection
-    description: SQL Injection in search input
-    path: /search
+scenarios:
+  - id: A1_BrokenAccessControl
+    description: 일반 사용자가 관리자 검색 페이지 조회
+    method: GET
+    endpoint: /admin/search
+    safe_status_codes:
+      - 302
+      - 403
+  - id: A1_BrokenAccessControl_POST
+    description: 일반 사용자가 관리자 검색 수행
     method: POST
+    endpoint: /admin/search
+    data:
+      keyword: "test"
+    safe_status_codes:
+      - 302
+      - 403
+  - id: A3_Injection
+    description: SQL 인젝션 시도 (게시글 검색)
+    method: POST
+    endpoint: /search
     data:
       keyword: "' OR '1'='1"
-    expect_redirect: true
-
-  - id: A3_XSS
-    description: Stored XSS in search keyword
-    path: /search
-    method: POST
-    data:
-      keyword: "<script>alert(1)</script>"
-    expect_redirect: true
-
-  - id: A5_BrokenAccessControl
-    description: Delete another user's search record
-    path: /delete/1
-    method: POST
-    login_user: user
-
-  - id: A7_XSSInSearchHistory
-    description: View search history as XSS payload
-    path: /history
+    safe_status_codes:
+      - 200
+  - id: A5_SecurityMisconfiguration
+    description: 존재하지 않는 URL 접근 시 에러 확인
     method: GET
-    login_user: user
-
-  - id: A9_InsufficientLogging
-    description: 악성 검색어 입력 로그 테스트
-    path: /search
-    method: POST
-    data:
-      keyword: "<malicious>DROP TABLE users</malicious>"
-    expect_redirect: true
-    login_user: user
-
-  - id: A10_SSRF
-    description: SSRF attempt (none expected but test URL-based inputs)
-    path: /search
-    method: POST
-    data:
-      keyword: "http://localhost:8000"
-    expect_redirect: true
+    endpoint: /nonexistent
+    safe_status_codes:
+      - 404
