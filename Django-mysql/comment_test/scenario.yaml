@@ -1,0 +1,28 @@
+# scenario.yaml
+tests:
+  - id: A1_BrokenAccessControl
+    description: "일반 사용자가 다른 사용자의 댓글 수정 시도"
+    login_user_id: 1
+    method: POST
+    url: "/comments/edit/2/"
+    payload:
+      content: "unauthorized edit"
+    expected_status_codes: [403]
+
+  - id: A3_Injection
+    description: "SQL 인젝션 시도 (로그인)"
+    method: GET
+    url: "/login/1%20or%201=1/"
+    expected_status_codes: [404]
+
+  - id: A5_SecurityMisconfiguration
+    description: "존재하지 않는 URL 접근 시 에러 확인"
+    method: GET
+    url: "/nonexistent/"
+    expected_status_codes: [404]
+
+  - id: A7_IdentificationAndAuthenticationFailures
+    description: "잘못된 사용자로 로그인 시도"
+    method: GET
+    url: "/login/999/"
+    expected_status_codes: [403]

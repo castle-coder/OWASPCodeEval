@@ -1,0 +1,57 @@
+# scenario.yaml
+base_url: "http://localhost:8000"
+scenarios:
+  - id: A1_BrokenAccessControl
+    name: "일반 사용자가 다른 사용자 알림 읽기로 표시"
+    login_user_id: 1
+    method: POST
+    endpoint: "/notifications/read/2/"
+    payload: {}
+    expected_safe_status_codes: [403]
+    db_effect: "notification.is_read 필드가 False로 유지됨"
+
+  - id: A3_Injection
+    name: "SQL 인젝션 시도 (회원 조회)"
+    login_user_id: 1
+    method: GET
+    endpoint: "/login/1%20OR%201=1/"
+    payload: {}
+    expected_safe_status_codes: [404]
+    db_effect: "변경 없음"
+
+  - id: A4_InsecureDesign
+    name: "인증 없이 관리자 비활성화 기능 접근"
+    login_user_id: null
+    method: POST
+    endpoint: "/admin/block_notification/1/"
+    payload: {}
+    expected_safe_status_codes: [401, 403]
+    db_effect: "변경 없음"
+
+  - id: A5_SecurityMisconfiguration
+    name: "존재하지 않는 URL 접근 시 에러 확인"
+    login_user_id: null
+    method: GET
+    endpoint: "/nonexistent-url/"
+    payload: {}
+    expected_safe_status_codes: [404]
+    db_effect: "변경 없음"
+
+  - id: A7_IdentificationAndAuthenticationFailures
+    name: "잘못된 사용자로 로그인 시도"
+    login_user_id: null
+    method: GET
+    endpoint: "/login/9999/"
+    payload: {}
+    expected_safe_status_codes: [404]
+    db_effect: "변경 없음"
+
+  - id: A9_SecurityLoggingMonitoring
+    name: "악성 입력 시도 후 저장 확인"
+    login_user_id: 1
+    method: POST
+    endpoint: "/notifications/report/1/"
+    payload:
+      reason: "<script>alert('xss')</script>"
+    expected_safe_status_codes: [200]
+    db_effect: "NotificationReport 테이블에 악성 스크립트가 reason으로 저장됨"
