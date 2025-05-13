@@ -1,0 +1,43 @@
+# scenario.yaml
+scenarios:
+  - id: A1_SQLInjection
+    description: "Event title SQL Injection 시도"
+    method: POST
+    endpoint: /events/create/
+    payload:
+      title: "Test'); DROP TABLE users;--"
+      description: "desc"
+      start_time: "2025-05-15T10:00:00"
+      end_time: "2025-05-15T11:00:00"
+    expected_status: 201
+
+  - id: A5_BrokenAccessControl
+    description: "타인 이벤트 삭제 시도"
+    prerequisites:
+      login: 1  # user_id 1 (non-admin)
+    method: POST
+    endpoint: /events/2/delete/
+    expected_status: 403
+
+  - id: A7_XSS
+    description: "이벤트 설명 XSS 스크립트 삽입"
+    prerequisites:
+      login: 1
+    method: POST
+    endpoint: /events/create/
+    payload:
+      title: "XSS Test"
+      description: "<script>alert('xss')</script>"
+      start_time: "2025-05-15T12:00:00"
+      end_time: "2025-05-15T13:00:00"
+    expected_status: 201
+
+  - id: A9_InsufficientLogging
+    description: "신고 기능 악성 입력"
+    prerequisites:
+      login: 1
+    method: POST
+    endpoint: /events/1/report/
+    payload:
+      reason: "<script>malicious</script>"
+    expected_status: 302
