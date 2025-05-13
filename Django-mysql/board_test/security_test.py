@@ -1,118 +1,84 @@
-import yaml
+import os
 import requests
-import pymysql
-from datetime import datetime
+import sqlite3
+import yaml
 
-BASE_URL = "http://127.0.0.1:5000"
+BASE_URL = "http://127.0.0.1:8000"
+DB_PATH = "mock_db.sqlite3"
+SCENARIO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "scenario.yaml")
+)
 
-# DB 연결 정보
-db_config = {
-    'host': 'localhost',
-    'user': 'mock_user',
-    'password': 'mock_password',
-    'db': 'mock_db',
-    'cursorclass': pymysql.cursors.DictCursor
-}
+def check_table_exists(table):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table,)
+    )
+    exists = cur.fetchone() is not None
+    conn.close()
+    return exists
 
-def load_scenarios(path="scenario.yaml"):
-    with open(path, 'r') as file:
-        return yaml.safe_load(file)
+def check_in_db(table, column, value):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute(f"SELECT 1 FROM {table} WHERE {column}=?", (value,))
+    found = cur.fetchone() is not None
+    conn.close()
+    return found
 
-def login(session, user_id):
-    if user_id is not None:
-        session.get(f"{BASE_URL}/login/{user_id}")
-
-def check_boards(title, user_id=None):
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            if user_id:
-                cursor.execute("SELECT * FROM boards WHERE title=%s AND user_id=%s", (title, user_id))
-            else:
-                cursor.execute("SELECT * FROM boards WHERE title=%s", (title,))
-            result = cursor.fetchone()
-        conn.close()
-        return result
-    except Exception as e:
-        print(f"DB 검사 중 오류 발생 (boards): {e}")
-        return None
-    
-def check_board_state(post_id):
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT title, content, is_blocked, updated_at FROM boards WHERE id=%s", (post_id,))
-            result = cursor.fetchone()
-        conn.close()
-        return result
-    except Exception as e:
-        print(f"DB 검사 중 오류 발생 (board state): {e}")
-        return None
-
-
-def check_reports(reason, user_id=None):
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            if user_id:
-                cursor.execute("SELECT * FROM reports WHERE reason=%s AND user_id=%s", (reason, user_id))
-            else:
-                cursor.execute("SELECT * FROM reports WHERE reason=%s", (reason,))
-            result = cursor.fetchone()
-        conn.close()
-        return result
-    except Exception as e:
-        print(f"DB 검사 중 오류 발생 (reports): {e}")
-        return None
-
-def run_scenario(scenario):
+def run_test(test):
     session = requests.Session()
-    login(session, scenario.get('login_user'))
+    # 로그인 여부
+    if test.get("login", False):
+        user = test.get("login_as", 1)
+        session.get(f"{BASE_URL}/login/{user}/")
 
-    response = session.post(f"{BASE_URL}{scenario['endpoint']}", data=scenario['data'])
-    print(f"[Test ID: {scenario['id']}] {scenario['description']}")
-    print(f"Status Code: {response.status_code}")
+    # HTTP 요청
+    url = BASE_URL + test["url"]
+    method = test["method"].upper()
+    data = test.get("data", {})
+    resp = session.post(url, data=data) if method == "POST" else session.get(url, params=data)
 
-    # 결과 판단
-    is_safe = True
+    status_ok = (resp.status_code == test["expected_status"])
+
+    # DB 검증
+    db_ok = True
     reason = ""
+    if "assert_table_exists" in test:
+        tbl = test["assert_table_exists"]
+        db_ok = check_table_exists(tbl)
+        if not db_ok:
+            reason = f"테이블 '{tbl}'가 존재하지 않음"
+    if db_ok and "assert_not_in_db" in test:
+        v = test["assert_not_in_db"]
+        if check_in_db(v["table"], v["column"], v["value"]):
+            db_ok = False
+            reason = f"악성 내용이 DB에 저장됨 ({v['column']}: {v['value']})"
+    if db_ok and "assert_in_db" in test:
+        v = test["assert_in_db"]
+        if not check_in_db(v["table"], v["column"], v["value"]):
+            db_ok = False
+            reason = f"정상 레코드가 DB에 없음 ({v['column']}: {v['value']})"
 
-    if response.status_code >= 500:
-        is_safe = False
-        reason = "서버 오류 발생"
-    elif 'check_db_title' in scenario:
-        result = check_boards(scenario['check_db_title'], scenario.get('login_user'))
-        if result:
-            is_safe = False
-            reason = f"DB에 악성 데이터가 삽입됨 (post_id: {result.get('post_id')}, user_id: {result.get('user_id')})"
-    elif 'check_report_reason' in scenario:
-        result = check_reports(scenario['check_report_reason'], scenario.get('login_user'))
-        if result:
-            is_safe = False
-            reason = f"악성 신고 내용이 DB에 저장됨 (report_id: {result.get('report_id')}, user_id: {result.get('user_id')})"
-    elif scenario.get('expect_db_unchanged'):
-        # 기본 게시물 상태 저장
-        pre_state = check_board_state(post_id=scenario['endpoint'].split('/')[-1])
-        
-        # 일정 시간 대기 후 재조회
-        import time
-        time.sleep(0.5)
-        post_state = check_board_state(post_id=scenario['endpoint'].split('/')[-1])
-
-        if pre_state != post_state:
-            is_safe = False
-            reason = f"게시글 내용이 변경됨 또는 차단 상태 변경됨: {pre_state} -> {post_state}"
-
-
-    print("결과:", "✅ 안전" if is_safe else "❌ 취약")
-    if reason:
-        print("이유:", reason)
-    print("-" * 50)
+    # 결과 출력
+    print("--------------------------------------------------")
+    print(f"[Test ID: {test['id']}] {test['name']}")
+    print(f"Status Code: {resp.status_code}")
+    result = "✅ 안전" if status_ok and db_ok else "❌ 취약"
+    print(f"결과: {result}")
+    if not status_ok:
+        print(f"이유: 예상 상태코드 {test['expected_status']}와 다름")
+    elif not db_ok:
+        print(f"이유: {reason}")
+    print("--------------------------------------------------\n")
 
 def main():
-    scenarios = load_scenarios()
-    for s in scenarios['tests']:
-        run_scenario(s)
+    with open(SCENARIO_PATH, encoding="utf-8") as f:
+        scenario = yaml.safe_load(f)
+    for test in scenario["tests"]:
+        run_test(test)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
