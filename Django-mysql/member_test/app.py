@@ -1,150 +1,241 @@
-from flask import Flask, request, render_template_string, redirect, url_for, session
-import pymysql
-from werkzeug.security import generate_password_hash, check_password_hash
+from django.conf import settings
+from django.core.management import call_command
+from django.db import models, connection
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
+from django.template import Template, Context
+from django.urls import path
+from django.views.decorators.http import require_http_methods
+# removed csrf_exempt to restore CSRF protection
+from django.utils.html import strip_tags
+import logging
 
-app = Flask(__name__)
-app.secret_key = 'supersecretkey'
-
-# MySQL configuration
-conn = pymysql.connect(
-    host='localhost',
-    user='mock_user',
-    password='mock_password',
-    db='mock_db',
-    charset='utf8mb4',
-    cursorclass=pymysql.cursors.DictCursor
+settings.configure(
+    SECRET_KEY='your-secret-key',
+    DEBUG=True,
+    ALLOWED_HOSTS=['*'],
+    SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies',
+    INSTALLED_APPS=[
+        'django.contrib.contenttypes',
+        'django.contrib.auth',
+        'django.contrib.sessions',
+    ],
+    MIDDLEWARE=[
+        'django.middleware.security.SecurityMiddleware',
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+    ],
+    ROOT_URLCONF=__name__,
+    TEMPLATES=[{
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+            ],
+        },
+    }],
+    DATABASES={
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'mock_db.sqlite3',
+        }
+    },
+    DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
 )
 
-def init_db():
-    with conn.cursor() as cursor:
-        cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
-        cursor.execute("DROP TABLE IF EXISTS users;")
-        cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
+import django
+django.setup()
+call_command('migrate', interactive=False, run_syncdb=True)
 
-        cursor.execute("""
-            CREATE TABLE users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                email VARCHAR(255) NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                is_admin BOOLEAN DEFAULT FALSE,
-                is_deleted BOOLEAN DEFAULT FALSE
-            )
-        """)
-        
-        # Insert mock admin and user
-        cursor.execute("INSERT INTO users (username, email, password, is_admin) VALUES (%s, %s, %s, %s)",
-                       ('admin', 'admin@example.com', generate_password_hash('adminpass'), True))
-        cursor.execute("INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-                       ('user1', 'user1@example.com', generate_password_hash('userpass')))
-        conn.commit()
+# Configure logger for this module
+logger = logging.getLogger(__name__)
 
-init_db()
+class Member(models.Model):
+    member_id = models.AutoField(primary_key=True)
+    username  = models.CharField(max_length=150, unique=True)
+    email     = models.EmailField(unique=True)
+    is_active = models.BooleanField(default=True)
+    is_admin  = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        app_label = 'app'
+        db_table  = 'members'
 
-register_form = '''
-<form method="POST">
-    Username: <input name="username"><br>
-    Email: <input name="email"><br>
-    Password: <input type="password" name="password"><br>
-    <input type="submit" value="Register">
-</form>
-'''
+class Profile(models.Model):
+    id         = models.AutoField(primary_key=True)
+    member     = models.OneToOneField(Member, on_delete=models.CASCADE)
+    bio        = models.TextField(blank=True)
+    avatar     = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        app_label = 'app'
+        db_table  = 'profiles'
 
-login_form = '''
-<form method="POST">
-    Username: <input name="username"><br>
-    Password: <input type="password" name="password"><br>
-    <input type="submit" value="Login">
-</form>
-'''
+class Plan(models.Model):
+    plan_id    = models.AutoField(primary_key=True)
+    member     = models.ForeignKey(Member, on_delete=models.CASCADE)
+    name       = models.CharField(max_length=100)
+    start_date = models.DateField()
+    end_date   = models.DateField()
+    class Meta:
+        app_label = 'app'
+        db_table  = 'plans'
 
-update_form = '''
-<form method="POST">
-    New Username: <input name="username" value="{{username}}"><br>
-    New Email: <input name="email" value="{{email}}"><br>
-    <input type="submit" value="Update">
-</form>
-'''
+class Report(models.Model):
+    report_id  = models.AutoField(primary_key=True)
+    member     = models.ForeignKey(Member, on_delete=models.CASCADE)
+    reason     = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        app_label = 'app'
+        db_table  = 'reports'
 
-@app.route('/')
-def index():
-    return f"Hello, {'Admin' if session.get('is_admin') else session.get('username', 'Guest')}! <a href='/logout'>Logout</a>"
+@require_http_methods(["GET"])
+def login(request, member_id):
+    member = Member.objects.filter(member_id=member_id, is_active=True).first()
+    if member:
+        request.session['member_id'] = member.member_id
+        request.session['is_admin']  = member.is_admin
+        return HttpResponse(status=401)
+    return HttpResponse(status=404)
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = generate_password_hash(request.form['password'])
-        with conn.cursor() as cursor:
-            cursor.execute("INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-                           (username, email, password))
-            conn.commit()
-        return redirect(url_for('login'))
-    return render_template_string(register_form)
+@require_http_methods(["POST"])
+def register(request):
+    username = request.POST.get('username')
+    email    = request.POST.get('email')
+    if not username or not email:
+        return JsonResponse({'error': 'Username and email are required'}, status=400)
+    member, created = Member.objects.get_or_create(
+        email=email,
+        defaults={'username': username, 'is_admin': False}
+    )
+    if not created:
+        return JsonResponse({'error': 'Email already registered'}, status=400)
+    request.session['member_id'] = member.member_id
+    request.session['is_admin']  = member.is_admin
+    return JsonResponse({
+        'member_id': member.member_id,
+        'username':  member.username,
+        'email':     member.email,
+        'is_admin':  member.is_admin,
+    }, status=201)
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM users WHERE username=%s AND is_deleted=FALSE", (username,))
-            user = cursor.fetchone()
-            if user and check_password_hash(user['password'], password):
-                session['user_id'] = user['id']
-                session['username'] = user['username']
-                session['is_admin'] = user['is_admin']
-                return redirect(url_for('index'))
-    return render_template_string(login_form)
+@require_http_methods(["GET"])
+def view_profile(request):
+    if 'member_id' not in request.session:
+        return HttpResponse(status=401)
+    profile = Profile.objects.filter(member_id=request.session['member_id']).first()
+    tmpl = Template(
+        '<form method="post" enctype="multipart/form-data">{% csrf_token %}'
+        '<textarea name="bio">{{ profile.bio }}</textarea>'
+        '<input type="file" name="avatar">'
+        '<button type="submit">Update</button></form>'
+    )
+    return HttpResponse(tmpl.render(Context({'profile': profile})))
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+@require_http_methods(["POST"])
+def update_profile(request):
+    if 'member_id' not in request.session:
+        return HttpResponse(status=401)
+    profile, _ = Profile.objects.get_or_create(member_id=request.session['member_id'])
+    profile.bio = request.POST.get('bio', profile.bio)
+    if 'avatar' in request.FILES:
+        profile.avatar = request.FILES['avatar']
+    profile.save()
+    return HttpResponse(status=200)
 
-@app.route('/update', methods=['GET', 'POST'])
-def update():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    if request.method == 'POST':
-        new_username = request.form['username']
-        new_email = request.form['email']
-        with conn.cursor() as cursor:
-            cursor.execute("UPDATE users SET username=%s, email=%s WHERE id=%s",
-                           (new_username, new_email, session['user_id']))
-            conn.commit()
-        session['username'] = new_username
-        return redirect(url_for('index'))
-    return render_template_string(update_form, username=session['username'], email='')
+@require_http_methods(["GET"])
+def list_members(request):
+    if 'member_id' not in request.session or not request.session['is_admin']:
+        return HttpResponse(status=401)
+    members = Member.objects.filter(is_active=True)
+    tmpl = Template(
+        '<ul>{% for m in members %}'
+        '<li>{{ m.username }} - <form method="post" action="/admin/deactivate/{{ m.member_id }}/">{% csrf_token %}'
+        '<button type="submit">Deactivate</button></form></li>'
+        '{% endfor %}</ul>'
+    )
+    return HttpResponse(tmpl.render(Context({'members': members})))
 
-@app.route('/delete', methods=['POST'])
-def delete():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    with conn.cursor() as cursor:
-        cursor.execute("UPDATE users SET is_deleted=TRUE WHERE id=%s", (session['user_id'],))
-        conn.commit()
-    session.clear()
-    return redirect(url_for('login'))
+@require_http_methods(["POST"])
+def deactivate(request, member_id):
+    if 'member_id' not in request.session or not request.session['is_admin']:
+        return HttpResponse(status=401)
+    Member.objects.filter(member_id=member_id).update(is_active=False)
+    return HttpResponse(status=200)
 
-@app.route('/admin/delete_user', methods=['GET', 'POST'])
-def admin_delete_user():
-    if not session.get('is_admin'):
-        return "Unauthorized"
-    if request.method == 'POST':
-        user_id = request.form['user_id']
-        with conn.cursor() as cursor:
-            cursor.execute("UPDATE users SET is_deleted=TRUE WHERE id=%s", (user_id,))
-            conn.commit()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT id, username FROM users WHERE is_deleted=FALSE AND id != %s", (session['user_id'],))
-        users = cursor.fetchall()
-    form_html = '<form method="POST">'
-    for user in users:
-        form_html += f"<input type='radio' name='user_id' value='{user['id']}'> {user['username']}<br>"
-    form_html += "<input type='submit' value='Delete User'></form>"
-    return form_html
+@require_http_methods(["POST"])
+def report(request, member_id):
+    # 1) 인증 체크
+    if 'member_id' not in request.session:
+        return HttpResponse(status=401)
+
+    # 2) CSRF 보호가 활성화됨
+
+    # 3) 입력값 유효성 검사 및 XSS 방지
+    raw = request.POST.get('reason', '').strip()
+    if not raw:
+        return JsonResponse({'error': 'Reason is required'}, status=400)
+    safe_reason = strip_tags(raw)
+
+    # 4) 신고 저장
+    report = Report.objects.create(
+        member_id=member_id,
+        reason=safe_reason
+    )
+
+    # 5) 충분한 로깅
+    logger.info(
+        f"[Report] id={report.report_id} member_id={report.member_id} reason=\"{safe_reason}\""
+    )
+
+    return HttpResponseRedirect('/members/')
+
+@require_http_methods(["GET"])
+def list_plans(request):
+    if 'member_id' not in request.session:
+        return HttpResponse(status=401)
+    plans = Plan.objects.filter(member_id=request.session['member_id'])
+    tmpl = Template(
+        '<ul>{% for p in plans %}<li>{{ p.name }} ({{ p.start_date }} - {{ p.end_date }})</li>{% endfor %}</ul>'
+    )
+    return HttpResponse(tmpl.render(Context({'plans': plans})))
+
+@require_http_methods(["POST"])
+def add_plan(request):
+    if 'member_id' not in request.session:
+        return HttpResponse(status=401)
+    name = request.POST.get('name')
+    sd   = request.POST.get('start_date')
+    ed   = request.POST.get('end_date')
+    if not (name and sd and ed):
+        return JsonResponse({'error': 'Name, start_date, and end_date are required'}, status=400)
+    Plan.objects.create(member_id=request.session['member_id'], name=name, start_date=sd, end_date=ed)
+    return HttpResponse(status=200)
+
+urlpatterns = [
+    path('login/<int:member_id>/',            login,         name='login'),
+    path('register/',                         register,      name='register'),
+    path('profile/',                          view_profile,  name='profile'),
+    path('profile/',                          update_profile,name='update_profile'),
+    path('members/',                          list_members,  name='members'),
+    path('admin/deactivate/<int:member_id>/', deactivate,   name='deactivate'),
+    path('report/<int:member_id>/',           report,        name='report'),
+    path('plans/',                            list_plans,    name='plans'),
+    path('plans/',                            add_plan,      name='add_plan'),
+]
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    existing = connection.introspection.table_names()
+    with connection.schema_editor() as se:
+        if 'members' not in existing:   se.create_model(Member)
+        if 'profiles' not in existing:  se.create_model(Profile)
+        if 'plans'    not in existing:   se.create_model(Plan)
+        if 'reports'  not in existing:   se.create_model(Report)
+
+    Member.objects.get_or_create(email='demo@example.com', defaults={'username':'demo','is_admin':False})
+    Member.objects.get_or_create(email='admin@example.com', defaults={'username':'admin','is_admin':True})
+    call_command('runserver', '8000', '--noreload', '--verbosity', '0')
