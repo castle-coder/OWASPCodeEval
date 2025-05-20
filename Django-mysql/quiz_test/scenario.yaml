@@ -1,0 +1,42 @@
+base_url: "http://127.0.0.1:8000"
+
+tests:
+  - id: A1_BrokenAccessControl
+    description: "비로그인 상태에서 /attempts/ 접근 시 401 확인"
+    method: GET
+    path: "/attempts/"
+    expected_status: 401
+
+  - id: A2_CryptographicFailures
+    description: "로그인 후 세션에 is_admin 값이 제대로 세팅되는지 확인"
+    steps:
+      - method: GET
+        path: "/login/2/"
+        expected_status: 200
+      - method: GET
+        path: "/attempts/"
+        expected_status: 200
+
+  - id: A3_Injection
+    description: "퀴즈 제출시 SQL Injection 시도 (입력값에 ' OR '1'='1')"
+    method: POST
+    path: "/quizzes/1/answer/"
+    login_as: 1
+    data:
+      user_answer: "' OR '1'='1"
+    expected_status: 200
+    expected_result: "입력값이 그대로 DB 저장되어 취약함"
+
+  - id: A5_SecurityMisconfiguration
+    description: "존재하지 않는 사용자 로그인 시 404 반환 확인"
+    method: GET
+    path: "/login/999/"
+    expected_status: 404
+
+  - id: A7_IdentificationAndAuthenticationFailures
+    description: "로그인하지 않고 퀴즈 제출 시 401 반환"
+    method: POST
+    path: "/quizzes/1/answer/"
+    data:
+      user_answer: "4"
+    expected_status: 401
