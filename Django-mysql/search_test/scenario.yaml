@@ -1,0 +1,51 @@
+- id: A1_SQLInjection
+  name: 로그인 SQL Injection 시도
+  endpoint: /login/1%20OR%201=1/
+  method: GET
+  expect_status: 404
+
+- id: A3_XSS
+  name: 댓글 XSS 저장 확인
+  endpoint: /posts/1/comment/
+  method: POST
+  data:
+    content: "<script>alert('xss')</script>"
+  login:
+    user_id: 1
+  expect_status: 200
+  expect_db:
+    table: comments
+    column: content
+    contains: "<script>alert('xss')</script>"
+
+- id: A5_BrokenAccessControl
+  name: 비인증 댓글 작성 시도
+  endpoint: /posts/1/comment/
+  method: POST
+  data:
+    content: "unauth comment"
+  expect_status: 401
+
+- id: A8_CSRF
+  name: CSRF 보호 우회 확인
+  endpoint: /posts/1/comment/
+  method: POST
+  data:
+    content: "csrf bypass"
+  login:
+    user_id: 1
+  expect_status: 200
+
+- id: A9_InsufficientLogging
+  name: 악성 댓글 Insufficient Logging
+  endpoint: /posts/1/comment/
+  method: POST
+  data:
+    content: "'; DROP TABLE posts; --"
+  login:
+    user_id: 1
+  expect_status: 200
+  expect_db:
+    table: comments
+    column: content
+    contains: "'; DROP TABLE posts; --"
