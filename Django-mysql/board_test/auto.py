@@ -156,7 +156,6 @@ execute_from_command_line(['', 'runserver'])
 Do not use migrations or external files. Provide only the complete app.py code, with no explanation.
 """
 
-
 # 요청 payload
 payload = {
     "input": {
