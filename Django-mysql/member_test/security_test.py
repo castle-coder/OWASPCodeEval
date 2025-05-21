@@ -1,75 +1,80 @@
-# security_test.py
 import os
-import yaml
 import requests
+import yaml
 import sqlite3
 
-BASE_URL = "http://127.0.0.1:8000"
+from urllib.parse import urljoin
 
-def load_scenarios():
-    here = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(here, "scenario.yaml")
-    with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f)["scenarios"]
+BASE_URL = 'http://127.0.0.1:8000'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCENARIO_PATH = os.path.join(SCRIPT_DIR, 'scenario.yaml')
+DB_PATH = os.path.join(SCRIPT_DIR, 'mock_db.sqlite3')
 
-def run_test(s):
-    session = requests.Session()
-    # 로그인 필요 시
-    if s.get("login_member_id"):
-        session.get(f"{BASE_URL}/login/{s['login_member_id']}/")
-
-    url = BASE_URL + s["endpoint"]
-    method = s["method"].upper()
-    if method == "GET":
-        res = session.get(url)
-    else:
-        res = session.post(url, data=s.get("data", {}))
-
-    status = res.status_code
-    vulnerable = False
-    reason = ""
-
-    # 상태 코드 검증
-    if status != s["expected_status"]:
-        vulnerable = True
-        reason = f"예상 상태 코드 {s['expected_status']}이(가) 아니므로 실패 (실제: {status})"
-    # DB 검사 필요 시
-    elif "check_db" in s:
-        here = os.path.dirname(os.path.realpath(__file__))
-        db_path = os.path.join(here, "mock_db.sqlite3")
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute(s["check_db"]["query"])
-        row = cur.fetchone()
-        cols = [d[0] for d in cur.description]
-        conn.close()
-
-        payload = s["check_db"]["expected_payload"]
-        field_idx = cols.index(s["check_db"]["payload_field"])
-        if row and payload in row[field_idx]:
-            vulnerable = True
-            if s["id"].startswith("A9_"):
-                report_id, _, member_id = row
-                reason = f"악성 신고 내용이 DB에 저장됨 (report_id: {report_id}, member_id: {member_id})"
-            else:
-                reason = f"DB에 악성 입력이 저장됨 ({s['check_db']['payload_field']} = {row[field_idx]})"
-        else:
-            reason = "DB에 악성 입력이 저장되지 않음"
-    else:
-        reason = "예상 결과와 일치"
-
-    # 결과 출력
-    print("--------------------------------------------------")
-    print(f"[Test ID: {s['id']}] {s['title']}")
-    print(f"Status Code: {status}")
-    print(f"결과: {'❌ 취약' if vulnerable else '✅ 안전'}")
+def print_result(scenario_id, status_code, success, reason):
+    icon = '✅' if success else '❌'
+    print(f"{'-'*50}")
+    print(f"[Test ID: {scenario_id}] {reason}")
+    print(f"Status Code: {status_code}")
+    print(f"결과: {icon} {'정상' if success else '취약'}")
     print(f"이유: {reason}")
+    print(f"{'-'*50}")
 
-def main():
-    scenarios = load_scenarios()
-    for s in scenarios:
-        run_test(s)
-    print("--------------------------------------------------")
+def run_tests():
+    with open(SCENARIO_PATH, 'r', encoding='utf-8') as f:
+        scenarios = yaml.safe_load(f)['scenarios']
 
-if __name__ == "__main__":
-    main()
+    for test in scenarios:
+        method = test['method']
+        url = urljoin(BASE_URL, test['endpoint'].lstrip('/'))
+        expected_status = test.get('expected_status', 200)
+        payload = test.get('payload')
+        headers = {'Content-Type': 'application/json'}
+
+        try:
+            if method == 'GET':
+                response = requests.get(url)
+            elif method == 'POST':
+                response = requests.post(url, json=payload, headers=headers)
+            else:
+                print_result(test['id'], 0, False, f"Unsupported HTTP method: {method}")
+                continue
+
+            status_code = response.status_code
+            content = response.text
+
+            # A5: Debug Mode 노출 확인
+            if test.get('expect_debug') is not None:
+                debug_exposed = 'Traceback' in content
+                expected_debug = test['expect_debug']
+                success = debug_exposed == expected_debug
+                reason = '디버그 정보가 노출됨' if debug_exposed else '디버그 정보 없음'
+                print_result(test['id'], status_code, success, reason)
+                continue
+
+            # A9: DB 저장 확인
+            if test.get('verify_db'):
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM members WHERE email=?", (payload['email'],))
+                row = cursor.fetchone()
+                conn.close()
+
+                if row:
+                    success = False
+                    reason = f"악성 신고 내용이 DB에 저장됨 (member_id: {row[0]}, name: {row[1]})"
+                else:
+                    success = True
+                    reason = "악성 내용이 저장되지 않음"
+                print_result(test['id'], status_code, success, reason)
+                continue
+
+            # 일반적인 상태코드 검증
+            success = (status_code == expected_status)
+            reason = f"Expected status {expected_status}, got {status_code}"
+            print_result(test['id'], status_code, success, reason)
+
+        except Exception as e:
+            print_result(test['id'], 0, False, f"오류 발생: {str(e)}")
+
+if __name__ == '__main__':
+    run_tests()

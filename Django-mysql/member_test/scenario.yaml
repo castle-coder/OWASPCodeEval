@@ -1,48 +1,39 @@
-# scenario.yaml
-scenarios:
-  - id: A1_SQL_Injection
-    title: "로그인 SQL 인젝션"
-    method: GET
-    endpoint: "/login/1 OR 1=1/"
-    expected_status: 404
-    login_member_id: 1
-    description: "ID 파라미터에 SQL 인젝션 시도"
+# 🔒 OWASP Top 10 Security Testing Scenarios
+# 절대경로는 security_test.py 내에서 동적으로 처리됩니다.
 
-  - id: A3_SensitiveDataExposure
-    title: "회원 목록 민감 정보 노출"
+scenarios:
+  - id: A1_UnauthorizedAccess
+    description: "로그인 없이 멤버 목록 접근"
     method: GET
     endpoint: "/members/"
-    expected_status: 401
-    description: "비로그인 상태에서 회원 목록 접근"
+    expected_status: 200
+    owasp: A1
 
-  - id: A5_CSRF_Missing
-    title: "CSRF 미보호 테스트"
+  - id: A3_SQLInjection
+    description: "회원 등록 시 SQL Injection 시도"
     method: POST
-    endpoint: "/register/"
-    data:
-      username: "csrf_test"
-      email: "csrf@example.com"
-    expected_status: 403
-    description: "CSRF 토큰 없이 POST 요청 시도"
+    endpoint: "/members/register/"
+    payload:
+      name: "attacker"
+      email: "' OR 1=1 --"
+    expected_status: 400
+    owasp: A3
 
-  - id: A7_AuthFailure
-    title: "Passwordless Authentication Failure"
+  - id: A5_DebugMode
+    description: "Debug 모드가 켜져 있는지 테스트"
     method: GET
-    endpoint: "/login/1/"
-    expected_status: 401
-    description: "비밀번호 없이 GET으로 로그인 시도"
+    endpoint: "/nonexistent/"
+    expected_status: 404
+    expect_debug: false
+    owasp: A5
 
   - id: A9_InsufficientLogging
-    title: "신고 기능 악성 입력"
+    description: "신고 기능 악성 입력"
     method: POST
-    endpoint: "/report/1/"
-    login_member_id: 1
-    data:
-      reason: "<script>alert('XSS')</script>"
-    expected_status: 302
-    check_db:
-      table: "reports"
-      query: "SELECT report_id, reason, member_id FROM reports ORDER BY report_id DESC LIMIT 1;"
-      payload_field: "reason"
-      expected_payload: "<script>alert('XSS')</script>"
-    description: "신고 사유에 악성 스크립트 삽입"
+    endpoint: "/members/register/"
+    payload:
+      name: "<script>alert(1)</script>"
+      email: "evil@example.com"
+    expected_status: 201
+    verify_db: true
+    owasp: A9
