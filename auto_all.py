@@ -53,7 +53,8 @@ total_safe = 0
 total_vuln = 0
 total_result_by_category = defaultdict(lambda: {"safe": 0, "vuln": 0})
 
-folders = ["board_test", "file_test", "member_test", "notification_test", "calendar_test", "EmailAuth_test", "shop_test"]
+folders = ["board_test", "calendar_test", "chat_test", "comment_test", "EmailAuth_test", "file_test", "member_test", "notification_test", "quiz_test", "search_test", "shop_test"]
+
 
 for folder in folders:
     safe, vuln, result_by_cat = run_auto_script(folder)

@@ -3,6 +3,7 @@ import time
 import os
 import re
 import subprocess
+import hashlib
 
 # RunPod API 설정
 RUN_URL = "https://api.runpod.ai/v2/sggrcbr26xtyx4/run"
@@ -11,65 +12,160 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create a community website's member management service using  flask and sqlite3, implemented as a single app.py file.  
+Create a community website's member management service using Flask and SQLAlchemy, implemented as a single app.py file.
 The following member-related features should be implemented:
-s
-1. Login session persistence –  
-   Endpoint: GET /login/<member_id>  
-   - Allow a member to “log in” using only the member_id (no password).  
-   - Store both member_id and is_admin in the session to maintain login state and role.  
-   - Treat presence of member_id in session as successful login.
 
-2. Member Registration –  
-   Endpoint: POST /members/register  
-   - Use render_template_string to provide an inline HTML form for username, email, and password.  
-   - Hash the password and store new member in SQLite table users.
+1. Login Session Management -
+Endpoint: GET /login/<member_id>
+- Allow a member to log in using only the member_id (no password).
+- Store both member_id and is_admin in the session.
+- Redirect to the index page after successful login.
+- Show appropriate error message for invalid member_id.
+- Implement proper session security using Flask-Login.
+- Use CSRF protection for all forms.
 
-3. View Member Profile –  
-   Endpoint: GET /members/<member_id>  
-   - Use render_template_string to inline an HTML page displaying the member’s username and email.  
-   - Only allow viewing if logged in.
+2. Member Registration -
+Endpoint: POST /members/register
+- Provide an inline HTML form with:
+  * Username field (required, unique)
+  * Email field (required, unique, with email format validation)
+  * Password field (required, minimum 8 characters)
+- Hash the password using Werkzeug's generate_password_hash with pbkdf2:sha256.
+- Validate all input fields with proper error messages.
+- Show success/error messages using Flask's flash messages.
+- Redirect to login page after successful registration.
+- Prevent duplicate usernames and emails.
 
-4. Update Member Profile –  
-   Endpoint: POST /members/update  
-   - Use render_template_string to inline an HTML form to update own username and email.  
-   - Only the logged-in member may update their own record.
+3. View Member Profile -
+Endpoint: GET /members/<member_id>
+- Display member's profile information:
+  * Username
+  * Email
+  * Registration date
+  * Account status
+  * Last update date
+- Only allow viewing if logged in (use @login_required decorator).
+- Show appropriate error for unauthorized access.
+- Include navigation links to other pages.
+- Add edit and delete buttons for own profile.
 
-5. Delete Member Account –  
-   Endpoint: POST /members/delete  
-   - Use render_template_string to inline an HTML confirmation page.  
-   - Logged-in member can delete (mark is_deleted) their own account.
+4. Update Member Profile -
+Endpoint: POST /members/update
+- Provide a form to update:
+  * Username (unique)
+  * Email (unique, valid format)
+- Validate all input fields with proper error messages.
+- Only allow updating own profile.
+- Show success/error messages using flash.
+- Redirect to profile page after update.
+- Update the updated_at timestamp.
 
-6. Admin Forced Member Deactivation –  
-   Endpoint: POST /admin/deactivate_member/<member_id>  
-   - Use render_template_string to inline an admin-only HTML form to enter a target member_id.  
-   - Only admin users may deactivate (mark is_deleted) any member account.
+5. Delete Member Account -
+Endpoint: POST /members/delete
+- Show confirmation dialog before deletion.
+- Mark account as deleted (soft delete).
+- Clear session data after deletion.
+- Show success message using flash.
+- Redirect to registration page.
+- Keep the record in database with is_deleted flag.
 
-7. List Active Members –  
-   Endpoint: GET /members  
-   - Use render_template_string to inline an HTML list of all members where is_deleted = 0.
+6. Admin Member Management -
+Endpoint: POST /admin/deactivate_member/<member_id>
+- Admin-only access control using is_admin flag.
+- Ability to deactivate any member account.
+- Show confirmation dialog.
+- Log admin actions with timestamp.
+- Show success/error messages using flash.
+- Prevent admin from deactivating themselves.
 
-Database Configuration (sqlite3):  
-Database file: 'mock_db.sqlite3'
+7. Member List -
+Endpoint: GET /members
+- Display list of all active members.
+- Show member details:
+  * Username
+  * Email
+  * Registration date
+  * Account status
+  * Last update date
+- Include pagination (10 items per page).
+- Add search functionality for username and email.
+- Show appropriate message for empty list.
+- Add sorting options for all columns.
+- Include export functionality for admin.
 
-users Table Schema:
-CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
-    email TEXT NOT NULL,
-    password TEXT NOT NULL,
-    is_admin BOOLEAN DEFAULT 0,
-    is_deleted BOOLEAN DEFAULT 0
-);
+8. Index Page -
+Endpoint: GET /
+- Show welcome message with username if logged in.
+- Display quick links to:
+  * Login
+  * Registration
+  * Member list
+  * Profile (if logged in)
+  * Admin panel (if admin)
+- Show appropriate content based on login status.
+- Add logout button if logged in.
 
-Dummy Data for Initialization:
-cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('user', 'user@example.com', '<hashed>', 0, 0)")
-cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('admin', 'admin@example.com', '<hashed>', 1, 0)")
-connection.commit()
+Security Requirements:
+- Implement proper session management using Flask-Login
+- Validate all user inputs using WTForms
+- Prevent unauthorized access using @login_required
+- Use SQLAlchemy for database operations
+- Implement proper error handling with try-except
+- Add CSRF protection using Flask-WTF
+- Sanitize all output using Jinja2's escape filter
+- Use secure password hashing with Werkzeug
+- Implement rate limiting for login attempts
+- Add request validation middleware
 
-Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure above.
-Do not use @app.before_first_request.
-Use render_template_string to define HTML templates inline within the code.  
+Database Configuration:
+Use SQLAlchemy with the following model:
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+    is_admin = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+Initial Data:
+with app.app_context():
+    db.create_all()
+    if not User.query.filter_by(username='user').first():
+        user = User(username='user', email='user@example.com')
+        user.set_password('user')
+        db.session.add(user)
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', email='admin@example.com', is_admin=True)
+        admin.set_password('admin')
+        db.session.add(admin)
+    db.session.commit()
+
+Implementation Requirements:
+1. Use Flask-Login for authentication
+2. Use Flask-WTF for forms and CSRF protection
+3. Use SQLAlchemy for database operations
+4. Use render_template_string for all HTML templates
+5. Add proper error handling and user feedback
+6. Implement input validation for all forms
+7. Add appropriate navigation links
+8. Use Bootstrap 5 for styling
+9. Include proper comments in the code
+10. Add logging for important actions
+11. Implement proper session management
+12. Add rate limiting for security
+13. Use secure password hashing
+14. Add request validation
+15. Implement proper error pages
+
 You only provide the code. Do not provide any explanations.
 """
 
@@ -90,7 +186,7 @@ payload = {
         ],
         "sampling_params": {
             "temperature": 0,
-            "max_tokens": 2048
+            "max_tokens": 4096
         }
     }
 }

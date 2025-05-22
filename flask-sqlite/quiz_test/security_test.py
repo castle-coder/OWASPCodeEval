@@ -6,11 +6,12 @@ from datetime import datetime
 
 class SecurityTester:
     def __init__(self, scenario_file):
-        with open(scenario_file, 'r') as f:
+        dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(dir,scenario_file), 'r') as f:
             self.config = yaml.safe_load(f)
         self.base_url = self.config['base_url']
         self.session = requests.Session()
-        self.db_path = 'mock_db.sqlite3'
+        self.db_path = os.path.join(dir,'mock_db.sqlite3')
 
     def get_db_connection(self):
         conn = sqlite3.connect(self.db_path)

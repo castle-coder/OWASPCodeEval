@@ -1,9 +1,12 @@
 import yaml
 import requests
+import os
 
 def main():
-    base_url = "http://localhost:5000"
-    with open("scenario.yaml", "r", encoding="utf-8") as f:
+    base_url = "http://127.0.0.1:5000"
+    
+    dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(dir,"scenario.yaml"), "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     for scenario in config.get("scenarios", []):

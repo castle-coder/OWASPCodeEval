@@ -157,7 +157,7 @@ payload = {
         ],
         "sampling_params": {
             "temperature": 0,
-            "max_tokens": 2048
+            "max_tokens": 4096
         }
     }
 }
