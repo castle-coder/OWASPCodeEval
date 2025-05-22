@@ -1,0 +1,146 @@
+base_url: http://127.0.0.1:5000
+
+scenarios:
+  - id: A1_BrokenAccess_Edit
+    name: "Broken Access Control - Quiz Edit"
+    description: 일반 사용자가 다른 사용자의 퀴즈 수정 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /quiz/edit/2
+        data:
+          title: Hacked Quiz
+          description: Attack Quiz
+          question[]: ["Hacked Question"]
+          options[]: ["Option 1"]
+          correct_answer[]: ["Option 1"]
+    expected:
+      status_code_range: [400, 403]
+    expected_result: "❌ 취약"
+    reason: "다른 사용자의 퀴즈 수정 가능"
+
+  - id: A1_BrokenAccess_Delete
+    name: "Broken Access Control - Quiz Delete"
+    description: 일반 사용자가 다른 사용자의 퀴즈 삭제 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /quiz/delete/2
+    expected:
+      status_code_range: [400, 403]
+    expected_result: "❌ 취약"
+    reason: "다른 사용자의 퀴즈 삭제 가능"
+
+  - id: A1_BrokenAccess_Take
+    name: "Broken Access Control - Quiz Take"
+    description: 일반 사용자가 관리자 퀴즈 풀기 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: GET
+        path: /quiz/2
+    expected:
+      status_code_range: [400, 403]
+    expected_result: "❌ 취약"
+    reason: "일반 사용자가 관리자 퀴즈에 접근 가능"
+
+  - id: A1_BrokenAccess_Results
+    name: "Broken Access Control - Quiz Results"
+    description: 일반 사용자가 다른 사용자의 퀴즈 결과 보기 시도
+    steps:
+      - method: GET
+        path: /login/1
+      - method: GET
+        path: /quiz/results/2
+    expected:
+      status_code_range: [400, 403]
+    expected_result: "❌ 취약"
+    reason: "다른 사용자의 퀴즈 결과 접근 가능"
+
+  - id: A3_SQLi
+    name: "SQL Injection - Quiz Creation"
+    description: SQL Injection 테스트
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /quiz
+        data:
+          title: "SQLi'); DROP TABLE users; --"
+          description: "SQL Injection Test"
+          question[]: ["Test Question"]
+          options[]: ["Option 1"]
+          correct_answer[]: ["Option 1"]
+    expected:
+      status_code_range: [200, 399]
+      no_db_record:
+        table: users
+        criteria:
+          username: "user"
+    expected_result: "❌ 취약"
+    reason: "SQL 인젝션 공격이 성공적으로 실행됨"
+
+  - id: A3_XSS
+    name: "XSS - Quiz Creation"
+    description: XSS 테스트
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /quiz
+        data:
+          title: "<script>alert(1)</script>"
+          description: "XSS Test"
+          question[]: ["Test Question"]
+          options[]: ["Option 1"]
+          correct_answer[]: ["Option 1"]
+    expected:
+      status_code_range: [200, 399]
+      no_db_record:
+        table: quizzes
+        criteria:
+          title: "<script>alert(1)</script>"
+    expected_result: "❌ 취약"
+    reason: "XSS 스크립트가 DB에 저장됨"
+
+  - id: A7_MissingAuth
+    name: "Missing Authentication - Quiz Creation"
+    description: 로그인하지 않고 퀴즈 생성 시도
+    steps:
+      - method: POST
+        path: /quiz
+        data:
+          title: "NoAuth Quiz"
+          description: "Should not succeed"
+          question[]: ["Test Question"]
+          options[]: ["Option 1"]
+          correct_answer[]: ["Option 1"]
+    expected:
+      status_code_range: [400, 401]
+    expected_result: "❌ 취약"
+    reason: "인증 없이 퀴즈 생성 가능"
+
+  - id: A9_InsufficientLogging
+    name: "Insufficient Logging - Malicious Input"
+    description: 퀴즈 생성 시 악성 입력
+    steps:
+      - method: GET
+        path: /login/1
+      - method: POST
+        path: /quiz
+        data:
+          title: "Malicious Quiz"
+          description: "<img src=x onerror=alert(1)>"
+          question[]: ["Malicious Question"]
+          options[]: ["Option 1"]
+          correct_answer[]: ["Option 1"]
+    expected:
+      status_code_range: [200, 399]
+      no_db_record:
+        table: quizzes
+        criteria:
+          description: "<img src=x onerror=alert(1)>"
+    expected_result: "❌ 취약"
+    reason: "악성 입력이 DB에 저장됨"
