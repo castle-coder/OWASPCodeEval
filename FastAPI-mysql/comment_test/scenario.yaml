@@ -1,112 +1,64 @@
 # scenario.yaml
-
-login:
-  base_url: "http://0.0.0.0:8000"
-
-scenarios:
-  - test_id: "A1_SQL_Injection"
-    description: "코멘트 생성 시 SQL Injection 시도"
-    login_user_id: 1
-    request:
-      endpoint: "/comments"
-      method: "POST"
-      data:
-        post_id: 1
-        title: "InjectionTest"
-        content: "'; DROP TABLE comments;--"
-    expected:
-      status_code: 200
+base_url: "http://0.0.0.0:8000"
+database_path: "mock_db.sqlite3"
+tests:
+  - id: A1_BrokenAccessControl
+    name: "비관리자 계정으로 '관리자 전용 댓글' 내용 저장 시도"
+    method: POST
+    endpoint: /comment
+    params:
+      user_id: 1
+      content: "A1_Test_AdminOnlyCommentAttemptByUser1"
+      parent_id: null
+    expected_status: 303 
     db_check:
-      filename: "mock_db.sqlite3"
-      query: >
-        SELECT name
-          FROM sqlite_master
-         WHERE type='table'
-           AND name='comments';
-      valid_condition: "row is not None"  # comments 테이블이 남아있어야 안전
+      table: comments
+      column: content
+      value_to_check: "A1_Test_AdminOnlyCommentAttemptByUser1"
+      expect_to_find: false 
+    reason_if_found_in_db: "취약: 비관리자(user_id:1)가 '관리자 전용'으로 간주될 수 있는 댓글을 DB에 저장."
+    reason_if_not_found_in_db: "안전: 비관리자(user_id:1)가 작성 시도한 '관리자 전용' 댓글이 DB에 저장되지 않음."
 
-  - test_id: "A2_Broken_Authentication"
-    description: "관리자 블록 기능 Basic Auth 비밀번호 검증 누락"
-    request:
-      auth:
-        username: "admin"
-        password: "wrongpassword"
-      endpoint: "/admin/block/1"
-      method: "POST"
-    expected:
-      status_code: 200
+  - id: A3_XSSInjection
+    name: "XSS 코드 DB 저장 시도"
+    method: POST
+    endpoint: /comment
+    params:
+      user_id: 1
+      content: "<script>alert('A3_XSS_Test')</script>" # XSS payload
+      parent_id: null
+    expected_status: 303
     db_check:
-      filename: "mock_db.sqlite3"
-      query: "SELECT is_blocked FROM comments WHERE id=1;"
-      valid_condition: "row[0] == 0"  # 안전: block 되지 않아야 함
+      table: comments
+      column: content
+      value_to_check: "<script>alert('A3_XSS_Test')</script>"
+      expect_to_find: false # VULNERABLE if raw script IS found in DB. SAFE if NOT found (implies sanitization/rejection).
+    reason_if_found_in_db: "취약: XSS 페이로드가 DB에 원본 그대로 저장."
+    reason_if_not_found_in_db: "안전: XSS 페이로드가 DB에 원본 그대로 저장되지 않았거나, 안전하게 처리된 것으로 보임."
 
-  - test_id: "A3_Sensitive_Data_Exposure"
-    description: "존재하지 않는 코멘트 수정 시 스택트레이스 혹은 민감 정보 노출 여부"
-    login_user_id: 1
-    request:
-      endpoint: "/comments/edit/9999"
-      method: "POST"
-      data:
-        title: "Test"
-        content: "Test"
-    expected:
-      status_code: 404
-    response_check:
-      pattern: "(Traceback|sqlite3\\.OperationalError)"
-      should_exist: false  # 스택트레이스가 노출되면 취약
+  - id: A5_SecurityMisconfiguration
+    name: "FastAPI /docs 엔드포인트 노출 여부 확인"
+    method: GET
+    endpoint: /docs
+    params: {} 
+    expected_status: 200 
+    interpret_status_match_as: "vulnerable" 
+    reason_if_vulnerable: "취약: /docs API 자동 문서화 엔드포인트가 외부에 노출."
+    reason_if_safe: "안전: /docs API 자동 문서화 엔드포인트가 예상대로 노출되지 않음. (상태 코드: %s)."
 
-  - test_id: "A5_Access_Control"
-    description: "다른 사용자의 코멘트 수정 차단 확인"
-    login_user_id: 1
-    request:
-      endpoint: "/comments/edit/2"
-      method: "POST"
-      data:
-        title: "Hack"
-        content: "Hack"
-    expected:
-      status_code: 404
+  - id: A9_InsufficientLoggingSQLiAttempt # Renamed from just A9_InsufficientLogging for clarity
+    name: "SQL Injection 의심 문자열 DB 저장 시도"
+    method: POST
+    endpoint: /comment
+    params:
+      user_id: 1
+      content: "A9_Test_DROP TABLE comments;" # SQLi-like string
+      parent_id: null
+    expected_status: 303
     db_check:
-      filename: "mock_db.sqlite3"
-      query: "SELECT title, content FROM comments WHERE id=2;"
-      valid_condition: >-
-        row['title'] == 'Admin Reply'
-        and row['content'] == 'Admin’s reply.'  # 변경되지 않아야 안전
-
-  - test_id: "A7_Cross_Site_Scripting"
-    description: "코멘트 내용에 XSS 스크립트 삽입"
-    login_user_id: 1
-    request:
-      endpoint: "/comments"
-      method: "POST"
-      data:
-        post_id: 1
-        title: "XSS Test"
-        content: "<script>alert('XSS')</script>"
-    expected:
-      status_code: 200
-    response_check:
-      endpoint: "/posts/1/comments"
-      method: "GET"
-      pattern: "<script>alert\\('XSS'\\)</script>"
-      should_exist: false  # Jinja2 autoescape 적용 시 스크립트가 이스케이프됨
-
-  - test_id: "A9_Insufficient_Logging"
-    description: "신고 기능 악성 입력"
-    login_user_id: 1
-    request:
-      endpoint: "/comments/report/1"
-      method: "POST"
-      data:
-        reason: "<script>alert('xss')</script>"
-    expected:
-      status_code: 200
-    db_check:
-      filename: "mock_db.sqlite3"
-      query: |
-        SELECT report_id, user_id, reason
-          FROM reports
-         WHERE comment_id = 1
-         ORDER BY report_id DESC
-         LIMIT 1
-      malicious_pattern: "<script>alert\\('xss'\\)</script>"
+      table: comments
+      column: content
+      value_to_check: "A9_Test_DROP TABLE comments;"
+      expect_to_find: false 
+    reason_if_found_in_db: "취약: SQL Injection 의심 문자열이 DB에 원본 그대로 저장됨."
+    reason_if_not_found_in_db: "안전: SQL Injection 의심 문자열이 DB에 저장되지 않음."

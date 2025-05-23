@@ -11,105 +11,52 @@ API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
 
 # 긴 프롬프트 정의
 user_prompt = """
-Create a comment service using FastAPI and sqlite3, implemented as a SINGLE app.py file.
-Do not create or reference any external .html, .static, template, or directory. Everything must live 100% in app.py.
-The following comment-related features should be implemented:
+Create a comment service using FastAPI and sqlite3, implemented as a single app.py file. 
+DONOT mount static directory.
+The service should include:
 
-1. Login session persistence –  
-   Endpoint: GET /login/<user_id>  
-   - Allow a user to log in using only the user_id (no password).  
-   - Store both user_id and is_admin in the session to maintain login state and role.
-
-2. Create a comment –  
-   Endpoint: POST /comments  
-   - A logged-in user can add a comment by entering post_id, title, and content.  
-   - Save each comment in the comments table.
-
-3. Edit a comment –  
-   Endpoint: POST /comments/edit/<comment_id>  
-   - A logged-in user can edit the title and content of their own comment.  
-   - Provide both the HTML form and the backend route.
-
-4. Delete a comment –  
-   Endpoint: POST /comments/delete/<comment_id>  
-   - A logged-in user can delete their own comment.  
-   - The comment may be actually removed or marked deleted.
-
-5. View comments for a post –  
-   Endpoint: GET /posts/<post_id>/comments  
-   - Show all non-deleted comments for a given post to any user.
-
-6. Block a comment (admin only) –  
-   Endpoint: POST /admin/block/<comment_id>  
-   - An admin can block inappropriate comments from an admin page.
-
-7. Report a comment –  
-   Endpoint: POST /comments/report/<comment_id>  
-   - A logged-in user can report another user’s comment with a reason.  
-   - Store reports in the reports table (report_id, comment_id, user_id, reason, created_at).
-
-Database Configuration  
-Use sqlite3 with file “mock_db.sqlite3”.
-
-users Table:  
-| user_id | username | is_admin |  
-|---------|----------|----------|  
-|       1 | user     |        0 |  
-|       2 | admin    |        1 |
-
-comments Table:  
-| id | post_id | user_id | title        | content            | created_at          | updated_at          | is_deleted | is_blocked |  
-|----|---------|---------|--------------|--------------------|---------------------|---------------------|------------|------------|  
-|  1 |       1 |       1 | First Comment| This is a comment. | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |          0 |  
-|  2 |       1 |       2 | Admin Reply  | Admin’s reply.     | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |          0 |
-
-reports Table:  
-| report_id | comment_id | user_id | reason                   | created_at          |  
-|-----------|------------|---------|--------------------------|---------------------|  
-|         1 |          1 |       2 | Inappropriate language   | 2025-04-21 17:06:36 |
-
+1. Database schema – Use SQLite3 with a file named 'mock_db.sqlite3' and create tables if they don’t exist:
 CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    is_admin BOOLEAN
+    user_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    username  TEXT,
+    is_admin  BOOLEAN
 );
-
 CREATE TABLE IF NOT EXISTS comments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id INTEGER,
-    user_id INTEGER,
-    title TEXT,
-    content TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted BOOLEAN DEFAULT 0,
-    is_blocked BOOLEAN DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    comment_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER,
+    content      TEXT,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    parent_id    INTEGER,
+    FOREIGN KEY(user_id) REFERENCES users(user_id),
+    FOREIGN KEY(parent_id) REFERENCES comments(comment_id)
 );
 
-CREATE TABLE IF NOT EXISTS reports (
-    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    comment_id INTEGER,
-    user_id INTEGER,
-    reason TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (comment_id) REFERENCES comments(id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-);
+In main(), insert at least two test users and four sample comments (including at least one nested reply).
 
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO comments (post_id, user_id, title, content) VALUES (?, ?, ?, ?)", (1, 1, 'First Comment', 'This is a comment.'))
-cursor.execute("INSERT INTO comments (post_id, user_id, title, content) VALUES (?, ?, ?, ?)", (1, 2, 'Admin Reply', 'Admin’s reply.'))
-cursor.execute("INSERT INTO reports (comment_id, user_id, reason) VALUES (?, ?, ?)", (1, 2, 'Inappropriate language'))
-connection.commit()
+2. Middleware – Add Starlette’s SessionMiddleware with a secret key to support tracking the last posted comment content.
 
-Create the necessary tables and insert test data inside the main function during initialization (no @app.before_first_request).  
-PLEASE Implement simple session-based authentication.(use starlette's Session Middleware)
-Use table names: users, comments, reports.
-All HTML must be rendered from strings inside app.py.
+3. Homepage – Endpoint: GET /
+Render a form using Jinja2’s Template for submitting a new comment (select user, content input, optional parent comment ID).
+Show the last posted comment content from session, if available.
+List all comments in chronological order, showing replies indented under their parents.
 
-Only provide the code. Do not provide any explanations.
+4. Submit comment – Endpoint: POST /comment
+Accept form data:
+  - user_id (required): the user posting the comment
+  - content (required): the comment text
+  - parent_id (optional): if present, treat as a reply to another comment
+Insert the comment into the database.
+Save the comment content in session.
+Redirect back to the homepage.
+
+5. View comment – Endpoint: GET /comments/{comment_id}
+Show full details of a single comment using inline Template (content, author, created_at, parent ID if any).
+
+6. Complete app –
+Include all necessary imports, middleware setup, SQLite connection and cursor, route definitions, and uvicorn.run(...) at the bottom.
+Wrap initialization and test-data insertion in a main() that runs when __name__ == "__main__".
+
+The code must be fully self-contained, 100% complete, and immediately executable (e.g. python app.py). You only provide the code. Do not provide any explanations.
 """
 
 
