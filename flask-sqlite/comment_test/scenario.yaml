@@ -1,0 +1,216 @@
+base_url: http://127.0.0.1:5000
+db_path: mock_db.sqlite3
+
+tests:
+# ────────────────────────── A1. Broken Access Control
+- id: A1_Unauth_CreateComment
+  name: "비로그인 댓글 생성 시도"
+  description: "세션 없이 POST /comment/create → 글이 실제로 저장되면 취약"
+  login_user: null
+  request:
+    method: POST
+    path: /comment/create
+    data:
+      post_id: 1
+      content: "⚠ UNAUTH_CMT"
+      parent_id: ""
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "content = '⚠ UNAUTH_CMT'"
+      column: id
+      must_equal: null            # None 이면 안전
+
+- id: A1_Unauth_DeleteComment
+  name: "비로그인 댓글 삭제 시도"
+  login_user: null
+  request:
+    method: POST
+    path: /comment/delete/1
+    data: { post_id: 1 }
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 1"
+      column: is_deleted
+      must_equal: 0
+
+- id: A1_Unauth_AdminBlock
+  name: "비로그인 관리자 차단 시도"
+  login_user: null
+  request:
+    method: POST
+    path: /admin/block/1
+    data: { post_id: 1 }
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 1"
+      column: is_blocked
+      must_equal: 0
+
+# ────────────────────────── A3. Injection
+- id: A3_SQLi_CommentContent
+  name: "SQLi 시도 – 댓글 내용"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/create
+    data:
+      post_id: 1
+      content: "'); DROP TABLE posts; --"
+      parent_id: ""
+  expect:
+    status: 302
+    db:
+      table: posts
+      where: "id = 1"
+      column: title
+      must_match: "First Post"    # 테이블이 살아있어야 안전
+
+- id: A3_SQLi_ReportReason
+  name: "SQLi 시도 – 신고 사유"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/report/1
+    data:
+      reason: "1'); DROP TABLE comments; --"
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 1"
+      column: content
+      must_match: "First comment"
+
+# ────────────────────────── A4. Insecure Design (IDOR)
+- id: A4_IDOR_EditOther
+  name: "타인 댓글 수정(IDOR)"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/edit/2
+    data:
+      post_id: 1
+      content: "⚠ IDOR_HACK"
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 2"
+      column: content
+      must_not_match: "IDOR_HACK"
+
+- id: A4_IDOR_DeleteOther
+  name: "타인 댓글 삭제(IDOR)"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/delete/2
+    data: { post_id: 1 }
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 2"
+      column: is_deleted
+      must_equal: 0
+
+# ────────────────────────── A7. Identification & Auth Failures
+- id: A7_Auth_Bypass_AdminBlock
+  name: "user 권한으로 관리자 차단 시도"
+  login_user: user
+  request:
+    method: POST
+    path: /admin/block/1
+    data: { post_id: 1 }
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 1"
+      column: is_blocked
+      must_equal: 0
+
+# ────────────────────────── A8. Software & Data Integrity
+- id: A8_Integrity_TamperTimestamp
+  name: "created_at 무결성 변조 시도"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/edit/1
+    data:
+      post_id: 1
+      content: "Tamper"
+      created_at: "1999-01-01 00:00:00"
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "id = 1"
+      column: created_at
+      must_not_match: "1999-01-01"
+
+# ────────────────────────── A9. Security Logging & Monitoring (저장 XSS 예시)
+- id: A9_StoredXSS_Comment
+  name: "저장 XSS – 댓글"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/create
+    data:
+      post_id: 1
+      content: "<script>alert('c')</script>"
+      parent_id: ""
+  expect:
+    status: 302
+    db:
+      table: comments
+      where: "content = '<script>alert(''c'')</script>'"
+      column: id
+      must_match: ".*"            # 존재하면 취약
+
+- id: A9_StoredXSS_Report
+  name: "저장 XSS – 신고"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/report/1
+    data:
+      reason: "<img src=x onerror=alert('r')>"
+  expect:
+    status: 302
+    db:
+      table: reports
+      where: "reason = '<img src=x onerror=alert(''r'')>'"
+      column: id
+      must_match: ".*"
+
+# ────────────────────────── A10. SSRF (Dummy)
+- id: A10_SSRF_Dummy
+  name: "SSRF 가능성 확인(더미)"
+  login_user: user
+  request:
+    method: GET
+    path: /index
+  expect:
+    status: 200
+
+# ────────────────────────── 추가 참고 시나리오
+- id: Extra_MassCommentSpam
+  name: "스팸 댓글 대량 등록"
+  description: "1초 동안 10회 연속 등록 시도 → 속도 제한 없으면 취약"
+  login_user: user
+  request:
+    method: POST
+    path: /comment/create
+    data:
+      post_id: 1
+      content: "SPAM_TEST"
+      parent_id: ""
+  expect:
+    status: 302        # 단순 예시로 302만 검사
