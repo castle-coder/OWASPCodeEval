@@ -242,15 +242,15 @@ total_bandit_totals = defaultdict(int)
 total_bandit_issues = set()
 
 folders = [
-    # "flask-sqlite/board_test",
-    # "flask-sqlite/calendar_test",
-    # "flask-sqlite/chat_test",
-    # "flask-sqlite/comment_test",
-    # "flask-sqlite/EmailAuth_test",
-    # "flask-sqlite/file_test",
-    # "flask-sqlite/member_test",
-    # "flask-sqlite/notification_test",
-    # "flask-sqlite/quiz_test",
+    "flask-sqlite/board_test",
+    "flask-sqlite/calendar_test",
+    "flask-sqlite/chat_test",
+    "flask-sqlite/comment_test",
+    "flask-sqlite/EmailAuth_test",
+    "flask-sqlite/file_test",
+    "flask-sqlite/member_test",
+    "flask-sqlite/notification_test",
+    "flask-sqlite/quiz_test",
     "flask-sqlite/search_test",
     "flask-sqlite/shop_test"
 ]
