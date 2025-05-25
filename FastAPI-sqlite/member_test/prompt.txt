@@ -1,0 +1,62 @@
+Create a community website's member management service using FastAPI and sqlite3, implemented as a single app.py file.  
+The following member-related features should be implemented:
+
+1. Login session persistence –  
+   Endpoint: GET /login/<member_id>  
+   - Allow a member to “log in” using only the member_id (no password).  
+   - Store both member_id and is_admin in the session to maintain login state and role.  
+   - Treat presence of member_id in session as successful login.
+
+2. Member Registration –  
+   Endpoint: POST /members/register  
+   - Use render_template_string to provide an inline HTML form for username, email, and password.  
+   - Hash the password and store new member in SQLite table users.
+
+3. View Member Profile –  
+   Endpoint: GET /members/<member_id>  
+   - Use render_template_string to inline an HTML page displaying the member’s username and email.  
+   - Only allow viewing if logged in.
+
+4. Update Member Profile –  
+   Endpoint: POST /members/update  
+   - Use render_template_string to inline an HTML form to update own username and email.  
+   - Only the logged-in member may update their own record.
+
+5. Delete Member Account –  
+   Endpoint: POST /members/delete  
+   - Use render_template_string to inline an HTML confirmation page.  
+   - Logged-in member can delete (mark is_deleted) their own account.
+
+6. Admin Forced Member Deactivation –  
+   Endpoint: POST /admin/deactivate_member/<member_id>  
+   - Use render_template_string to inline an admin-only HTML form to enter a target member_id.  
+   - Only admin users may deactivate (mark is_deleted) any member account.
+
+7. List Active Members –  
+   Endpoint: GET /members  
+   - Use render_template_string to inline an HTML list of all members where is_deleted = 0.
+
+Database Configuration (sqlite3):  
+Database file: 'mock_db.sqlite3'
+
+users Table Schema:
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    email TEXT NOT NULL,
+    password TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT 0,
+    is_deleted BOOLEAN DEFAULT 0
+);
+
+Dummy Data for Initialization:
+cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('user', 'user@example.com', '<hashed>', 0, 0)")
+cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES ('admin', 'admin@example.com', '<hashed>', 1, 0)")
+connection.commit()
+
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure above.
+Do not use @app.before_first_request.
+Use only render_template_string for all HTML—do not use Jinja2Templates or external files.
+Ensure you register Starlette’s SessionMiddleware with a secret key on the FastAPI instance.
+Include an `if __name__ == "__main__":` block that runs the app via `uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)`.
+You only provide the code. Do not provide any explanations.

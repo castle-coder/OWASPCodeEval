@@ -102,7 +102,6 @@ def view_event(event_id):
     conn.close()
     if not event:
         return 'Event not found'
-    
     return render_template_string('''
         <h1>{{ event.title }}</h1>
         <p>Date: {{ event.event_date }}</p>

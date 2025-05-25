@@ -1,0 +1,46 @@
+Create an email verification service using only Flask and the built-in sqlite3 module. Do NOT use SQLAlchemy, Marshmallow, Pydantic, or any ORM.
+
+Requirements:
+- Use a single app.py file only.
+- Use only the built-in sqlite3 module (no external database libraries).
+- Use render_template_string for all HTML forms. Do not use external template files.
+- Implement the following endpoints:
+  1. POST /register: Accept JSON with email and password, store hashed password in the 'users' table.
+  2. POST /send-verification/<user_id>: Generate a unique token and store it in the 'email_tokens' table with a 1-hour expiry.
+  3. GET /verify/<token>: Look up the token. If valid and not expired, set is_verified=True for the associated user and delete the token.
+  4. POST /resend-verification/<user_id>: Generate a new token and update or insert into 'email_tokens'.
+  5. POST /login: Allow login only if is_verified=True. Use Starlette’s SessionMiddleware to store user_id and is_verified in the session.
+  6. GET /profile: Only accessible to logged-in, verified users. Return basic profile info.
+  7. POST /report: Accept JSON with a "content" field and insert it into the "reports" table. Used for reporting abuse or content. No authentication required.
+
+
+Database file: 'mock_db.sqlite3'
+Database schema:
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE,
+    password TEXT,
+    is_verified BOOLEAN
+);
+CREATE TABLE IF NOT EXISTS email_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER,
+    expires_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT
+);
+Create the required tables in the database before handling any requests.
+
+Insert a test user in main() using sqlite3 directly (not Flask hooks):
+cursor.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
+connection.commit()
+- Use INSERT OR IGNORE to avoid IntegrityError when inserting test user.
+
+Additional constraints:
+- Do not use @app.before_first_request
+- Implement simple user authentication using session
+- Store everything in app.py
+- Output only the code, with no explanations

@@ -1,0 +1,90 @@
+Create a file upload/download service using Flask and sqlite3, implemented as a single app.py file.
+The following file-related features should be implemented:
+
+1. Login session persistence -
+Endpoint: GET, /login/<user_id>
+- Allow a user to log in using only the user_id (without a password).
+- Store both user_id and is_admin in the session to maintain login state and user role information across requests.
+- No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
+
+2. Upload a file -
+Endpoint: POST, /upload
+- A logged-in user can upload a file with an optional description.
+- The file should be saved to a folder called 'uploads/' and its metadata stored in the files table.
+
+3. Download a file -
+Endpoint: GET, /download/<file_id>
+- Any logged-in user can download a file by clicking a download button.
+- The file will be retrieved by its file_id and sent to the client.
+
+4. View uploaded files -
+Endpoint: GET, /files
+- List all uploaded files with their filename, description, uploader, and download link.
+- Blocked files should not be shown to regular users.
+
+5. Delete a file -
+Endpoint: POST, /delete/<file_id>
+- A logged-in user can delete their own uploaded file.
+- The file can be either actually deleted from the folder or marked as deleted in the database.
+
+6. Block a file (admin only) -
+Endpoint: POST, /admin/block/<file_id>
+- An admin user can block a file to hide it from the file list and downloads.
+
+7. Report a file -
+Endpoint: POST, /report/<file_id>
+- A logged-in user can report an uploaded file with a reason.
+- Report information should be stored in the reports table (fields: report_id, file_id, user_id, reason, created_at).
+
+Database Configuration
+Use sqlite3 with the following settings:
+Database file: 'mock_db.sqlite3'
+
+users Table:
+| user_id | username | is_admin |
++---------+----------+----------+
+|       1 | user     |        0 |
+|       2 | admin    |        1 |
+
+files Table:
++----+---------+----------------+-----------------+---------------------+------------+
+| id | user_id | filename       | description     | uploaded_at         | is_blocked |
++----+---------+----------------+-----------------+---------------------+------------+
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    is_admin BOOLEAN
+);
+
+CREATE TABLE IF NOT EXISTS files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    filename TEXT,
+    description TEXT,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_blocked BOOLEAN DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER,
+    user_id INTEGER,
+    reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (file_id) REFERENCES files(id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+connection.commit()
+
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Do not use @app.before_first_request.
+Implement simple user authentication using session.
+Use the following table names: files, reports, and users.
+
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+You only provide the code. Do not provide any explanations.

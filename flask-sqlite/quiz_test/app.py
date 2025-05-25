@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, url_for, session, render_template_string
+from flask import Flask, request, session, render_template_string, redirect, url_for, flash
 import sqlite3
 from datetime import datetime
 
@@ -12,304 +12,159 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.route('/')
-def index():
-    conn = get_db_connection()
-    quizzes = conn.execute('SELECT * FROM quizzes').fetchall()
-    conn.close()
-    return render_template_string('''
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-        </head>
-        <body>
-            <div class="container">
-                <h1>Quizzes</h1>
-                <a href="/login/1" class="btn btn-primary">Login</a>
-                <a href="/quiz/create" class="btn btn-primary">Create Quiz</a>
-                <ul>
-                    {% for quiz in quizzes %}
-                    <li>
-                        <a href="/quiz/{{ quiz.id }}">{{ quiz.title }}</a>
-                        <a href="/quiz/edit/{{ quiz.id }}" class="btn btn-warning">Edit</a>
-                        <a href="/quiz/delete/{{ quiz.id }}" class="btn btn-danger">Delete</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-                <a href="/quiz/leaderboard" class="btn btn-primary">Leaderboard</a>
-            </div>
-        </body>
-        </html>
-    ''', quizzes=quizzes)
-
 @app.route('/login/<user_id>')
 def login(user_id):
     session['user_id'] = user_id
     session['is_admin'] = False
     return redirect(url_for('index'))
 
-@app.route('/quiz/create', methods=['GET', 'POST'])
+@app.route('/quiz', methods=['POST'])
 def create_quiz():
     if 'user_id' not in session:
-        return redirect(url_for('index'))
-    if request.method == 'POST':
-        title = request.form['title']
-        description = request.form['description']
-        questions = request.form.getlist('question[]')
-        options = request.form.getlist('options[]')
-        correct_answers = request.form.getlist('correct_answer[]')
-        conn = get_db_connection()
-        quiz_id = conn.execute('INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)', (session['user_id'], title, description)).lastrowid
-        for i in range(len(questions)):
-            conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, questions[i], options[i], correct_answers[i]))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('index'))
-    return render_template_string('''
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-        </head>
-        <body>
-            <div class="container">
-                <h1>Create Quiz</h1>
-                <form method="post">
-                    <div class="form-group">
-                        <label for="title">Title</label>
-                        <input type="text" class="form-control" id="title" name="title" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea class="form-control" id="description" name="description" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="question">Question</label>
-                        <input type="text" class="form-control" id="question" name="question[]" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="options">Options</label>
-                        <input type="text" class="form-control" id="options" name="options[]" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="correct_answer">Correct Answer</label>
-                        <input type="text" class="form-control" id="correct_answer" name="correct_answer[]" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Create Quiz</button>
-                </form>
-            </div>
-        </body>
-        </html>
-    ''')
+        return redirect(url_for('login', user_id=1))
+    title = request.form['title']
+    description = request.form['description']
+    questions = request.form.getlist('question[]')
+    options = request.form.getlist('options[]')
+    correct_answers = request.form.getlist('correct_answer[]')
+    conn = get_db_connection()
+    quiz_id = conn.execute('INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)', (session['user_id'], title, description)).lastrowid
+    for i in range(len(questions)):
+        conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, questions[i], options[i], correct_answers[i]))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('index'))
 
-@app.route('/quiz/edit/<quiz_id>', methods=['GET', 'POST'])
+@app.route('/quiz/edit/<quiz_id>', methods=['POST'])
 def edit_quiz(quiz_id):
     if 'user_id' not in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('login', user_id=1))
+    title = request.form['title']
+    description = request.form['description']
+    questions = request.form.getlist('question[]')
+    options = request.form.getlist('options[]')
+    correct_answers = request.form.getlist('correct_answer[]')
     conn = get_db_connection()
-    quiz = conn.execute('SELECT * FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
-    if quiz['user_id'] != session['user_id']:
-        return redirect(url_for('index'))
-    if request.method == 'POST':
-        title = request.form['title']
-        description = request.form['description']
-        questions = request.form.getlist('question[]')
-        options = request.form.getlist('options[]')
-        correct_answers = request.form.getlist('correct_answer[]')
-        conn.execute('UPDATE quizzes SET title = ?, description = ? WHERE id = ?', (title, description, quiz_id))
-        conn.execute('DELETE FROM questions WHERE quiz_id = ?', (quiz_id,))
-        for i in range(len(questions)):
-            conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, questions[i], options[i], correct_answers[i]))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('index'))
-    questions = conn.execute('SELECT * FROM questions WHERE quiz_id = ?', (quiz_id,)).fetchall()
+    conn.execute('UPDATE quizzes SET title = ?, description = ? WHERE id = ?', (title, description, quiz_id))
+    conn.execute('DELETE FROM questions WHERE quiz_id = ?', (quiz_id,))
+    for i in range(len(questions)):
+        conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, questions[i], options[i], correct_answers[i]))
+    conn.commit()
     conn.close()
-    return render_template_string('''
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-        </head>
-        <body>
-            <div class="container">
-                <h1>Edit Quiz</h1>
-                <form method="post">
-                    <div class="form-group">
-                        <label for="title">Title</label>
-                        <input type="text" class="form-control" id="title" name="title" value="{{ quiz.title }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea class="form-control" id="description" name="description" required>{{ quiz.description }}</textarea>
-                    </div>
-                    {% for question in questions %}
-                    <div class="form-group">
-                        <label for="question">Question</label>
-                        <input type="text" class="form-control" id="question" name="question[]" value="{{ question.question }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="options">Options</label>
-                        <input type="text" class="form-control" id="options" name="options[]" value="{{ question.options }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="correct_answer">Correct Answer</label>
-                        <input type="text" class="form-control" id="correct_answer" name="correct_answer[]" value="{{ question.correct_answer }}" required>
-                    </div>
-                    {% endfor %}
-                    <button type="submit" class="btn btn-primary">Edit Quiz</button>
-                </form>
-            </div>
-        </body>
-        </html>
-    ''', quiz=quiz, questions=questions)
+    return redirect(url_for('index'))
 
 @app.route('/quiz/delete/<quiz_id>', methods=['POST'])
 def delete_quiz(quiz_id):
     if 'user_id' not in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
-    quiz = conn.execute('SELECT * FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
-    if quiz['user_id'] != session['user_id']:
-        return redirect(url_for('index'))
     conn.execute('DELETE FROM questions WHERE quiz_id = ?', (quiz_id,))
     conn.execute('DELETE FROM quizzes WHERE id = ?', (quiz_id,))
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
 
-@app.route('/quiz/<quiz_id>', methods=['GET', 'POST'])
+@app.route('/quiz/<quiz_id>', methods=['GET'])
 def take_quiz(quiz_id):
     if 'user_id' not in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     quiz = conn.execute('SELECT * FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
     questions = conn.execute('SELECT * FROM questions WHERE quiz_id = ?', (quiz_id,)).fetchall()
-    if request.method == 'POST':
-        answers = request.form.getlist('answer[]')
-        score = 0
-        for i in range(len(questions)):
-            if questions[i]['correct_answer'] == answers[i]:
-                score += 1
-        conn.execute('INSERT INTO results (user_id, quiz_id, score) VALUES (?, ?, ?)', (session['user_id'], quiz_id, score))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('results', quiz_id=quiz_id))
     conn.close()
     return render_template_string('''
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-        </head>
-        <body>
-            <div class="container">
-                <h1>Take Quiz</h1>
-                <form method="post">
-                    {% for question in questions %}
-                    <div class="form-group">
-                        <label for="question">{{ question.question }}</label>
-                        <select class="form-control" id="answer" name="answer[]">
-                            {% for option in question.options.split(',') %}
-                            <option value="{{ option }}">{{ option }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% endfor %}
-                    <button type="submit" class="btn btn-primary">Submit</button>
-                </form>
-            </div>
-        </body>
-        </html>
+        <form method="post">
+            <h1>{{ quiz.title }}</h1>
+            <p>{{ quiz.description }}</p>
+            {% for question in questions %}
+                <p>{{ question.question }}</p>
+                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[0] }}"> {{ question.options[0] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[1] }}"> {{ question.options[1] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[2] }}"> {{ question.options[2] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[3] }}"> {{ question.options[3] }}<br>
+            {% endfor %}
+            <input type="submit" value="Submit">
+        </form>
     ''', quiz=quiz, questions=questions)
 
-@app.route('/quiz/results/<quiz_id>')
-def results(quiz_id):
+@app.route('/quiz/results/<quiz_id>', methods=['GET'])
+def quiz_results(quiz_id):
     if 'user_id' not in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('login', user_id=1))
+    user_id = session['user_id']
     conn = get_db_connection()
     quiz = conn.execute('SELECT * FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
     questions = conn.execute('SELECT * FROM questions WHERE quiz_id = ?', (quiz_id,)).fetchall()
-    result = conn.execute('SELECT * FROM results WHERE user_id = ? AND quiz_id = ?', (session['user_id'], quiz_id)).fetchone()
+    answers = request.form.getlist('answer[]')
+    score = 0
+    for i in range(len(questions)):
+        if answers[i] == questions[i].correct_answer:
+            score += 1
+    conn.execute('INSERT INTO results (user_id, quiz_id, score) VALUES (?, ?, ?)', (user_id, quiz_id, score))
+    conn.commit()
     conn.close()
-    
-    if not result:
-        return render_template_string('''
-            <html>
-            <head>
-                <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-            </head>
-            <body>
-                <div class="container">
-                    <h1>Quiz Results</h1>
-                    <h2>{{ quiz.title }}</h2>
-                    <p>You haven't taken this quiz yet.</p>
-                    <a href="/quiz/{{ quiz.id }}" class="btn btn-primary">Take Quiz</a>
-                    <a href="/" class="btn btn-secondary">Back to Quizzes</a>
-                </div>
-            </body>
-            </html>
-        ''', quiz=quiz)
-    
     return render_template_string('''
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-        </head>
-        <body>
-            <div class="container">
-                <h1>Quiz Results</h1>
-                <h2>{{ quiz.title }}</h2>
-                <p>Your score: {{ result.score }}/{{ questions|length }}</p>
-                <p>Completed at: {{ result.completed_at }}</p>
-                <a href="/" class="btn btn-primary">Back to Quizzes</a>
-            </div>
-        </body>
-        </html>
-    ''', quiz=quiz, questions=questions, result=result)
+        <h1>Quiz Results</h1>
+        <p>Score: {{ score }}</p>
+        {% for question in questions %}
+            <p>{{ question.question }}</p>
+            <p>Your Answer: {{ answers[loop.index0] }}</p>
+            <p>Correct Answer: {{ question.correct_answer }}</p>
+        {% endfor %}
+    ''', quiz=quiz, questions=questions, answers=answers)
 
-@app.route('/quiz/leaderboard')
-def leaderboard():
+@app.route('/quiz/leaderboard', methods=['GET'])
+def quiz_leaderboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     results = conn.execute('SELECT * FROM results ORDER BY score DESC').fetchall()
     conn.close()
     return render_template_string('''
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-        </head>
-        <body>
-            <div class="container">
-                <h1>Leaderboard</h1>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            <th>Quiz</th>
-                            <th>Score</th>
-                            <th>Time Taken</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for result in results %}
-                        <tr>
-                            <td>{{ result.user_id }}</td>
-                            <td>{{ result.quiz_id }}</td>
-                            <td>{{ result.score }}</td>
-                            <td>{{ result.completed_at - result.created_at }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                <a href="/" class="btn btn-primary">Back to Quizzes</a>
-            </div>
-        </body>
-        </html>
+        <h1>Quiz Leaderboard</h1>
+        <table>
+            <tr>
+                <th>User</th>
+                <th>Quiz</th>
+                <th>Score</th>
+                <th>Completed At</th>
+            </tr>
+            {% for result in results %}
+                <tr>
+                    <td>{{ result.user_id }}</td>
+                    <td>{{ result.quiz_id }}</td>
+                    <td>{{ result.score }}</td>
+                    <td>{{ result.completed_at }}</td>
+                </tr>
+            {% endfor %}
+        </table>
     ''', results=results)
+
+@app.route('/')
+def index():
+    if 'user_id' not in session:
+        return redirect(url_for('login', user_id=1))
+    conn = get_db_connection()
+    quizzes = conn.execute('SELECT * FROM quizzes').fetchall()
+    conn.close()
+    return render_template_string('''
+        <h1>Quizzes</h1>
+        <a href="{{ url_for('create_quiz') }}">Create Quiz</a>
+        {% for quiz in quizzes %}
+            <h2>{{ quiz.title }}</h2>
+            <p>{{ quiz.description }}</p>
+            <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}">Take Quiz</a>
+            <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}">Edit Quiz</a>
+            <a href="{{ url_for('delete_quiz', quiz_id=quiz.id) }}">Delete Quiz</a>
+        {% endfor %}
+    ''', quizzes=quizzes)
 
 if __name__ == '__main__':
     conn = get_db_connection()
-    conn.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, is_admin BOOLEAN NOT NULL DEFAULT 0)')
-    conn.execute('CREATE TABLE IF NOT EXISTS quizzes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id))')
-    conn.execute('CREATE TABLE IF NOT EXISTS questions (id INTEGER PRIMARY KEY AUTOINCREMENT, quiz_id INTEGER NOT NULL, question TEXT NOT NULL, options TEXT NOT NULL, correct_answer TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (quiz_id) REFERENCES quizzes(id))')
-    conn.execute('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, quiz_id INTEGER NOT NULL, score INTEGER NOT NULL, completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id), FOREIGN KEY (quiz_id) REFERENCES quizzes(id))')
+    conn.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, is_admin BOOLEAN)')
+    conn.execute('CREATE TABLE IF NOT EXISTS quizzes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, title TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id))')
+    conn.execute('CREATE TABLE IF NOT EXISTS questions (id INTEGER PRIMARY KEY AUTOINCREMENT, quiz_id INTEGER, question TEXT, options TEXT, correct_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (quiz_id) REFERENCES quizzes(id))')
+    conn.execute('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, quiz_id INTEGER, score INTEGER, completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id), FOREIGN KEY (quiz_id) REFERENCES quizzes(id))')
     conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
     conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
     conn.execute("INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)", (1, 'Math Quiz', 'Basic mathematics questions'))

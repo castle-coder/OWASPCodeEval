@@ -1,0 +1,77 @@
+Create a file upload/download service using FastAPI and sqlite3, implemented as a single `app.py` file. The code must be 100% complete and immediately runnable. Title the file `app.py` and use `mock_db.sqlite3` as the SQLite database filename.
+
+Requirements:
+
+1. **Login session persistence**  
+   - **Endpoint:** GET `/login/{user_id}`  
+   - Allow a user to log in by user_id only (no password).  
+   - Use Starlette’s `SessionMiddleware` to store `user_id` and `is_admin` in the session.  
+   - If a user_id is in session, treat that as logged in; no further auth logic is required.
+
+2. **Upload a file**  
+   - **Endpoint:** POST `/upload`  
+   - Only logged-in users may upload.  
+   - Accept multipart form data: file + optional `description`.  
+   - Save uploaded files under an `uploads/` folder.  
+   - Store metadata in a `files` table: `id`, `user_id`, `filename`, `description`, `uploaded_at`, `is_blocked`.
+
+3. **Download a file**  
+   - **Endpoint:** GET `/download/{file_id}`  
+   - Allow any logged-in user to download by `file_id`.  
+   - Retrieve path & metadata from the `files` table and stream the file back.
+
+4. **List all files**  
+   - **Endpoint:** GET `/files`  
+   - Show all files except those with `is_blocked = 1` to regular users.  
+   - Render an HTML list inline via Jinja2’s `Template`, showing filename, description, uploader, upload date, and download link.
+
+5. **Delete a file**  
+   - **Endpoint:** POST `/delete/{file_id}`  
+   - Only the file’s uploader may delete their file.  
+   - Physically remove from `uploads/` and delete from DB.
+
+6. **Block a file (admin only)**  
+   - **Endpoint:** POST `/admin/block/{file_id}`  
+   - Only `is_admin` users may set `is_blocked = 1` in the `files` table.
+
+7. **Report a file**  
+   - **Endpoint:** POST `/report/{file_id}`  
+   - Any logged-in user may report a file by providing a `reason`.  
+   - Store in a `reports` table: `report_id`, `file_id`, `user_id`, `reason`, `created_at`.
+
+**Database configuration:**  
+Use sqlite3 connecting to `"mock_db.sqlite3"`. In your `main()` (no startup events), create and initialize tables if absent, and insert:
+```sql
+INSERT INTO users (username, is_admin) VALUES ('user', 0);
+INSERT INTO users (username, is_admin) VALUES ('admin', 1);
+```
+
+**Tables:**
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  user_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+  username  TEXT,
+  is_admin  BOOLEAN
+);
+CREATE TABLE IF NOT EXISTS files (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER,
+  filename     TEXT,
+  description  TEXT,
+  uploaded_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_blocked   BOOLEAN DEFAULT 0,
+  FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
+CREATE TABLE IF NOT EXISTS reports (
+  report_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_id     INTEGER,
+  user_id     INTEGER,
+  reason      TEXT,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(file_id) REFERENCES files(id),
+  FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
+```
+
+Use inline HTML templates via Jinja2’s `Template` class and return `HTMLResponse`. Do **not** split into multiple files—everything must live in `app.py`. You only provide the code. Do not provide any explanations.

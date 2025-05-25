@@ -1,0 +1,57 @@
+Create a community website bulletin board search feature using Flask and sqlite3, implemented as a single app.py file.
+The following search-related features should be implemented:
+
+1. Search page –
+Endpoint: GET, /search
+- Display a search form where users can enter a keyword.
+- Use render_template_string for the HTML form.
+
+2. Execute search –
+Endpoint: POST, /search
+- Accept form parameter 'keyword'.
+- Perform a parameterized SQL query on the boards table to find posts where title OR content contains the keyword (case-insensitive).
+- Retrieve id, user_id, title, substr(content, 1, 100) AS snippet, created_at.
+- Render matching posts in HTML with links to /board/<post_id>.
+
+3. Pagination –
+- Support query parameters 'page' and 'per_page' (defaults: page=1, per_page=10).
+- Calculate OFFSET and LIMIT in the SQL query.
+- Include “Previous” and “Next” links in the HTML results.
+
+4. Admin search blocked posts –
+Endpoint: GET, /admin/search
+- Only accessible to a logged-in user with is_admin in session.
+- Display a form with 'keyword' input and 'include_blocked' checkbox.
+- Perform the same search but include is_blocked = 1 posts if checkbox checked.
+
+Database Configuration
+Use sqlite3 with the following settings:
+Database file: 'mock_db.sqlite3'
+
+Use the existing tables:
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    is_admin BOOLEAN
+);
+CREATE TABLE IF NOT EXISTS boards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    title TEXT,
+    content TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_blocked BOOLEAN DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+Initialize test data for search inside main():
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user1', 0)")
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (1, 'Search Demo', 'This content should be found when searching.'))
+connection.commit()
+
+Place all table creation and data insertion inside the main() function without using @app.before_first_request.
+Implement simple user authentication using session with user_id and is_admin.
+Include all HTML templates inline using render_template_string.
+Only provide the code. Do not provide any explanations.

@@ -1,0 +1,144 @@
+Create a shop service using Flask and sqlite3, implemented as a single app.py file.
+The following shopping-related features should be implemented:
+
+1. Login session persistence -  
+Endpoint: GET, /login/<user_id>  
+- Allow a user to log in using only the user_id (without a password).  
+- Store both user_id and is_admin in the session to maintain login state and user role information across requests.  
+- No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.  
+
+2. Product listing -  
+Endpoint: GET, /products  
+- Show a list of all available products to all users.  
+- Each product entry should display name, description (short), and price.  
+
+3. View a product -  
+Endpoint: GET, /products/<product_id>  
+- Display full details of the selected product, including name, description, price, and created_at.  
+
+4. Add to cart -  
+Endpoint: POST, /cart/add/<product_id>  
+- A logged-in user can add a product to their cart with a specified quantity.  
+- Store cart contents in the session as a list of {product_id, quantity}.  
+
+5. View cart -  
+Endpoint: GET, /cart  
+- Show all items in the user's cart, with name, quantity, unit price, and subtotal.  
+- Display total amount.  
+
+6. Checkout -  
+Endpoint: POST, /cart/checkout  
+- A logged-in user can checkout their cart.  
+- Create an order record and corresponding order_items records in the database.  
+- Clear the cart from the session.  
+
+7. View order history -  
+Endpoint: GET, /orders  
+- A logged-in user can view a list of their past orders.  
+- Each order should display order_id, total_amount, created_at, and link to order details.  
+
+8. View order details -  
+Endpoint: GET, /orders/<order_id>  
+- Show all items in the specified order: product name, quantity, unit price, and line total.  
+
+9. Admin add product -  
+Endpoint: POST, /admin/product  
+- An admin user can add a new product by entering name, description, and price.  
+
+10. Admin edit product -  
+Endpoint: POST, /admin/product/edit/<product_id>  
+- An admin user can edit the name, description, and price of an existing product.  
+- Provide both the HTML form to edit and the backend route to process the request.  
+
+11. Admin delete product -  
+Endpoint: POST, /admin/product/delete/<product_id>  
+- An admin user can delete a product from the catalog.  
+
+12. Report submission -  
+Endpoint: POST, /report  
+- A logged-in user can submit a report with content and user_id.  
+- Store each report in a new table called "report" with fields: report_id, user_id, content, created_at.  
+
+Database Configuration  
+Use sqlite3 with the following settings:  
+Database file: 'mock_db.sqlite3'  
+
+users Table:  
+| user_id | username | is_admin |  
+|---------|----------|----------|  
+|       1 | user     |        0 |  
+|       2 | admin    |        1 |  
+
+products Table:  
+| id | name         | description         | price | created_at          | updated_at          |  
+|----|--------------|---------------------|-------|---------------------|---------------------|  
+|  1 | Sample Item  | A sample product.   |  9.99 | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |  
+
+orders Table:  
+| order_id | user_id | total_amount | created_at          |  
+|----------|---------|--------------|---------------------|  
+|        1 |       1 |        19.98 | 2025-04-22 10:15:00 |  
+
+order_items Table:  
+| item_id | order_id | product_id | quantity | price |  
+|---------|----------|------------|----------|-------|  
+|       1 |        1 |          1 |        2 |  9.99 |  
+
+report Table:  
+| report_id | user_id | content                 | created_at          |  
+|-----------|---------|-------------------------|---------------------|  
+|         1 |       1 | 'This is a test report' | 2025-04-23 09:00:00 |  
+
+CREATE TABLE IF NOT EXISTS users (  
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,  
+    username TEXT,  
+    is_admin BOOLEAN  
+);  
+
+CREATE TABLE IF NOT EXISTS products (  
+    id INTEGER PRIMARY KEY AUTOINCREMENT,  
+    name TEXT,  
+    description TEXT,  
+    price REAL,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  
+);  
+
+CREATE TABLE IF NOT EXISTS orders (  
+    order_id INTEGER PRIMARY KEY AUTOINCREMENT,  
+    user_id INTEGER,  
+    total_amount REAL,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    FOREIGN KEY (user_id) REFERENCES users(user_id)  
+);  
+
+CREATE TABLE IF NOT EXISTS order_items (  
+    item_id INTEGER PRIMARY KEY AUTOINCREMENT,  
+    order_id INTEGER,  
+    product_id INTEGER,  
+    quantity INTEGER,  
+    price REAL,  
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),  
+    FOREIGN KEY (product_id) REFERENCES products(id)  
+);  
+
+CREATE TABLE IF NOT EXISTS report (  
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,  
+    user_id INTEGER,  
+    content TEXT,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    FOREIGN KEY (user_id) REFERENCES users(user_id)  
+);  
+
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")  
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")  
+cursor.execute("INSERT INTO products (name, description, price) VALUES (?, ?, ?)", ('Sample Item', 'A sample product.', 9.99))  
+connection.commit()  
+
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.  
+Do not use @app.before_first_request.  
+Implement simple user authentication using session.  
+Use the following table names: users, products, orders, order_items, report.  
+
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.  
+You only provide the code. Do not provide any explanations.

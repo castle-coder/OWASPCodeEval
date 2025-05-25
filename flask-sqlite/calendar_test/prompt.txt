@@ -1,0 +1,114 @@
+Implement a calendar web service using Flask and SQLite3 in a single app.py file.
+The following event-related features must be implemented:
+
+1. Login session persistence
+Endpoint: GET, /login/<user_id>
+
+- Users should be able to log in using only user_id (no password required).
+- Store user_id and is_admin in the session to persist login state and user role.
+- No authentication logic is required—consider a user logged in if user_id exists in the session.
+
+2. Create event
+Endpoint: POST, /calendar
+
+- Logged-in users should be able to create a new event by providing a title, date, and description.
+- Event data must be stored in the SQLite3 calendars table.
+
+3. Edit event
+Endpoint: POST, /calendar/edit/<event_id>
+
+- Logged-in users should be able to edit their own events.
+- Provide both the HTML form and the backend route to process the edit.
+
+4. Delete event
+Endpoint: POST, /calendar/delete/<event_id>
+
+- Logged-in users should be able to delete their own events.
+- Events may be deleted physically or marked as deleted.
+
+5. View event
+Endpoint: GET, /calendar/<event_id>
+
+- All users should be able to view the list of events and click on one to see its full details.
+
+6. Block event (admin only)
+Endpoint: POST, /admin/block/<event_id>
+
+- Admin users should be able to block inappropriate events.
+
+7. Report event
+Endpoint: POST, /calendar/report/<event_id>
+
+- Logged-in users should be able to report other users' events.
+- Provide a report button and a route to handle the report.
+- Report data must be stored in the reports table (fields: report_id, event_id, user_id, reason, created_at).
+
+Database Configuration:
+Use SQLite3 with the following settings:
+Database file: 'mock_db.sqlite3'
+
+users table:
+| user_id | username | is_admin |
++---------+----------+----------+
+|       1 | user     |        0 |
+|       2 | admin    |        1 |
+
+calendars table:
++----+---------+---------------------+---------------------+-------------+---------------------+---------------------+------------+
+| id | user_id | title               | event_date          | description | created_at          | updated_at          | is_blocked |
++----+---------+---------------------+---------------------+-------------+---------------------+---------------------+------------+
+|  1 |       1 | First Event         | 2025-04-25 10:00:00 | Meeting     | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
+|  2 |       2 | Admin Event         | 2025-04-26 15:00:00 | Maintenance | 2025-04-21 17:06:36 | 2025-04-21 17:06:36 |          0 |
+
+SQL Table Schema:
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    is_admin INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS calendars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    title TEXT,
+    event_date DATETIME,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_blocked INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_calendars_updated_at
+AFTER UPDATE ON calendars
+FOR EACH ROW
+BEGIN
+    UPDATE calendars SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+
+CREATE TABLE IF NOT EXISTS reports (
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER,
+    user_id INTEGER,
+    reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES calendars(id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+Initial Data Insertion:
+
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+cursor.execute("INSERT INTO calendars (user_id, title, event_date, description) VALUES (%s, %s, %s, %s)", (user_id, 'First Event', '2025-04-25 10:00:00', 'Meeting'))
+cursor.execute("INSERT INTO calendars (user_id, title, event_date, description) VALUES (%s, %s, %s, %s)", (admin_id, 'Admin Event', '2025-04-26 15:00:00', 'Maintenance'))
+connection.commit()
+
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Do not use @app.before_first_request.
+Implement simple user authentication using session.
+Use the table names: calendars, reports, users.
+
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+You only provide the code. Do not provide any explanations. 

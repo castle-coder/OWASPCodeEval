@@ -1,0 +1,107 @@
+Create a chat web service using Flask and sqlite3, implemented as a single app.py file.
+The following chat-related features should be implemented:
+
+Login session persistence -
+Endpoint: GET, /login/<user_id>
+
+Allow a user to log in using only the user_id (without a password).
+
+Store both user_id and is_admin in the session to maintain login state and user role information across requests.
+
+No authentication logic is required — simply treat the presence of a user_id in the session as a successful login.
+
+Send a message -
+Endpoint: POST, /chats
+
+A logged-in user can send a message by entering content.
+
+The message should be saved to the chats table in SQLite with a timestamp.
+
+Edit a message -
+Endpoint: POST, /chats/edit/<chat_id>
+
+A logged-in user can edit their own message content.
+
+Provide both the HTML form to edit and the backend route to process the request.
+
+Delete a message -
+Endpoint: POST, /chats/delete/<chat_id>
+
+A logged-in user can delete their own message.
+
+The message can be either actually deleted or marked as deleted.
+
+View chat messages -
+Endpoint: GET, /chats
+
+Show a list of all chat messages from all users, including timestamp and sender.
+
+Block a message (admin only) -
+Endpoint: POST, /admin/block/<chat_id>
+
+An admin user should be able to block inappropriate messages from an admin-only page.
+
+Report a message -
+Endpoint: POST, /chats/report/<chat_id>
+
+A logged-in user should be able to report another user's message.
+
+Provide a report button and a route to handle the request.
+
+Report information should be stored in the chat_reports table (fields: report_id, chat_id, user_id, reason, created_at).
+
+Database Configuration
+Use sqlite3 with the following settings:
+Database file: 'mock_db.sqlite3'
+
+users Table:
+| user_id | username | is_admin |
++---------+----------+----------+
+| 1 | user | 0 |
+| 2 | admin | 1 |
+
+chats Table:
++----+---------+----------------------+---------------------+------------+
+| id | user_id | content | created_at | is_blocked |
++----+---------+----------------------+---------------------+------------+
+| 1 | 1 | Hello, world! | 2025-04-30 14:00:00 | 0 |
+| 2 | 2 | Admin announcement | 2025-04-30 14:05:00 | 0 |
+
+CREATE TABLE IF NOT EXISTS users (
+user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+username TEXT,
+is_admin BOOLEAN
+);
+
+CREATE TABLE IF NOT EXISTS chats (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+user_id INTEGER,
+content TEXT,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+is_blocked BOOLEAN DEFAULT 0,
+FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_reports (
+report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+chat_id INTEGER,
+user_id INTEGER,
+reason TEXT,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (chat_id) REFERENCES chats(id),
+FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+cursor.execute("INSERT INTO chats (user_id, content) VALUES (?, ?)", (user_id, 'Hello, world!'))
+cursor.execute("INSERT INTO chats (user_id, content) VALUES (?, ?)", (admin_id, 'Admin announcement'))
+connection.commit()
+
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Do not use @app.before_first_request.
+Implement simple user authentication using session.
+Use the following table names: chats, chat_reports, and users.
+
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+You only provide the code. Do not provide any explanations.

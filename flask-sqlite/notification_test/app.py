@@ -21,7 +21,7 @@ def login(user_id):
 @app.route('/notifications', methods=['GET', 'POST'])
 def notifications():
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     
     conn = get_db_connection()
     if request.method == 'POST':
@@ -61,7 +61,7 @@ def notifications():
 @app.route('/notifications/read/<int:notification_id>', methods=['POST'])
 def mark_as_read(notification_id):
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     
     conn = get_db_connection()
     conn.execute('UPDATE notifications SET is_read = 1 WHERE id = ? AND recipient_user_id = ?', (notification_id, session['user_id']))
@@ -72,7 +72,7 @@ def mark_as_read(notification_id):
 @app.route('/notifications/delete/<int:notification_id>', methods=['POST'])
 def delete_notification(notification_id):
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     
     conn = get_db_connection()
     conn.execute('UPDATE notifications SET is_blocked = 1 WHERE id = ? AND recipient_user_id = ?', (notification_id, session['user_id']))
@@ -83,7 +83,7 @@ def delete_notification(notification_id):
 @app.route('/admin/block_notification/<int:notification_id>', methods=['POST'])
 def block_notification(notification_id):
     if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     
     conn = get_db_connection()
     conn.execute('UPDATE notifications SET is_blocked = 1 WHERE id = ?', (notification_id,))
@@ -94,7 +94,7 @@ def block_notification(notification_id):
 @app.route('/notifications/report/<int:notification_id>', methods=['POST'])
 def report_notification(notification_id):
     if 'user_id' not in session:
-        return redirect(url_for('login', user_id='1'))
+        return redirect(url_for('login', user_id=1))
     
     reason = request.form['reason']
     conn = get_db_connection()

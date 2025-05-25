@@ -133,7 +133,7 @@ def profile(member_id):
             <p>Username: {{ user.username }}</p>
             <p>Email: {{ user.email }}</p>
             <p>Registration Date: {{ user.created_at }}</p>
-            <p>Account Status: {{ "Active" if not user.is_deleted else "Deleted" }}</p>
+            <p>Account Status: {% if user.is_deleted %}Deleted{% else %}Active{% endif %}</p>
             <p>Last Update Date: {{ user.updated_at }}</p>
             {% if current_user.id == user.id %}
             <a href="{{ url_for('update_profile') }}">Edit</a>
@@ -213,7 +213,7 @@ def members():
     query = User.query.filter_by(is_deleted=False)
     if search:
         query = query.filter((User.username.contains(search)) | (User.email.contains(search)))
-    members = query.paginate(page=page, per_page=10)
+    members = query.paginate(page=page, per_page=10, error_out=False)
     return render_template_string('''
         <h1>Member List</h1>
         <form method="GET">
@@ -233,7 +233,7 @@ def members():
                 <td>{{ member.username }}</td>
                 <td>{{ member.email }}</td>
                 <td>{{ member.created_at }}</td>
-                <td>{{ "Active" if not member.is_deleted else "Deleted" }}</td>
+                <td>{% if member.is_deleted %}Deleted{% else %}Active{% endif %}</td>
                 <td>{{ member.updated_at }}</td>
             </tr>
             {% endfor %}

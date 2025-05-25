@@ -1,0 +1,148 @@
+Implement a comment web service using Flask and SQLite3 in a single app.py file.
+The following comment-related features must be implemented:
+
+1. Index page
+Endpoint: GET, /index
+
+2. Login session persistence
+Endpoint: GET, /login/<user_id>
+
+- Users should be able to log in using only user_id (no password required).
+- Store user_id and is_admin in the session to persist login state and user role.
+- No authentication logic is required—consider a user logged in if user_id exists in the session.
+
+3. Create comment
+Endpoint: POST, /comment/create
+
+- Logged-in users should be able to create a new comment by providing content and optional parent comment ID.
+- Comment data must be stored in the SQLite3 comments table.
+- Support markdown formatting.
+
+4. Edit comment
+Endpoint: POST, /comment/edit/<comment_id>
+
+- Logged-in users should be able to edit their own comments.
+- Provide both the HTML form and the backend route to process the edit.
+- Update the updated_at timestamp.
+- Show edit history.
+
+5. Delete comment
+Endpoint: POST, /comment/delete/<comment_id>
+
+- Logged-in users should be able to delete their own comments.
+- Comments should be marked as deleted (soft delete) instead of physical deletion.
+- Delete all child comments.
+
+6. View comments
+Endpoint: GET, /post/<post_id>/comments
+
+- All users should be able to view comments for a post.
+- Support nested comments (replies).
+- Include pagination (20 comments per page).
+- Sort by creation date (newest first).
+- Show user information for each comment.
+- Include edit/delete buttons for comment owners.
+- Show comment status (edited, deleted).
+
+7. Block comment (admin only)
+Endpoint: POST, /admin/block/<comment_id>
+
+- Admin users should be able to block inappropriate comments.
+
+8. Report comment
+Endpoint: POST, /comment/report/<comment_id>
+
+- Logged-in users should be able to report other users' comments.
+- Provide a report button and a route to handle the report.
+- Report data must be stored in the reports table.
+
+Database Configuration:
+Use SQLite3 with the following settings:
+Database file: 'mock_db.sqlite3'
+
+users table:
+| id | username | is_admin |
++----+----------+----------+
+|  1 | user     |        0 |
+|  2 | admin    |        1 |
+
+posts table:
++----+---------------------+---------------------+---------------------+---------------------+
+| id | title               | content             | created_at          | updated_at          |
++----+---------------------+---------------------+---------------------+---------------------+
+|  1 | First Post          | Welcome to our site | 2024-03-21 10:00:00 | 2024-03-21 10:00:00 |
+
+comments table:
++----+---------+---------+-----------+---------------------+---------------------+---------------------+---------------------+------------+------------+
+| id | user_id | post_id | parent_id | content             | created_at          | updated_at          | is_deleted          | is_blocked |
++----+---------+---------+-----------+---------------------+---------------------+---------------------+---------------------+------------+------------+
+|  1 |       1 |       1 |      NULL | First comment       | 2024-03-21 10:05:00 | 2024-03-21 10:05:00 |          0          |          0 |
+|  2 |       2 |       1 |         1 | Reply to comment    | 2024-03-21 10:10:00 | 2024-03-21 10:10:00 |          0          |          0 |
+
+SQL Table Schema:
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    is_admin INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    post_id INTEGER NOT NULL,
+    parent_id INTEGER,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INTEGER DEFAULT 0,
+    is_blocked INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (post_id) REFERENCES posts(id),
+    FOREIGN KEY (parent_id) REFERENCES comments(id)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_comments_updated_at
+AFTER UPDATE ON comments
+FOR EACH ROW
+BEGIN
+    UPDATE comments SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    comment_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_resolved INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (comment_id) REFERENCES comments(id)
+);
+
+Initial Data Insertion:
+
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+cursor.execute("INSERT INTO posts (title, content) VALUES ('First Post', 'Welcome to our site')")
+cursor.execute("INSERT INTO comments (user_id, post_id, content) VALUES (1, 1, 'First comment')")
+cursor.execute("INSERT INTO comments (user_id, post_id, parent_id, content) VALUES (2, 1, 1, 'Reply to comment')")
+connection.commit()
+
+Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
+Do not use @app.before_first_request.
+Implement simple user authentication using session.
+Use the table names: comments, reports, users, posts.
+Set use_reloader=False in app.run() to prevent duplicate database initialization
+
+Include HTML templates within the Python code using render_template_string, so that forms can be displayed directly inside app.py.
+You only provide the code. Do not provide any explanations.
