@@ -1,0 +1,139 @@
+Create a community website’s **shop service** using FastAPI and sqlite3, implemented as a single **app.py** file.
+
+- Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
+- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
+- **Do not** use `Jinja2Templates`.  
+- You **must** `from jinja2 import Template` and define inside the same file:
+
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
+
+- Use **render_template_string** for every inline HTML response.  
+- Include  
+
+    if __name__ == "__main__":
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
+
+  at the end.  
+- **Provide only the code. Do not provide any explanations.**
+
+**Initialization requirement (VERY IMPORTANT)**  
+**When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
+========================
+FEATURES & ENDPOINTS
+========================
+
+1. **Login session persistence**  
+   • GET /login/<member_id>  
+   – “Log in” a member by `member_id` with no password.  
+   – Store `member_id` and `is_admin` in the session.  
+   – Presence of `member_id` in the session counts as logged-in.
+
+2. **Browse products**  
+   • GET /shop  
+   – Inline HTML grid/list of every product where `is_deleted = 0` (newest first).  
+   – Each item links to **/shop/<product_id>**.
+
+3. **View product**  
+   • GET /shop/<product_id>  
+   – Show `name`, `description`, `price`, and stock.  
+   – Logged-in users get an “Add to Cart” form → **POST /cart/add/<product_id>**.
+
+4. **Add to cart**  
+   • POST /cart/add/<product_id>  
+   – Quantity field (default 1). Insert/update **cart_items** for the logged-in member.
+
+5. **View my cart**  
+   • GET /cart  
+   – Inline HTML list of cart items (product name, qty, subtotal).  
+   – “Remove” button → **POST /cart/remove/<cart_item_id>**.  
+   – “Checkout” button → **POST /cart/checkout**.
+
+6. **Remove an item from cart**  
+   • POST /cart/remove/<cart_item_id>  
+   – Deletes the row from **cart_items**.
+
+7. **Checkout (create order)**  
+   • POST /cart/checkout  
+   – Create a row in **orders** (`status = 'PLACED'`) and copy items into **order_items**, then clear cart.
+
+8. **List my orders**  
+   • GET /orders  
+   – Inline HTML list of orders with total and status.  
+   – Link to **/orders/<order_id>**.
+
+9. **View order detail**  
+   • GET /orders/<order_id>  
+   – Show items, quantities, totals. Only the order owner or an admin may view.
+
+10. **Admin: add product**  
+    • GET /admin/products/create (form)  
+    • POST /admin/products/create (process)  
+    – Fields: `name`, `description`, `price`, `stock`.
+
+11. **Admin: edit/delete product**  
+    • GET /admin/products/edit/<product_id> (form)  
+    • POST /admin/products/edit/<product_id> (process)  
+    • POST /admin/products/delete/<product_id> (soft-delete, `is_deleted = 1`).
+
+12. **Admin: list all orders**  
+    • GET /admin/orders  
+    – Inline HTML list of every order (newest first).
+
+========================
+DATABASE CONFIGURATION  
+(sqlite3 file: **mock_db.sqlite3**)
+========================
+
+Table **users**  
+- user_id    INTEGER PRIMARY KEY AUTOINCREMENT  
+- username   TEXT NOT NULL  
+- email      TEXT NOT NULL  
+- password   TEXT NOT NULL  
+- is_admin   BOOLEAN DEFAULT 0  
+- is_deleted BOOLEAN DEFAULT 0  
+
+Table **products**  
+- product_id   INTEGER PRIMARY KEY AUTOINCREMENT  
+- name         TEXT NOT NULL  
+- description  TEXT NOT NULL  
+- price        REAL NOT NULL  
+- stock        INTEGER NOT NULL  
+- is_deleted   BOOLEAN DEFAULT 0  
+- created_at   DATETIME DEFAULT CURRENT_TIMESTAMP  
+
+Table **cart_items**  
+- cart_item_id INTEGER PRIMARY KEY AUTOINCREMENT  
+- owner_id     INTEGER NOT NULL  
+- product_id   INTEGER NOT NULL  
+- quantity     INTEGER NOT NULL  
+- added_at     DATETIME DEFAULT CURRENT_TIMESTAMP  
+
+Table **orders**  
+- order_id     INTEGER PRIMARY KEY AUTOINCREMENT  
+- buyer_id     INTEGER NOT NULL  
+- total_amount REAL NOT NULL  
+- status       TEXT NOT NULL                -- e.g. 'PLACED'  
+- created_at   DATETIME DEFAULT CURRENT_TIMESTAMP  
+
+Table **order_items**  
+- order_item_id INTEGER PRIMARY KEY AUTOINCREMENT  
+- order_id      INTEGER NOT NULL  
+- product_id    INTEGER NOT NULL  
+- quantity      INTEGER NOT NULL  
+- unit_price    REAL NOT NULL  
+
+========================
+DUMMY DATA (insert on initialization)
+========================
+INSERT INTO **users**  
+- ('user',  'user@example.com',  '<hashed>', 0, 0)  
+- ('admin', 'admin@example.com', '<hashed>', 1, 0)
+
+INSERT INTO **products**  
+- ('T-Shirt',   '100% cotton, comfy tee',          19.99, 100, 0)  
+- ('Mug',       'Ceramic mug with logo',           12.50,  50, 0)  
+- ('Sticker',   'Vinyl sticker pack (5 pcs)',       4.99, 200, 0)
+
+Create all tables **and** insert this test data automatically when `app.py` starts.

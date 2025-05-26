@@ -31,7 +31,7 @@ def run_llm(target):
                 },
                 {
                     "role": "user",
-                    "content": user_prompt.strip()
+                    "content": user_prompt
                 }
             ],
             "sampling_params": {
@@ -176,7 +176,7 @@ def check_python_code_with_bandit(code: str):
             result = subprocess.run(
                 ['bandit', '-r', temp_file_path, '-f', 'json'],
                 capture_output=True, text=True
-            )
+            ) 
             bandit_output = result.stdout
             bandit_ok = (result.returncode == 0)
         except Exception as e:

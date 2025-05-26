@@ -1,142 +1,167 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, Form
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.requests import Request
 from starlette.responses import RedirectResponse
-from starlette.status import HTTP_401_UNAUTHORIZED
 from datetime import datetime, timedelta
+from jinja2 import Template
 import sqlite3
-import secrets
+import random
+import string
 import hashlib
+import uvicorn
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 
-DATABASE = 'mock_db.sqlite3'
-
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
+def get_db():
+    conn = sqlite3.connect("mock_db.sqlite3")
     conn.row_factory = sqlite3.Row
     return conn
 
+def render_template_string(html: str, **context):
+    return HTMLResponse(Template(html).render(**context))
+
 @app.on_event("startup")
-def startup():
-    conn = get_db_connection()
+async def startup_event():
+    conn = get_db()
     conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE,
-            password TEXT,
-            is_verified BOOLEAN
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            email TEXT NOT NULL,
+            password TEXT NOT NULL,
+            is_admin BOOLEAN DEFAULT 0,
+            email_verified BOOLEAN DEFAULT 0,
+            verification_code TEXT,
+            verification_expires DATETIME,
+            is_deleted BOOLEAN DEFAULT 0
         )
     ''')
     conn.execute('''
-        CREATE TABLE IF NOT EXISTS email_tokens (
-            token TEXT PRIMARY KEY,
-            user_id INTEGER,
-            expires_at TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    conn.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
+        INSERT INTO users (username, email, password, is_admin, email_verified)
+        SELECT 'user', 'user@example.com', ?, 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'user@example.com')
+    ''', (hashlib.sha256('password'.encode()).hexdigest(),))
+    conn.execute('''
+        INSERT INTO users (username, email, password, is_admin, email_verified)
+        SELECT 'admin', 'admin@example.com', ?, 1, 1
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@example.com')
+    ''', (hashlib.sha256('password'.encode()).hexdigest(),))
     conn.commit()
     conn.close()
+
+@app.get("/register")
+async def register_form(request: Request):
+    html = """
+        <form method="post" action="/register">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+    """
+    return render_template_string(html)
 
 @app.post("/register")
-async def register(email: str = Form(...), password: str = Form(...)):
-    conn = get_db_connection()
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    conn.execute("INSERT INTO users (email, password, is_verified) VALUES (?, ?, ?)", (email, hashed_password, False))
+async def register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...)):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+    if cursor.fetchone():
+        return render_template_string("Email already registered.")
+    verification_code = ''.join(random.choices(string.digits, k=6))
+    verification_expires = datetime.now() + timedelta(minutes=10)
+    cursor.execute("INSERT INTO users (username, email, password, verification_code, verification_expires) VALUES (?, ?, ?, ?, ?)", (username, email, hashlib.sha256(password.encode()).hexdigest(), verification_code, verification_expires))
+    user_id = cursor.lastrowid
     conn.commit()
     conn.close()
-    return {"message": "Registration successful. Please check your email for verification."}
+    return RedirectResponse("/auth/send/" + str(user_id))
 
-@app.post("/send-verification/{user_id}")
-async def send_verification(user_id: int):
-    conn = get_db_connection()
-    token = secrets.token_urlsafe(16)
-    expires_at = datetime.utcnow() + timedelta(hours=1)
-    conn.execute("INSERT INTO email_tokens (token, user_id, expires_at) VALUES (?, ?, ?)", (token, user_id, expires_at))
+@app.get("/auth/send/{user_id}")
+async def send_verification_email(request: Request, user_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    user = cursor.fetchone()
+    if not user or user['email_verified']:
+        return render_template_string("User not found or already verified.")
+    verification_code = ''.join(random.choices(string.digits, k=6))
+    verification_expires = datetime.now() + timedelta(minutes=10)
+    cursor.execute("UPDATE users SET verification_code = ?, verification_expires = ? WHERE user_id = ?", (verification_code, verification_expires, user_id))
     conn.commit()
     conn.close()
-    # Simulate sending email
-    verification_url = f"http://localhost:8000/verify/{token}"
-    body = Template("""
-    <h1>Verify Your Email</h1>
-    <p>Please click <a href="{{ url }}">here</a> to verify your address.</p>
-    """).render(url=verification_url)
-    send_email(email, "Email Verification", body)
-    return {"message": "Verification email sent."}
+    html = f"""
+        Verification code sent to {user['email']}: {verification_code}
+    """
+    return render_template_string(html)
 
-@app.get("/verify/{token}")
-async def verify(token: str):
-    conn = get_db_connection()
-    token_info = conn.execute("SELECT * FROM email_tokens WHERE token = ?", (token,)).fetchone()
-    if not token_info or token_info['expires_at'] < datetime.utcnow():
+@app.get("/auth/verify")
+async def verify_form(request: Request):
+    html = """
+        <form method="post" action="/auth/verify">
+            <input type="text" name="user_id" placeholder="User ID" required>
+            <input type="text" name="code" placeholder="Verification Code" required>
+            <button type="submit">Verify</button>
+        </form>
+    """
+    return render_template_string(html)
+
+@app.post("/auth/verify")
+async def verify(request: Request, user_id: str = Form(...), code: str = Form(...)):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    user = cursor.fetchone()
+    if not user or user['email_verified']:
+        return render_template_string("User not found or already verified.")
+    if user['verification_code'] == code and user['verification_expires'] > datetime.now():
+        cursor.execute("UPDATE users SET email_verified = 1, verification_code = NULL, verification_expires = NULL WHERE user_id = ?", (user_id,))
+        conn.commit()
         conn.close()
-        return {"message": "Invalid or expired token."}
-    user_id = token_info['user_id']
-    conn.execute("UPDATE users SET is_verified = ? WHERE id = ?", (True, user_id))
-    conn.execute("DELETE FROM email_tokens WHERE token = ?", (token,))
-    conn.commit()
-    conn.close()
-    html = Template("""
-    <h1>Email Verified</h1>
-    <p>Your email has been successfully verified.</p>
-    """).render()
-    return HTMLResponse(html)
-
-@app.post("/resend-verification/{user_id}")
-async def resend_verification(user_id: int):
-    conn = get_db_connection()
-    token = secrets.token_urlsafe(16)
-    expires_at = datetime.utcnow() + timedelta(hours=1)
-    conn.execute("INSERT INTO email_tokens (token, user_id, expires_at) VALUES (?, ?, ?)", (token, user_id, expires_at))
-    conn.commit()
-    conn.close()
-    # Simulate sending email
-    verification_url = f"http://localhost:8000/verify/{token}"
-    body = Template("""
-    <h1>Verify Your Email</h1>
-    <p>Please click <a href="{{ url }}">here</a> to verify your address.</p>
-    """).render(url=verification_url)
-    send_email(email, "Email Verification", body)
-    return {"message": "Verification email resent."}
-
-@app.post("/login")
-async def login(email: str = Form(...), password: str = Form(...)):
-    conn = get_db_connection()
-    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    if not user or user['password'] != hashlib.sha256(password.encode()).hexdigest() or not user['is_verified']:
+        return render_template_string("Email verified successfully.")
+    else:
         conn.close()
-        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Invalid credentials or email not verified.")
-    request.session['user_id'] = user['id']
-    request.session['is_verified'] = user['is_verified']
-    conn.close()
-    return {"message": "Login successful."}
+        return render_template_string("Invalid verification code or expired.")
 
-@app.get("/profile")
-async def profile(request: Request):
-    user_id = request.session.get('user_id')
-    is_verified = request.session.get('is_verified')
-    if not user_id or not is_verified:
-        return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
-    conn = get_db_connection()
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+@app.get("/login/{user_id}")
+async def login(request: Request, user_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    user = cursor.fetchone()
+    if not user or not user['email_verified']:
+        return render_template_string("User not found or not verified.")
+    request.session['user_id'] = user_id
+    request.session['is_admin'] = user['is_admin']
     conn.close()
-    html = Template("""
-    <h1>Profile</h1>
-    <p>Email: {{ user.email }}</p>
-    <p>Verified: {{ user.is_verified }}</p>
-    """).render(user=user)
-    return HTMLResponse(html)
+    return render_template_string("Logged in successfully.")
 
-def send_email(email, subject, body):
-    # Implement email sending logic here
-    pass
+@app.get("/admin/unverified")
+async def admin_unverified(request: Request):
+    if 'user_id' not in request.session or not request.session['is_admin']:
+        return render_template_string("Access denied.")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email_verified = 0")
+    users = cursor.fetchall()
+    conn.close()
+    html = "<ul>"
+    for user in users:
+        html += f"<li>{user['username']} ({user['email']})</li>"
+    html += "</ul>"
+    return render_template_string(html)
+
+@app.post("/admin/force_verify/{user_id}")
+async def admin_force_verify(request: Request, user_id: int):
+    if 'user_id' not in request.session or not request.session['is_admin']:
+        return render_template_string("Access denied.")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET email_verified = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return render_template_string("User verified successfully.")
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

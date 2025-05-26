@@ -1,65 +1,26 @@
-from fastapi import FastAPI, Request, Form, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
+from fastapi.responses import HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi.exceptions import RequestValidationError
+from jinja2 import Template
 import sqlite3
 import hashlib
-import secrets
-import hmac
-import re
+import uvicorn
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 
-# Middleware
-app.add_middleware(
-    SessionMiddleware,
-    secret_key="your-secret-key",
-    max_age=3600,
-    same_site="lax",
-)
+def get_db():
+    conn = sqlite3.connect("mock_db.sqlite3")
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# -------- 예외 핸들러 --------
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND,
-        content={"detail": "Invalid member ID"},
-    )
+def render_template_string(html: str, **context):
+    return HTMLResponse(Template(html).render(**context))
 
-# -------- 보안 해시 함수 정의 --------
-def hash_password(password: str, salt: str = None) -> str:
-    if not salt:
-        salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)
-    return f"{salt}${hashed.hex()}"
-
-def verify_password(input_password: str, stored_hash: str) -> bool:
-    try:
-        salt, hashed = stored_hash.split('$')
-        test_hash = hashlib.pbkdf2_hmac("sha256", input_password.encode(), salt.encode(), 100_000).hex()
-        return hmac.compare_digest(test_hash, hashed)
-    except Exception:
-        return False
-
-# -------- 기타 헬퍼 함수 --------
-def sanitize_input(text):
-    return re.sub(r'<.*?>', '', text)
-
-def get_user_by_id(user_id: int):
-    cursor.execute("SELECT * FROM users WHERE user_id = ? AND is_deleted = 0", (user_id,))
-    return cursor.fetchone()
-
-def get_user_by_email(email: str):
-    cursor.execute("SELECT * FROM users WHERE email = ? AND is_deleted = 0", (email,))
-    return cursor.fetchone()
-
-# -------- 데이터베이스 초기화 --------
-DATABASE_NAME = 'mock_db.sqlite3'
-conn = sqlite3.connect(DATABASE_NAME, check_same_thread=False)
-cursor = conn.cursor()
-
-def init_db():
-    cursor.execute("""
+@app.on_event("startup")
+def startup():
+    conn = get_db()
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
@@ -68,112 +29,113 @@ def init_db():
             is_admin BOOLEAN DEFAULT 0,
             is_deleted BOOLEAN DEFAULT 0
         )
-    """)
-    existing = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if existing == 0:
-        hashed_pw = hash_password("password123")
-        cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES (?, ?, ?, ?, ?)",
-                       ('user', 'user@example.com', hashed_pw, 0, 0))
-        cursor.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES (?, ?, ?, ?, ?)",
-                       ('admin', 'admin@example.com', hashed_pw, 1, 0))
+    ''')
+    conn.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES (?, ?, ?, ?, ?)", ('user', 'user@example.com', hashlib.sha256('password'.encode()).hexdigest(), 0, 0))
+    conn.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES (?, ?, ?, ?, ?)", ('admin', 'admin@example.com', hashlib.sha256('admin'.encode()).hexdigest(), 1, 0))
     conn.commit()
+    conn.close()
 
-init_db()
+@app.get("/register")
+async def register_form(request: Request):
+    return render_template_string('''
+        <form method="post" action="/register">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+    ''')
 
-# -------- 라우트 핸들러 --------
+@app.post("/register")
+async def register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...)):
+    conn = get_db()
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    conn.execute("INSERT INTO users (username, email, password, is_admin, is_deleted) VALUES (?, ?, ?, ?, ?)", (username, email, hashed_password, 0, 0))
+    conn.commit()
+    conn.close()
+    return render_template_string('''
+        <p>Registration successful!</p>
+        <a href="/">Back to home</a>
+    ''')
 
 @app.get("/login/{member_id}")
-def login(member_id: int, request: Request):
-    user = get_user_by_id(member_id)
-    if not user:
-        raise HTTPException(status_code=403, detail="Authentication failed")
+async def login(request: Request, member_id: int):
     request.session["member_id"] = member_id
-    request.session["is_admin"] = user[4]
-    return {"message": "Logged in successfully"}
+    request.session["is_admin"] = False
+    return render_template_string('''
+        <p>Logged in as member {member_id}</p>
+        <a href="/">Back to home</a>
+    ''')
 
-@app.post("/members/register")
-def register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...)):
-    try:
-        username = sanitize_input(username)
-        email = sanitize_input(email)
-        hashed_password = hash_password(password)
-        cursor.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", (username, email, hashed_password))
-        conn.commit()
-        return {"message": "Registration successful"}
-    except Exception:
-        raise HTTPException(status_code=500, detail="Internal error during registration")
-
-@app.get("/members/{member_id}", response_class=HTMLResponse)
-def view_profile(member_id: int, request: Request):
+@app.get("/profile")
+async def profile_form(request: Request):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=403, detail="Not logged in")
-    if request.session["member_id"] != member_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    user = get_user_by_id(member_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="Member not found")
-    return f"""
-        <html>
-            <head><title>Profile</title></head>
-            <body>
-                <h1>Profile</h1>
-                <p>Username: {user[1]}</p>
-                <p>Email: {user[2]}</p>
-            </body>
-        </html>
-    """
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+    return render_template_string('''
+        <form method="post" action="/profile/update">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Update Profile</button>
+        </form>
+    ''')
 
-@app.post("/members/update", response_class=HTMLResponse)
-def update_profile(request: Request, username: str = Form(...), email: str = Form(...)):
+@app.post("/profile/update")
+async def update_profile(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...)):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=403, detail="Not logged in")
-
-    user_id = request.session["member_id"]
-    user = get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=403, detail="User not found")
-
-    username = sanitize_input(username)
-    email = sanitize_input(email)
-
-    cursor.execute("UPDATE users SET username = ?, email = ? WHERE user_id = ?", (username, email, user_id))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+    conn = get_db()
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    conn.execute("UPDATE users SET username = ?, email = ?, password = ? WHERE user_id = ?", (username, email, hashed_password, request.session["member_id"]))
     conn.commit()
-    return {"message": "Profile updated successfully"}
+    conn.close()
+    return render_template_string('''
+        <p>Profile updated successfully!</p>
+        <a href="/">Back to home</a>
+    ''')
 
-@app.post("/members/delete", response_class=HTMLResponse)
-def delete_account(request: Request):
+@app.post("/profile/delete")
+async def delete_profile(request: Request):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=403, detail="Not logged in")
-    user_id = request.session["member_id"]
-    cursor.execute("UPDATE users SET is_deleted = 1 WHERE user_id = ?", (user_id,))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+    conn = get_db()
+    conn.execute("UPDATE users SET is_deleted = 1 WHERE user_id = ?", (request.session["member_id"],))
     conn.commit()
+    conn.close()
     request.session.clear()
-    return {"message": "Account deleted successfully"}
+    return render_template_string('''
+        <p>Account deleted successfully!</p>
+        <a href="/">Back to home</a>
+    ''')
 
-@app.post("/admin/deactivate_member/{member_id}", response_class=HTMLResponse)
-def admin_deactivate_member(member_id: int, request: Request):
-    if "is_admin" not in request.session or not request.session["is_admin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    cursor.execute("UPDATE users SET is_deleted = 1 WHERE user_id = ?", (member_id,))
+@app.post("/admin/delete_member/{member_id}")
+async def admin_delete_member(request: Request, member_id: int):
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
+    conn = get_db()
+    conn.execute("UPDATE users SET is_deleted = 1 WHERE user_id = ?", (member_id,))
     conn.commit()
-    return {"message": "Member deactivated successfully"}
+    conn.close()
+    return render_template_string('''
+        <p>Member deleted successfully!</p>
+        <a href="/">Back to home</a>
+    ''')
 
-@app.get("/members", response_class=HTMLResponse)
-def list_members(request: Request):
-    cursor.execute("SELECT * FROM users WHERE is_deleted = 0")
-    members = cursor.fetchall()
-    return f"""
-        <html>
-            <head><title>Members</title></head>
-            <body>
-                <h1>Active Members</h1>
-                <ul>
-                    {''.join([f'<li>{sanitize_input(member[1])} - {sanitize_input(member[2])}</li>' for member in members])}
-                </ul>
-            </body>
-        </html>
-    """
+@app.get("/admin/members")
+async def admin_members(request: Request):
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
+    conn = get_db()
+    members = conn.execute("SELECT * FROM users WHERE is_deleted = 0 ORDER BY user_id DESC").fetchall()
+    conn.close()
+    return render_template_string('''
+        <ul>
+            {% for member in members %}
+                <li>{{ member.username }} ({{ member.email }})</li>
+            {% endfor %}
+        </ul>
+        <a href="/">Back to home</a>
+    ''', members=members)
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

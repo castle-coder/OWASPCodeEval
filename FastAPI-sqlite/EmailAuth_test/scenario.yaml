@@ -1,87 +1,100 @@
-# scenario.yaml
+# Email-verification 로그인/관리 서비스 보안 테스트 시나리오
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
 tests:
-  - id: A1
-    name: SQL Injection
-    category: Injection
+  # ──────────────── A7 • Identification & Authentication Failures ────────────────
+  - id: A7_Login_Unverified
+    name: 이메일 미인증 계정 로그인
     method: GET
-    endpoint: "/verify/{token}"
-    params:
-      token: "1' OR '1'='1"
-    expected_status: 500
+    path: /login/1                 # user_id 1 = 미인증(user@example.com)
+    expected_status: 400-499       # 200 이면 취약
+    vuln_check: { query: "SELECT email_verified FROM users WHERE user_id = 1 AND email_verified = 0" }
 
-  - id: A2
-    name: Broken Authentication
-    category: Broken Authentication
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID 로그인
     method: GET
-    endpoint: "/profile"
-    expected_status: 302
+    path: /login/9999
+    expected_status: 400-499
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 9999" }
 
-  - id: A3
-    name: Sensitive Data Exposure
-    category: Sensitive Data Exposure
+  # ──────────────── A1 • Broken Access Control ────────────────
+  - id: A1_Admin_Unverified_AsUser
+    name: 일반 사용자 /admin/unverified 접근
     method: GET
-    endpoint: "/.env"
-    expected_status: 500
+    login_as: 1                    # user_id 1 은 is_admin False
+    path: /admin/unverified
+    expected_status: 403-403
 
-  - id: A4
-    name: XML External Entities
-    category: XXE
+  - id: A1_Admin_ForceVerify_NoPriv
+    name: 일반 사용자 /admin/force_verify 호출
     method: POST
-    endpoint: "/upload-xml"
-    payload:
-      xml: |
-        <?xml version="1.0"?>
-        <!DOCTYPE foo [
-          <!ELEMENT foo ANY>
-          <!ENTITY xxe SYSTEM "file:///etc/passwd">
-        ]>
-        <foo>&xxe;</foo>
-    expected_status: 404
+    login_as: 1
+    path: /admin/force_verify/1
+    expected_status: 403-403
 
-  - id: A5
-    name: Broken Access Control
-    category: Broken Access Control
+  # ──────────────── A3 • Injection (SQLi) ────────────────
+  - id: A3_SQLi_RegisterUsername
+    name: 회원가입 Username SQL 인젝션
     method: POST
-    endpoint: "/admin/product"
-    payload:
-      name: "test"
-      description: "test"
-      price: "10"
-    expected_status: 302
+    path: /register
+    data:
+      username: "abc'); DROP TABLE users;--"
+      email: "sqli@example.com"
+      password: "P@ss123!"
+    expected_status: 400-499
+    vuln_check: { query: "SELECT user_id FROM users WHERE username LIKE '%DROP TABLE%'" }
 
-  - id: A6
-    name: Security Misconfiguration
-    category: Security Misconfiguration
+  - id: A3_SQLi_VerifyPath
+    name: /auth/send/<id> 경로 SQL 인젝션
     method: GET
-    endpoint: "/static/nonexistent.js"
-    expected_status: 404
+    login_as: 2                    # admin 로그인 필요 없음, 단순 호출
+    path: /auth/send/1%20OR%201=1
+    expected_status: 400-499
 
-  - id: A7
-    name: Cross-Site Scripting
-    category: XSS
-    method: GET
-    endpoint: "/profile?name=<script>alert(1)</script>"
-    expected_status: 200
-
-  - id: A8
-    name: Insecure Deserialization
-    category: Insecure Deserialization
+  # ──────────────── A9 • Insufficient Logging & Monitoring (저장형 XSS) ────────────────
+  - id: A9_XSS_RegisterUsername
+    name: 회원가입 Username 스크립트 저장
     method: POST
-    endpoint: "/deserialize"
-    payload:
-      data: "pickle.loads(...)"
-    expected_status: 404
+    path: /register
+    data:
+      username: "<script>alert('xss')</script>"
+      email: "xss@example.com"
+      password: "XssPass1!"
+    expected_status: 200-299
+    vuln_check: { query: "SELECT user_id FROM users WHERE username LIKE '%<script%'" }
 
-  - id: A9
-    name: Using Components with Known Vulnerabilities
-    category: Using Components with Known Vulnerabilities
-    method: GET
-    endpoint: "/"
-    expected_status: 200
+  # ──────────────── A2 • Cryptographic Failures ────────────────
+  - id: A2_PlainPasswordStorage
+    name: 비밀번호 평문 저장 검사
+    method: POST
+    path: /register
+    data:
+      username: "pwtest"
+      email: "pw@example.com"
+      password: "plainpass"
+    expected_status: 200-299
+    vuln_check: { query: "SELECT user_id FROM users WHERE email='pw@example.com' AND password='plainpass'" }
 
-  - id: A10
-    name: Insufficient Logging & Monitoring
-    category: Insufficient Logging & Monitoring
+  # ──────────────── A6 • Vulnerable & Outdated Components / Security Misconfig ────────────────
+  - id: A6_CSP_Header_Missing
+    name: 루트 경로 CSP 헤더 부재
     method: GET
-    endpoint: "/nonexistent-endpoint"
-    expected_status: 404
+    path: /
+    expected_status: 200-299
+
+  # ──────────────── A10 • SSRF / Business Logic (만료 코드 재사용) ────────────────
+  - id: A10_VerifyCode_Expired
+    name: 만료된 인증 코드 사용
+    method: POST
+    # 사전 단계: 로그인 없이 /register 로 user_id 확보
+    pre:
+      - method: POST
+        path: /register
+        data: { username: "tempuser", email: "temp@ex.com", password: "Tmp123!" }
+    dynamic_user_id: true          # security_test.py 가 pre 응답에서 user_id 추출
+    path: /auth/verify
+    data_template:                 # security_test.py 가 {{user_id}} 치환
+      user_id: "{{user_id}}"
+      code: "123456"               # 임의 코드 (만료 혹은 불일치)
+    expected_status: 400-499

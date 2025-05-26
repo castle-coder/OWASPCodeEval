@@ -1,0 +1,92 @@
+# Quiz 서비스 – OWASP Top 10 취약점 점검 시나리오
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
+tests:
+  # ──────────────── A1 Broken Access Control ────────────────
+  - id: A1_BAC_Create_NoLogin
+    name: 로그인 없이 퀴즈 생성
+    method: POST
+    path: /quizzes/create
+    data: { title: "t", question: "q", correct_answer: "a" }
+    expected_status: 401-401
+
+  - id: A1_BAC_Attempts_NoLogin
+    name: 로그인 없이 시도 목록 열람
+    method: GET
+    path: /attempts
+    expected_status: 401-401
+
+  - id: A1_BAC_AdminList_NoPriv
+    name: 비관리자 /admin/quizzes 접근
+    method: GET
+    login_as: user1
+    path: /admin/quizzes
+    expected_status: 401-401
+
+  - id: A1_BAC_AdminDelete_NoPriv
+    name: 비관리자 /admin/delete_quiz 호출
+    method: POST
+    login_as: user1
+    path: /admin/delete_quiz/1
+    expected_status: 401-401
+
+  - id: A1_BAC_Delete_OtherUser
+    name: 본인 아닌 퀴즈 삭제
+    method: POST
+    login_as: user1
+    path: /quizzes/delete/9999          # 존재·소유 상관없이 404가 정상
+    expected_status: 404-404
+
+  # ──────────────── A7 Identification & Auth Failures ────────────────
+  - id: A7_Login_Nonexist
+    name: 존재하지 않는 ID 로그인
+    method: GET
+    path: /login/ghost_user
+    expected_status: 400-499            # 허용되면 취약
+
+  # ──────────────── A3 Injection ────────────────
+  - id: A3_SQLi_Title
+    name: 제목 필드 SQL 인젝션
+    method: POST
+    login_as: user1
+    path: /quizzes/create
+    data:
+      title: "abc'); DROP TABLE quizzes;--"
+      question: "inject?"
+      correct_answer: "no"
+    expected_status: 400-499
+
+  - id: A3_SQLi_PathParam
+    name: 경로 파라미터 SQL 인젝션
+    method: GET
+    login_as: user1
+    path: /quizzes/1%20OR%201=1
+    expected_status: 400-499
+
+  # ──────────────── A9 Insufficient Logging & Monitoring (XSS 저장 검사) ────────────────
+  - id: A9_XSS_TitleStored
+    name: 제목에 스크립트 저장
+    method: POST
+    login_as: user1
+    path: /quizzes/create
+    data:
+      title: "<script>alert('xss')</script>"
+      question: "2+2?"
+      correct_answer: "4"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT quiz_id FROM quizzes WHERE title LIKE '%<script%'"
+
+  - id: A9_XSS_QuestionStored
+    name: 질문에 onerror 이벤트 저장
+    method: POST
+    login_as: user1
+    path: /quizzes/create
+    data:
+      title: "Image Test"
+      question: "<img src=x onerror=alert(1)>"
+      correct_answer: "ok"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT quiz_id FROM quizzes WHERE question LIKE '%onerror=%'"

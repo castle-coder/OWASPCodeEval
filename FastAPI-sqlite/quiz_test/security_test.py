@@ -8,32 +8,30 @@ SCENARIO_PATH = os.path.join(dir, 'scenario.yaml')
 
 
 def status_ok(code: int, spec: str) -> bool:
-    """코드가 spec 범위(예: '401-401' 또는 '200-299') 안에 있으면 True"""
+    """Status code가 spec(예: '401-401' 또는 '200-299') 범위 내인지 확인"""
     m = re.match(r"(\d+)-(\d+)$", spec)
     if m:
-        lo, hi = map(int, m.groups())
-        return lo <= code <= hi
+        low, high = map(int, m.groups())
+        return low <= code <= high
     return code == int(spec)
 
 
 def row_exists(db: str, query: str) -> bool:
-    """쿼리 결과가 존재하면 True (취약)"""
     conn = sqlite3.connect(db)
     cur = conn.cursor()
     try:
         cur.execute(query)
         found = cur.fetchone() is not None
-    except sqlite3.Error:
+    except Exception:
         found = False
-    finally:
-        conn.close()
+    conn.close()
     return found
 
 
 def run_test(base: str, db: str, t: dict):
     sess = requests.Session()
 
-    # 로그인 필요 시
+    # Optional login
     if t.get("login_as") is not None:
         sess.get(f"{base}/login/{t['login_as']}", allow_redirects=False)
 
@@ -47,21 +45,23 @@ def run_test(base: str, db: str, t: dict):
     ok = status_ok(resp.status_code, t["expected_status"])
     reason = None
 
-    # DB 취약 여부
-    if t.get("vuln_check") and row_exists(db, t["vuln_check"]["query"]):
-        ok = False
-        reason = "악성 데이터가 DB에 저장됨"
+    # 추가 취약 확인
+    if t.get("vuln_check"):
+        if row_exists(db, t["vuln_check"]["query"]):
+            ok = False
+            reason = "악성 데이터가 DB에 저장됨"
 
-    # 범주별 기본 메시지
+    # A7 로그인 취약: 비존재 ID 허용
+    if t["id"].startswith("A7_") and not ok and reason is None:
+        reason = "비존재 ID로 로그인 허용"
+
+    # A3 SQL 인젝션 취약
+    if t["id"].startswith("A3_") and not ok and reason is None:
+        reason = "SQL 인젝션 시도 허용"
+
+    # 일반 코드 불일치
     if not ok and reason is None:
-        if t["id"].startswith("A1_"):
-            reason = "권한 우회 허용"
-        elif t["id"].startswith("A3_"):
-            reason = "SQL 인젝션 허용"
-        elif t["id"].startswith("A7_"):
-            reason = "비존재 ID 로그인 허용"
-        else:
-            reason = "예상치 못한 응답 코드"
+        reason = "예상치 못한 응답 코드"
 
     return ok, resp.status_code, reason
 
@@ -72,12 +72,12 @@ def main():
     db = DB_PATH  # 절대 경로 사용
 
     for test in cfg["tests"]:
-        safe, actual, why = run_test(base, db, test)
+        success, actual, why = run_test(base, db, test)
         print(SEP)
         print(f"[Test ID: {test['id']}] {test['name']}")
         print(f"Status Code: {actual} (expected {test['expected_status']})")
-        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
-        if why and not safe:
+        print(f"결과: {'✅ 안전' if success else '❌ 취약'}")
+        if why and not success:
             print(f"이유: {why}")
     print(SEP)
 

@@ -1,167 +1,246 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form, Request
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, File, UploadFile, status
+from fastapi.responses import HTMLResponse, StreamingResponse
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse
-from starlette.requests import Request
-from starlette.status import HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
-from datetime import datetime
+from starlette.responses import FileResponse
+from jinja2 import Template
 import sqlite3
-import os
+import uvicorn
+from datetime import datetime
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 
-DATABASE = "mock_db.sqlite3"
-
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect("mock_db.sqlite3")
     conn.row_factory = sqlite3.Row
     return conn
 
+def render_template_string(html: str, **context):
+    return HTMLResponse(Template(html).render(**context))
+
 @app.on_event("startup")
-def startup():
+async def startup_event():
     conn = get_db()
     conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            user_id   INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT,
-            is_admin  BOOLEAN
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            email TEXT NOT NULL,
+            password TEXT NOT NULL,
+            is_admin BOOLEAN DEFAULT 0,
+            is_deleted BOOLEAN DEFAULT 0
         )
     ''')
     conn.execute('''
         CREATE TABLE IF NOT EXISTS files (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id      INTEGER,
-            filename     TEXT,
-            description  TEXT,
-            uploaded_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_blocked   BOOLEAN DEFAULT 0,
-            FOREIGN KEY(user_id) REFERENCES users(user_id)
+            file_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id INTEGER NOT NULL,
+            original_name TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            mime_type TEXT NOT NULL,
+            data BLOB NOT NULL,
+            is_deleted BOOLEAN DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     conn.execute('''
-        CREATE TABLE IF NOT EXISTS reports (
-            report_id   INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_id     INTEGER,
-            user_id     INTEGER,
-            reason      TEXT,
-            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(file_id) REFERENCES files(id),
-            FOREIGN KEY(user_id) REFERENCES users(user_id)
-        )
+        INSERT INTO users (username, email, password, is_admin, is_deleted)
+        SELECT 'user', 'user@example.com', '<hashed>', 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user')
     ''')
     conn.execute('''
-        INSERT INTO users (username, is_admin) VALUES ('user', 0)
+        INSERT INTO users (username, email, password, is_admin, is_deleted)
+        SELECT 'admin', 'admin@example.com', '<hashed>', 1, 0
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin')
     ''')
     conn.execute('''
-        INSERT INTO users (username, is_admin) VALUES ('admin', 1)
+        INSERT INTO files (owner_id, original_name, size, mime_type, data, is_deleted)
+        SELECT 2, 'sample.txt', 11, 'text/plain', X'73616d706c652074657874', 0
+        WHERE NOT EXISTS (SELECT 1 FROM files WHERE original_name = 'sample.txt')
     ''')
     conn.commit()
     conn.close()
 
-@app.get("/login/{user_id}")
-async def login(request: Request, user_id: int):
-    request.session["user_id"] = user_id
-    request.session["is_admin"] = user_id == 1
-    return RedirectResponse("/files")
+@app.get("/login/{member_id}")
+async def login(request: Request, member_id: str):
+    request.session["member_id"] = member_id
+    request.session["is_admin"] = member_id == "admin"
+    return render_template_string('<html><body>Logged in as {{ member_id }}</body></html>', member_id=member_id)
 
-@app.post("/upload")
-async def upload_file(request: Request, file: UploadFile = File(...), description: str = Form(None)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not logged in")
-    filename = file.filename
-    file_path = os.path.join("uploads", filename)
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+@app.get("/files/upload")
+async def upload_form(request: Request):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to upload files.</body></html>')
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Upload File</h1>
+            <form action="/files/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file">
+                <input type="submit" value="Upload">
+            </form>
+        </body>
+        </html>
+    ''')
+
+@app.post("/files/upload")
+async def upload_file(request: Request, file: UploadFile = File(...)):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to upload files.</body></html>')
+    file_data = await file.read()
     conn = get_db()
     conn.execute('''
-        INSERT INTO files (user_id, filename, description) VALUES (?, ?, ?)
-    ''', (user_id, filename, description))
+        INSERT INTO files (owner_id, original_name, size, mime_type, data, is_deleted)
+        VALUES (?, ?, ?, ?, ?, 0)
+    ''', (request.session["member_id"], file.filename, len(file_data), file.content_type, file_data))
     conn.commit()
     conn.close()
-    return RedirectResponse("/files")
-
-@app.get("/download/{file_id}")
-async def download_file(request: Request, file_id: int):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not logged in")
-    conn = get_db()
-    file = conn.execute('''
-        SELECT * FROM files WHERE id = ? AND is_blocked = 0
-    ''', (file_id,)).fetchone()
-    conn.close()
-    if not file:
-        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="File not found")
-    file_path = os.path.join("uploads", file["filename"])
-    return FileResponse(file_path, filename=file["filename"])
+    return render_template_string('<html><body>File uploaded successfully.</body></html>')
 
 @app.get("/files")
 async def list_files(request: Request):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not logged in")
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to view your files.</body></html>')
     conn = get_db()
-    if user_id == 1:
-        files = conn.execute('''
-            SELECT * FROM files
-        ''').fetchall()
-    else:
-        files = conn.execute('''
-            SELECT * FROM files WHERE is_blocked = 0
-        ''').fetchall()
+    files = conn.execute('''
+        SELECT file_id, original_name, size, created_at
+        FROM files
+        WHERE owner_id = ? AND is_deleted = 0
+        ORDER BY created_at DESC
+    ''', (request.session["member_id"],)).fetchall()
     conn.close()
-    return templates.TemplateResponse("files.html", {"request": request, "files": files})
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>My Files</h1>
+            <ul>
+                {% for file in files %}
+                <li><a href="/files/{{ file.file_id }}/download">{{ file.original_name }} ({{ file.size }} bytes, {{ file.created_at }})</a></li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', files=files)
 
-@app.post("/delete/{file_id}")
-async def delete_file(request: Request, file_id: int):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not logged in")
+@app.get("/files/{file_id}/download")
+async def download_file(request: Request, file_id: int):
     conn = get_db()
     file = conn.execute('''
-        SELECT * FROM files WHERE id = ? AND user_id = ?
-    ''', (file_id, user_id)).fetchone()
+        SELECT file_id, original_name, mime_type, data
+        FROM files
+        WHERE file_id = ? AND is_deleted = 0
+    ''', (file_id,)).fetchone()
+    conn.close()
     if not file:
-        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="File not found")
-    file_path = os.path.join("uploads", file["filename"])
-    os.remove(file_path)
+        raise HTTPException(status_code=404, detail="File not found")
+    if request.session["member_id"] != str(file["owner_id"]) and not request.session.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    return StreamingResponse(file["data"], media_type=file["mime_type"], headers={"Content-Disposition": f"attachment; filename={file['original_name']}"})
+
+@app.post("/files/delete/{file_id}")
+async def delete_file(request: Request, file_id: int):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to delete files.</body></html>')
+    conn = get_db()
+    file = conn.execute('''
+        SELECT file_id, owner_id
+        FROM files
+        WHERE file_id = ? AND is_deleted = 0
+    ''', (file_id,)).fetchone()
+    conn.close()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    if request.session["member_id"] != str(file["owner_id"]) and not request.session.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Delete File</h1>
+            <p>Are you sure you want to delete this file?</p>
+            <form action="/files/delete/{{ file_id }}" method="post">
+                <input type="submit" value="Delete">
+            </form>
+        </body>
+        </html>
+    ''', file_id=file_id)
+
+@app.post("/files/delete/{file_id}", response_class=HTMLResponse)
+async def delete_file_confirm(request: Request, file_id: int):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to delete files.</body></html>')
+    conn = get_db()
     conn.execute('''
-        DELETE FROM files WHERE id = ?
+        UPDATE files
+        SET is_deleted = 1
+        WHERE file_id = ?
     ''', (file_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/files")
+    return render_template_string('<html><body>File deleted successfully.</body></html>')
 
-@app.post("/admin/block/{file_id}")
-async def block_file(request: Request, file_id: int):
-    user_id = request.session.get("user_id")
-    if not user_id or not request.session.get("is_admin"):
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not authorized")
+@app.get("/admin/files")
+async def admin_list_files(request: Request):
+    if "member_id" not in request.session or not request.session.get("is_admin"):
+        return render_template_string('<html><body>Please <a href="/login/admin">log in as admin</a> to view all files.</body></html>')
+    conn = get_db()
+    files = conn.execute('''
+        SELECT file_id, owner_id, original_name, size, created_at
+        FROM files
+        WHERE is_deleted = 0
+    ''').fetchall()
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Admin Files</h1>
+            <ul>
+                {% for file in files %}
+                <li><a href="/files/{{ file.file_id }}/download">{{ file.original_name }} ({{ file.size }} bytes, {{ file.created_at }})</a></li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', files=files)
+
+@app.post("/admin/delete_file/{file_id}")
+async def admin_delete_file(request: Request, file_id: int):
+    if "member_id" not in request.session or not request.session.get("is_admin"):
+        return render_template_string('<html><body>Please <a href="/login/admin">log in as admin</a> to delete files.</body></html>')
+    conn = get_db()
+    file = conn.execute('''
+        SELECT file_id
+        FROM files
+        WHERE file_id = ? AND is_deleted = 0
+    ''', (file_id,)).fetchone()
+    conn.close()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Delete File</h1>
+            <p>Are you sure you want to delete this file?</p>
+            <form action="/admin/delete_file/{{ file_id }}" method="post">
+                <input type="submit" value="Delete">
+            </form>
+        </body>
+        </html>
+    ''', file_id=file_id)
+
+@app.post("/admin/delete_file/{file_id}", response_class=HTMLResponse)
+async def admin_delete_file_confirm(request: Request, file_id: int):
+    if "member_id" not in request.session or not request.session.get("is_admin"):
+        return render_template_string('<html><body>Please <a href="/login/admin">log in as admin</a> to delete files.</body></html>')
     conn = get_db()
     conn.execute('''
-        UPDATE files SET is_blocked = 1 WHERE id = ?
+        UPDATE files
+        SET is_deleted = 1
+        WHERE file_id = ?
     ''', (file_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/files")
+    return render_template_string('<html><body>File deleted successfully.</body></html>')
 
-@app.post("/report/{file_id}")
-async def report_file(request: Request, file_id: int, reason: str = Form(...)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not logged in")
-    conn = get_db()
-    conn.execute('''
-        INSERT INTO reports (file_id, user_id, reason) VALUES (?, ?, ?)
-    ''', (file_id, user_id, reason))
-    conn.commit()
-    conn.close()
-    return RedirectResponse("/files")
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

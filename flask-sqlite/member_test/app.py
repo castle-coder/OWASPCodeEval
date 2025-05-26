@@ -57,19 +57,18 @@ def load_user(user_id):
 def index():
     return render_template_string('''
         <h1>Welcome, {{ current_user.username }}!</h1>
-        <a href="{{ url_for('login', member_id=current_user.id) }}">Login</a>
+        <a href="{{ url_for('login') }}">Login</a>
         <a href="{{ url_for('register') }}">Register</a>
         <a href="{{ url_for('members') }}">Member List</a>
-        <a href="{{ url_for('profile') }}">Profile</a>
         {% if current_user.is_admin %}
-        <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
+            <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
         {% endif %}
         <a href="{{ url_for('logout') }}">Logout</a>
     ''')
 
 @app.route('/login/<member_id>', methods=['GET'])
 def login(member_id):
-    user = User.query.get(member_id)
+    user = User.query.filter_by(username=member_id).first()
     if user and not user.is_deleted:
         login_user(user)
         session['is_admin'] = user.is_admin
@@ -85,7 +84,7 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/members/register', methods=['POST'])
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
@@ -98,26 +97,37 @@ def register():
             db.session.add(user)
             db.session.commit()
             flash('Registration successful', 'success')
-            return redirect(url_for('login', member_id=user.id))
+            return redirect(url_for('login', member_id=form.username.data))
     return render_template_string('''
-        <h1>Register</h1>
-        <form method="POST">
+        <form method="post">
             {{ form.hidden_tag() }}
             <p>
                 {{ form.username.label }}<br>
                 {{ form.username(size=32) }}
+                {% for error in form.username.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
             </p>
             <p>
                 {{ form.email.label }}<br>
                 {{ form.email(size=64) }}
+                {% for error in form.email.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
             </p>
             <p>
                 {{ form.password.label }}<br>
                 {{ form.password(size=32) }}
+                {% for error in form.password.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
             </p>
             <p>
                 {{ form.confirm_password.label }}<br>
                 {{ form.confirm_password(size=32) }}
+                {% for error in form.confirm_password.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
             </p>
             <p>{{ form.submit() }}</p>
         </form>
@@ -125,8 +135,8 @@ def register():
 
 @app.route('/members/<member_id>', methods=['GET'])
 @login_required
-def profile(member_id):
-    user = User.query.get(member_id)
+def member_profile(member_id):
+    user = User.query.filter_by(username=member_id).first()
     if user and not user.is_deleted:
         return render_template_string('''
             <h1>Profile</h1>
@@ -135,9 +145,9 @@ def profile(member_id):
             <p>Registration Date: {{ user.created_at }}</p>
             <p>Account Status: {% if user.is_deleted %}Deleted{% else %}Active{% endif %}</p>
             <p>Last Update Date: {{ user.updated_at }}</p>
-            {% if current_user.id == user.id %}
-            <a href="{{ url_for('update_profile') }}">Edit</a>
-            <a href="{{ url_for('delete_profile') }}">Delete</a>
+            {% if current_user.username == user.username %}
+                <a href="{{ url_for('update_profile') }}">Edit</a>
+                <a href="{{ url_for('delete_profile') }}">Delete</a>
             {% endif %}
         ''', user=user)
     else:
@@ -148,32 +158,29 @@ def profile(member_id):
 def update_profile():
     form = ProfileForm()
     if form.validate_on_submit():
-        user = User.query.get(current_user.id)
-        if user.username != form.username.data:
-            if User.query.filter_by(username=form.username.data).first():
-                flash('Username already exists', 'error')
-            else:
-                user.username = form.username.data
-        if user.email != form.email.data:
-            if User.query.filter_by(email=form.email.data).first():
-                flash('Email already exists', 'error')
-            else:
-                user.email = form.email.data
-        user.updated_at = datetime.utcnow()
-        db.session.commit()
-        flash('Profile updated', 'success')
-        return redirect(url_for('profile', member_id=user.id))
+        user = User.query.filter_by(username=current_user.username).first()
+        if user:
+            user.username = form.username.data
+            user.email = form.email.data
+            db.session.commit()
+            flash('Profile updated successfully', 'success')
+            return redirect(url_for('member_profile', member_id=current_user.username))
     return render_template_string('''
-        <h1>Update Profile</h1>
-        <form method="POST">
+        <form method="post">
             {{ form.hidden_tag() }}
             <p>
                 {{ form.username.label }}<br>
                 {{ form.username(size=32) }}
+                {% for error in form.username.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
             </p>
             <p>
                 {{ form.email.label }}<br>
                 {{ form.email(size=64) }}
+                {% for error in form.email.errors %}
+                    <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}
             </p>
             <p>{{ form.submit() }}</p>
         </form>
@@ -182,28 +189,28 @@ def update_profile():
 @app.route('/members/delete', methods=['POST'])
 @login_required
 def delete_profile():
-    user = User.query.get(current_user.id)
-    user.is_deleted = True
-    user.updated_at = datetime.utcnow()
-    db.session.commit()
-    session.clear()
-    flash('Profile deleted', 'success')
-    return redirect(url_for('register'))
+    user = User.query.filter_by(username=current_user.username).first()
+    if user:
+        user.is_deleted = True
+        db.session.commit()
+        logout_user()
+        session.clear()
+        flash('Profile deleted successfully', 'success')
+        return redirect(url_for('register'))
+    abort(404)
 
 @app.route('/admin/deactivate_member/<member_id>', methods=['POST'])
 @login_required
 def deactivate_member(member_id):
     if not current_user.is_admin:
         abort(403)
-    user = User.query.get(member_id)
-    if user:
-        user.is_deleted = True
-        user.updated_at = datetime.utcnow()
+    user = User.query.filter_by(username=member_id).first()
+    if user and not user.is_deleted:
+        user.is_active = False
         db.session.commit()
-        flash('Member deactivated', 'success')
-    else:
-        flash('Member not found', 'error')
-    return redirect(url_for('members'))
+        flash('Member deactivated successfully', 'success')
+        return redirect(url_for('members'))
+    abort(404)
 
 @app.route('/members', methods=['GET'])
 @login_required
@@ -212,12 +219,12 @@ def members():
     search = request.args.get('search', '', type=str)
     query = User.query.filter_by(is_deleted=False)
     if search:
-        query = query.filter((User.username.contains(search)) | (User.email.contains(search)))
-    members = query.paginate(page=page, per_page=10, error_out=False)
+        query = query.filter(User.username.contains(search) | User.email.contains(search))
+    members = query.paginate(page, 10, False)
     return render_template_string('''
-        <h1>Member List</h1>
-        <form method="GET">
-            <input type="text" name="search" placeholder="Search by username or email" value="{{ request.args.get('search', '') }}">
+        <h1>Members</h1>
+        <form method="get">
+            <input type="text" name="search" placeholder="Search by username or email" value="{{ search }}">
             <button type="submit">Search</button>
         </form>
         <table>
@@ -227,20 +234,60 @@ def members():
                 <th>Registration Date</th>
                 <th>Account Status</th>
                 <th>Last Update Date</th>
+                {% if current_user.is_admin %}
+                    <th>Actions</th>
+                {% endif %}
             </tr>
             {% for member in members.items %}
-            <tr>
-                <td>{{ member.username }}</td>
-                <td>{{ member.email }}</td>
-                <td>{{ member.created_at }}</td>
-                <td>{% if member.is_deleted %}Deleted{% else %}Active{% endif %}</td>
-                <td>{{ member.updated_at }}</td>
-            </tr>
+                <tr>
+                    <td>{{ member.username }}</td>
+                    <td>{{ member.email }}</td>
+                    <td>{{ member.created_at }}</td>
+                    <td>{% if member.is_deleted %}Deleted{% else %}Active{% endif %}</td>
+                    <td>{{ member.updated_at }}</td>
+                    {% if current_user.is_admin %}
+                        <td>
+                            <form method="post" action="{{ url_for('deactivate_member', member_id=member.username) }}">
+                                <button type="submit">Deactivate</button>
+                            </form>
+                        </td>
+                    {% endif %}
+                </tr>
             {% endfor %}
         </table>
-        <a href="{{ url_for('members', page=members.prev_num) }}">Previous</a>
-        <a href="{{ url_for('members', page=members.next_num) }}">Next</a>
-    ''', members=members)
+        <nav>
+            <ul class="pagination">
+                {% if members.has_prev %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('members', page=members.prev_num, search=search) }}">Previous</a></li>
+                {% endif %}
+                {% for page_num in members.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num == members.page %}
+                            <li class="page-item active"><a class="page-link" href="{{ url_for('members', page=page_num, search=search) }}">{{ page_num }}</a></li>
+                        {% else %}
+                            <li class="page-item"><a class="page-link" href="{{ url_for('members', page=page_num, search=search) }}">{{ page_num }}</a></li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                {% if members.has_next %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('members', page=members.next_num, search=search) }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    ''', members=members, search=search)
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+        if not User.query.filter_by(username='user').first():
+            user = User(username='user', email='user@example.com')
+            user.set_password('user')
+            db.session.add(user)
+        if not User.query.filter_by(username='admin').first():
+            admin = User(username='admin', email='admin@example.com', is_admin=True)
+            admin.set_password('admin')
+            db.session.add(admin)
+        db.session.commit()
     app.run(debug=True)

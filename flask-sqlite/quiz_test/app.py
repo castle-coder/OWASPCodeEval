@@ -29,8 +29,8 @@ def create_quiz():
     correct_answers = request.form.getlist('correct_answer[]')
     conn = get_db_connection()
     quiz_id = conn.execute('INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)', (session['user_id'], title, description)).lastrowid
-    for i in range(len(questions)):
-        conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, questions[i], options[i], correct_answers[i]))
+    for question, option, correct_answer in zip(questions, options, correct_answers):
+        conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, question, option, correct_answer))
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
@@ -47,8 +47,8 @@ def edit_quiz(quiz_id):
     conn = get_db_connection()
     conn.execute('UPDATE quizzes SET title = ?, description = ? WHERE id = ?', (title, description, quiz_id))
     conn.execute('DELETE FROM questions WHERE quiz_id = ?', (quiz_id,))
-    for i in range(len(questions)):
-        conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, questions[i], options[i], correct_answers[i]))
+    for question, option, correct_answer in zip(questions, options, correct_answers):
+        conn.execute('INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)', (quiz_id, question, option, correct_answer))
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
@@ -91,27 +91,21 @@ def take_quiz(quiz_id):
 def quiz_results(quiz_id):
     if 'user_id' not in session:
         return redirect(url_for('login', user_id=1))
-    user_id = session['user_id']
     conn = get_db_connection()
     quiz = conn.execute('SELECT * FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
     questions = conn.execute('SELECT * FROM questions WHERE quiz_id = ?', (quiz_id,)).fetchall()
     answers = request.form.getlist('answer[]')
-    score = 0
-    for i in range(len(questions)):
-        if answers[i] == questions[i].correct_answer:
-            score += 1
-    conn.execute('INSERT INTO results (user_id, quiz_id, score) VALUES (?, ?, ?)', (user_id, quiz_id, score))
+    score = sum(1 for answer, correct_answer in zip(answers, [question.correct_answer for question in questions]) if answer == correct_answer)
+    conn.execute('INSERT INTO results (user_id, quiz_id, score) VALUES (?, ?, ?)', (session['user_id'], quiz_id, score))
     conn.commit()
     conn.close()
     return render_template_string('''
         <h1>Quiz Results</h1>
         <p>Score: {{ score }}</p>
-        {% for question in questions %}
-            <p>{{ question.question }}</p>
-            <p>Your Answer: {{ answers[loop.index0] }}</p>
-            <p>Correct Answer: {{ question.correct_answer }}</p>
+        {% for question, answer in zip(questions, answers) %}
+            <p>{{ question.question }} - {{ 'Correct' if answer == question.correct_answer else 'Incorrect' }}</p>
         {% endfor %}
-    ''', quiz=quiz, questions=questions, answers=answers)
+    ''', quiz=quiz, questions=questions, answers=answers, score=score)
 
 @app.route('/quiz/leaderboard', methods=['GET'])
 def quiz_leaderboard():
@@ -149,13 +143,13 @@ def index():
     conn.close()
     return render_template_string('''
         <h1>Quizzes</h1>
-        <a href="{{ url_for('create_quiz') }}">Create Quiz</a>
+        <a href="/quiz">Create Quiz</a>
         {% for quiz in quizzes %}
             <h2>{{ quiz.title }}</h2>
             <p>{{ quiz.description }}</p>
-            <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}">Take Quiz</a>
-            <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}">Edit Quiz</a>
-            <a href="{{ url_for('delete_quiz', quiz_id=quiz.id) }}">Delete Quiz</a>
+            <a href="/quiz/{{ quiz.id }}">Take Quiz</a>
+            <a href="/quiz/edit/{{ quiz.id }}">Edit Quiz</a>
+            <a href="/quiz/delete/{{ quiz.id }}">Delete Quiz</a>
         {% endfor %}
     ''', quizzes=quizzes)
 

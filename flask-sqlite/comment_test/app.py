@@ -4,10 +4,11 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
-app.config['DATABASE'] = 'mock_db.sqlite3'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mock_db.sqlite3'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 def get_db_connection():
-    conn = sqlite3.connect(app.config['DATABASE'])
+    conn = sqlite3.connect('mock_db.sqlite3')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -118,12 +119,13 @@ def report_comment(comment_id):
         return 'Not logged in', 401
     user_id = session['user_id']
     reason = request.form['reason']
+    post_id = request.form['post_id']
     conn = get_db_connection()
     conn.execute('INSERT INTO reports (user_id, comment_id, reason) VALUES (?, ?, ?)',
                  (user_id, comment_id, reason))
     conn.commit()
     conn.close()
-    return redirect(url_for('view_comments', post_id=request.form['post_id']))
+    return redirect(url_for('view_comments', post_id=post_id))
 
 if __name__ == '__main__':
     with app.app_context():

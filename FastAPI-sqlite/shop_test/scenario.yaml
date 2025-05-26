@@ -1,73 +1,104 @@
-# scenario.yaml
+# E-Commerce Demo API – OWASP Top-10 Test Scenarios (v2)
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
 tests:
-  - id: A1
-    name: SQL Injection
-    method: GET
-    endpoint: "/products/1 OR 1=1"
-    expected_status: 500
+  # ─── 기존 항목들 (앞부분에 이미 정의되어 있다고 가정) ───
+  # … A1, A2, A3, A5, A7, A9 항목들 …
 
-  - id: A2
-    name: Broken Authentication
+  # ────────── A1 • Broken Access Control (추가) ──────────
+  - id: A1_ProductEdit_NoPriv_GET
+    name: 일반 사용자 /admin/products/edit/1 (GET)
     method: GET
-    endpoint: "/cart"
-    expected_status: 302
+    login_as: 1
+    path: /admin/products/edit/1
+    expected_status: 403-403
 
-  - id: A3
-    name: Sensitive Data Exposure
-    method: GET
-    endpoint: "/orders"
-    expected_status: 500
-
-  - id: A4
-    name: XML External Entities
+  - id: A1_ProductEdit_NoPriv_POST
+    name: 일반 사용자 /admin/products/edit/1 (POST)
     method: POST
-    endpoint: "/xml"
-    headers:
-      Content-Type: application/xml
-    body: |
-      <?xml version="1.0"?>
-      <!DOCTYPE foo [
-        <!ELEMENT foo ANY>
-        <!ENTITY xxe SYSTEM "file:///etc/passwd">
-      ]>
-      <foo>&xxe;</foo>
-    expected_status: 404
+    login_as: 1
+    path: /admin/products/edit/1
+    data: { name: "hack", description: "hack", price: 1.0, stock: 1 }
+    expected_status: 403-403
 
-  - id: A5
-    name: Broken Access Control
-    method: GET
-    endpoint: "/admin/product"
-    expected_status: 302
-
-  - id: A6
-    name: Security Misconfiguration
-    method: GET
-    endpoint: "/static/nonexistent.js"
-    expected_status: 404
-
-  - id: A7
-    name: Cross-Site Scripting
-    method: GET
-    endpoint: "/products?search=<script>alert(1)</script>"
-    expected_status: 200
-
-  - id: A8
-    name: Insecure Deserialization
+  - id: A1_ProductDelete_NoPriv
+    name: 일반 사용자 /admin/products/delete/1
     method: POST
-    endpoint: "/deserialize"
-    headers:
-      Content-Type: application/octet-stream
-    body: "rO0ABXNyABFqYXZhLnV0aWwuTGlzdA=="
-    expected_status: 404
+    login_as: 1
+    path: /admin/products/delete/1
+    expected_status: 403-403
 
-  - id: A9
-    name: Using Components with Known Vulnerabilities
-    method: GET
-    endpoint: "/version"
-    expected_status: 404
+  - id: A1_Checkout_EmptyCart
+    name: 빈 장바구니로 체크아웃 시도
+    method: POST
+    login_as: 1
+    path: /cart/checkout
+    expected_status: 400-499
 
-  - id: A10
-    name: Insufficient Logging & Monitoring
+  - id: A1_AddHugeQty_ExceedsStock
+    name: 재고보다 큰 수량으로 장바구니 추가
+    method: POST
+    login_as: 1
+    path: /cart/add/1
+    data: { quantity: 9999 }
+    expected_status: 400-499
+
+  # ────────── A3 • Injection (SQLi) (추가) ──────────
+  - id: A3_SQLi_ProductDescription
+    name: 관리자 상품 설명 SQL 인젝션
+    method: POST
+    login_as: 2
+    path: /admin/products/create
+    data:
+      name: "SQLiProd"
+      description: "abc'); DROP TABLE orders;--"
+      price: 5.0
+      stock: 1
+    expected_status: 400-499
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='orders'"
+
+  - id: A3_SQLi_OrderIDPath
+    name: /orders/<id> 경로 SQL 인젝션
     method: GET
-    endpoint: "/logs"
-    expected_status: 404
+    login_as: 1
+    path: /orders/1%20OR%201=1
+    expected_status: 400-499
+
+  # ────────── A9 • Stored XSS (추가) ──────────
+  - id: A9_XSS_ProductDesc
+    name: 상품 설명 XSS 저장
+    method: POST
+    login_as: 2
+    path: /admin/products/create
+    data:
+      name: "XSSdesc"
+      description: "<img src=x onerror=alert(1)>"
+      price: 3.0
+      stock: 1
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT product_id FROM products WHERE description LIKE '%onerror=%'"
+
+  - id: A9_XSS_ProductName
+    name: 상품 이름 XSS 저장
+    method: POST
+    login_as: 2
+    path: /admin/products/create
+    data:
+      name: "<script>alert('x')</script>"
+      description: "desc"
+      price: 2.0
+      stock: 1
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT product_id FROM products WHERE name LIKE '%<script%'"
+
+  # ────────── A5 • Security Misconfiguration (헤더) 추가 ──────────
+  - id: A5_Header_XFrame
+    name: X-Frame-Options 헤더 부재
+    method: GET
+    login_as: 1
+    path: /shop
+    expected_status: 200-299

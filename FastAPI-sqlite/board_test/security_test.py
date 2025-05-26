@@ -1,79 +1,85 @@
-import requests
-import yaml
-import sqlite3
-import os
+import yaml, requests, sqlite3, re, os
+
+SEP = "-" * 50
+
+dir = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(dir, 'mock_db.sqlite3')
+SCENARIO_PATH = os.path.join(dir, 'scenario.yaml')
 
 
-def run_test(scenario, base_url, db_file):
-    test_id = scenario['id']
-    name = scenario['name']
-    session = requests.Session()
+def status_ok(code: int, spec: str) -> bool:
+    m = re.match(r"(\d+)-(\d+)$", spec)
+    if m:
+        low, high = map(int, m.groups())
+        return low <= code <= high
+    return code == int(spec)
 
-    # HTTP Basic Auth 설정
-    auth = scenario.get('auth')
-    if auth:
-        session.auth = (auth['username'], auth['password'])
 
-    url = base_url + scenario['endpoint']
-    method = scenario['method'].upper()
-    data = scenario.get('data', {})
-    resp = session.request(method, url, data=data, allow_redirects=False)
-
-    status_code = resp.status_code
-    expected = scenario.get('expected_status')
-    result = '✅ 안전' if status_code == expected else '❌ 취약'
-    reason = f"예상 상태 코드 {expected}이(가) 아님 (실제: {status_code})" if status_code != expected else "상태 코드가 예상과 일치함"
-
-    # DB 검사
-    if 'check_db' in scenario and status_code == expected:
-        conn = sqlite3.connect(db_file)
-        cur = conn.cursor()
-        tbl = scenario['check_db']['table']
-        col = scenario['check_db']['column']
-        payload = scenario['check_db'].get('payload')
-
-        cur.execute(f"SELECT {col} FROM {tbl} ORDER BY report_id DESC LIMIT 1")
+def db_row_exists(db: str, query: str) -> bool:
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    try:
+        cur.execute(query)
         row = cur.fetchone()
-        if row and payload and row[0] == payload:
-            reason = f"{name}이(가) DB에 삽입됨 ({col}: {row[0]})"
-            result = '❌ 취약'
-        else:
-            reason = f"{name}이(가) DB에 삽입되지 않음"
+    except sqlite3.Error:
+        row = None
+    finally:
         conn.close()
+    return row is not None
 
-    # Header 검사
-    elif 'check_headers' in scenario and status_code == expected:
-        header = scenario['check_headers']['header']
-        must = scenario['check_headers']['must_contain']
-        hdr_val = resp.headers.get(header, '')
-        if must in hdr_val:
-            reason = f"{header}에 '{must}' 존재"
+
+def run(test: dict, base: str, db: str):
+    s = requests.Session()
+
+    # 세션 로그인 필요 시
+    if test.get("login_as") is not None:
+        s.get(f"{base}/login/{test['login_as']}", allow_redirects=False)
+
+    resp = s.request(
+        method=test["method"],
+        url=f"{base}{test['path']}",
+        data=test.get("data"),
+        allow_redirects=False,
+    )
+
+    ok = status_ok(resp.status_code, test["expected_status"])
+    reason = None
+
+    # DB 기반 추가 검증
+    if test.get("vuln_check"):
+        if db_row_exists(db, test["vuln_check"]["query"]):
+            ok = False
+            reason = "악성 데이터가 DB에 저장됨"
+
+    # 분류별 일반 메시지
+    if not ok and reason is None:
+        if test["id"].startswith("A7_"):
+            reason = "인증 실패 취약"
+        elif test["id"].startswith("A3_"):
+            reason = "SQL 인젝션 허용"
+        elif test["id"].startswith("A1_"):
+            reason = "권한 우회 허용"
         else:
-            reason = f"{header}에 '{must}' 없음"
-            result = '❌ 취약'
+            reason = "예상치 못한 응답 코드"
 
-    # 출력
-    print("--------------------------------------------------")
-    print(f"[Test ID: {test_id}] {name}")
-    print(f"Status Code: {status_code}")
-    print(f"결과: {result}")
-    print(f"이유: {reason}")
-    print("--------------------------------------------------\n")
+    return ok, resp.status_code, reason
+
+
+def main():
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = DB_PATH  # 절대 경로 사용
+
+    for t in cfg["tests"]:
+        safe, actual_code, why = run(t, base, db)
+        print(SEP)
+        print(f"[Test ID: {t['id']}] {t['name']}")
+        print(f"Status Code: {actual_code} (expected {t['expected_status']})")
+        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
+        if why and not safe:
+            print(f"이유: {why}")
+    print(SEP)
 
 
 if __name__ == "__main__":
-    # 현재 스크립트의 절대 경로 가져오기
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # YAML 로드
-    yaml_path = os.path.join(current_dir, "scenario.yaml")
-    with open(yaml_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
-    base_url = config['base_url']
-    db_file = os.path.join(current_dir, config['db_file'])
-
-    for scenario in config['scenarios']:
-        if scenario.get('skip'):
-            continue
-        run_test(scenario, base_url, db_file)
+    main()

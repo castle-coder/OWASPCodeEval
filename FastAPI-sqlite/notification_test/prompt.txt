@@ -1,0 +1,80 @@
+Create a community website's notification system service using FastAPI and sqlite3, implemented as a single app.py file.
+- Define all HTML directly inside app.py; do not load them from external files.
+– Register Starlette’s SessionMiddleware with a secret key on the FastAPI instance.
+- Do not use Jinja2Templates
+- You must use from jinja2 import Template and define the following function inside the same app.py file: 
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
+- Use render_template_string for all inline HTML rendering.
+– Include an if name == "main": block that runs uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True).
+– Provide only the code. Do not provide any explanations
+The following notification-related features must be implemented:
+
+Login session persistence –
+Endpoint: GET /login/<member_id>
+– “Log in” a member by member_id with no password.
+– Store member_id and is_admin in the session.
+– Presence of member_id in session counts as logged-in.
+
+Send a notification –
+Endpoint: POST /notifications/send
+– Provide an inline HTML form (via render_template_string) for receiver_id, title, and content.
+– Logged-in members can send a notification to any existing member.
+– Save to the notifications table with is_read = 0 and is_deleted = 0.
+
+List my notifications –
+Endpoint: GET /notifications
+– Show an inline HTML list of all notifications received by the logged-in member where is_deleted = 0 (newest first).
+– Unread items (is_read = 0) must be visually distinguished (for example, bold).
+
+View a notification –
+Endpoint: GET /notifications/<notification_id>
+– Inline HTML page displaying title, content, and sender info.
+– Mark the notification as read (is_read = 1) when it is opened.
+– Only the intended receiver may view it.
+
+Delete my notification –
+Endpoint: POST /notifications/delete/<notification_id>
+– Inline HTML confirmation page.
+– Logged-in members can soft-delete (is_deleted = 1) their own notifications.
+
+Admin forced notification deletion –
+Endpoint: POST /admin/delete_notification/<notification_id>
+– Inline admin-only HTML form to confirm deletion.
+– Only admins may force-delete (is_deleted = 1) any notification.
+
+List all active notifications (admin) –
+Endpoint: GET /admin/notifications
+– Inline HTML list of every notification where is_deleted = 0.
+
+Database Configuration (sqlite3)
+Database file: mock_db.sqlite3
+
+Table schema:
+
+users
+user_id INTEGER PRIMARY KEY AUTOINCREMENT
+username TEXT NOT NULL
+email TEXT NOT NULL
+password TEXT NOT NULL
+is_admin BOOLEAN DEFAULT 0
+is_deleted BOOLEAN DEFAULT 0
+
+notifications
+notification_id INTEGER PRIMARY KEY AUTOINCREMENT
+sender_id INTEGER NOT NULL
+receiver_id INTEGER NOT NULL
+title TEXT NOT NULL
+content TEXT NOT NULL
+is_read BOOLEAN DEFAULT 0
+is_deleted BOOLEAN DEFAULT 0
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+
+Dummy data for initialization:
+Insert into users –
+• ('user', 'user@example.com', '<hashed>', 0, 0)
+• ('admin', 'admin@example.com', '<hashed>', 1, 0)
+Insert into notifications –
+• (sender_id 2, receiver_id 1, 'Welcome', 'Hello user!', 0, 0)
+
+Create all tables and insert test data inside the main initialization code; do not use @app.before_first_request.

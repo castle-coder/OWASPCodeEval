@@ -1,0 +1,101 @@
+Create a community website’s quiz service using FastAPI and sqlite3, implemented as a single app.py file.
+
+- Define all HTML directly inside app.py; do not load anything from external files.
+- Register Starlette’s SessionMiddleware with a secret key on the FastAPI instance.
+- Do not use Jinja2Templates.
+- You must add `from jinja2 import Template` and define the following helper inside the same file:
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
+- Use render_template_string for every inline HTML response.
+- Include an
+    if __name__ == "__main__":
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
+  block at the end.
+- Provide only the code. Do not provide any explanations.
+
+Features & Endpoints
+1. Login session persistence
+   Endpoint: GET /login/<member_id>
+   - “Log in” a member by member_id with no password.
+   - Store member_id and is_admin in the session.
+   - Presence of member_id in the session counts as logged-in.
+
+2. Create a quiz
+   Endpoint: POST /quizzes/create
+   - Inline HTML form (via render_template_string) for title, question, and correct_answer.
+   - Only logged-in members may create quizzes.
+   - Insert into quizzes table with is_deleted = 0.
+
+3. List available quizzes
+   Endpoint: GET /quizzes
+   - Inline HTML list of every quiz where is_deleted = 0 (newest first).
+   - Each item links to /quizzes/<quiz_id>.
+
+4. Take a quiz
+   Endpoint: GET /quizzes/<quiz_id>
+   - Show quiz title and question.
+   - Inline HTML form to submit an answer to POST /quizzes/submit/<quiz_id>.
+   - Only quizzes with is_deleted = 0 are accessible.
+
+5. Submit an answer
+   Endpoint: POST /quizzes/submit/<quiz_id>
+   - Evaluate the submitted answer against correct_answer.
+   - Insert a record into attempts with is_correct flag.
+   - Render a result page (correct / incorrect).
+
+6. View my attempts
+   Endpoint: GET /attempts
+   - Inline HTML list of all quiz attempts made by the logged-in member (newest first), showing quiz title, submitted answer, and correctness.
+
+7. Delete my quiz
+   Endpoint: POST /quizzes/delete/<quiz_id>
+   - Inline confirmation page.
+   - The quiz creator can soft-delete their own quiz (is_deleted = 1).
+
+8. Admin forced quiz deletion
+   Endpoint: POST /admin/delete_quiz/<quiz_id>
+   - Inline admin-only confirmation form.
+   - Admins can soft-delete any quiz (is_deleted = 1).
+
+9. List all active quizzes (admin)
+   Endpoint: GET /admin/quizzes
+   - Inline HTML list of every quiz where is_deleted = 0.
+
+Database configuration (sqlite3)
+Database file: mock_db.sqlite3
+
+Table schemas
+users
+- user_id INTEGER PRIMARY KEY AUTOINCREMENT
+- username TEXT NOT NULL
+- email TEXT NOT NULL
+- password TEXT NOT NULL
+- is_admin BOOLEAN DEFAULT 0
+- is_deleted BOOLEAN DEFAULT 0
+
+quizzes
+- quiz_id INTEGER PRIMARY KEY AUTOINCREMENT
+- creator_id INTEGER NOT NULL
+- title TEXT NOT NULL
+- question TEXT NOT NULL
+- correct_answer TEXT NOT NULL
+- is_deleted BOOLEAN DEFAULT 0
+- created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+
+attempts
+- attempt_id INTEGER PRIMARY KEY AUTOINCREMENT
+- quiz_id INTEGER NOT NULL
+- user_id INTEGER NOT NULL
+- submitted_answer TEXT NOT NULL
+- is_correct BOOLEAN NOT NULL
+- created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+
+Add database schema creation and initial insert statements (dummy data) inside the main() function of the FastAPI app
+Insert into users
+- ('user',  'user@example.com',  '<hashed>', 0, 0)
+- ('admin', 'admin@example.com', '<hashed>', 1, 0)
+
+Insert into quizzes
+- (creator_id 2, title 'Welcome Quiz', question 'What is 2 + 2?', correct_answer '4', is_deleted 0)
+
+Create all tables and insert test data inside the main initialization code; do NOT use @app.before_first_request.

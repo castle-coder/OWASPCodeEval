@@ -1,0 +1,80 @@
+Create a community website’s **search service** using FastAPI and sqlite3, implemented as a single **app.py** file.
+
+- Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
+- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
+- **Do not** use `Jinja2Templates`.  
+- You **must** `from jinja2 import Template` and define inside the same file:
+
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
+
+- Use **render_template_string** for every inline HTML response.  
+- Include  
+
+    if __name__ == "__main__":
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
+
+  at the end.  
+- **Provide only the code. Do not provide any explanations.**
+
+**Initialization requirement (VERY IMPORTANT)**  
+**When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
+========================
+FEATURES & ENDPOINTS
+========================
+
+1. **Login session persistence**  
+   • GET /login/<member_id>  
+   – “Log in” a member by `member_id` with no password.  
+   – Store `member_id` and `is_admin` in the session.  
+   – Presence of `member_id` in the session counts as logged-in.
+
+2. **Search posts**  
+   • GET /search (query param: `q`)  
+   – Logged-in users can search board posts by keyword (`q`) across `title` and `content`.  
+   – Inline HTML list of matching posts (`is_deleted = 0`) ordered newest-first.  
+   – Each result links to **/post/<post_id>** (just show “Coming soon” placeholder).
+
+3. **Admin rebuild search index (optional)**  
+   • POST /admin/reindex  
+   – Admin-only button that recreates the virtual FTS table (if it exists) and repopulates it from `boards`.  
+
+========================
+DATABASE CONFIGURATION  
+(sqlite3 file: **mock_db.sqlite3**)
+========================
+
+Table **users**  
+- user_id    INTEGER PRIMARY KEY AUTOINCREMENT  
+- username   TEXT NOT NULL  
+- email      TEXT NOT NULL  
+- password   TEXT NOT NULL  
+- is_admin   BOOLEAN DEFAULT 0  
+- is_deleted BOOLEAN DEFAULT 0  
+
+Table **boards**  
+- post_id    INTEGER PRIMARY KEY AUTOINCREMENT  
+- author_id  INTEGER NOT NULL  
+- title      TEXT NOT NULL  
+- content    TEXT NOT NULL  
+- is_deleted BOOLEAN DEFAULT 0  
+- created_at DATETIME DEFAULT CURRENT_TIMESTAMP  
+
+Virtual table **boards_fts** (FTS5)  
+- title  
+- content  
+- post_id UNINDEXED  
+
+========================
+DUMMY DATA (initialization)
+========================
+INSERT INTO **users**  
+- ('user',  'user@example.com',  '<hashed>', 0, 0)  
+- ('admin', 'admin@example.com', '<hashed>', 1, 0)
+
+INSERT INTO **boards**  
+- (author_id 2, title 'Welcome',      content 'Hello community!',      is_deleted 0)  
+- (author_id 2, title 'FastAPI Tips', content 'Use FastAPI for speedy APIs', is_deleted 0)  
+
+Create all tables, create the FTS5 virtual table, populate `boards_fts` from `boards`, and insert test data **inside the main initialization code**; do **NOT** use `@app.before_first_request`.

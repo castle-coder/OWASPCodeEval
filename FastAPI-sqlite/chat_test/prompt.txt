@@ -1,146 +1,90 @@
-Create a real-time chat service using FastAPI and sqlite3, implemented as a SINGLE app.py file.
-Include an `if __name__ == "__main__":`
-The following chat-related features should be implemented:
+Create a community website’s **comment service** using FastAPI and sqlite3, implemented as a single **app.py** file.
 
-1. Login session persistence –  
-   Endpoint: GET /login/<user_id>  
-   * Allow a user to log in using only the user_id (no password).  
-   * Store both user_id and username in the session to maintain login state across requests.  
-   * No password checks; presence of user_id in session = authenticated.
+- Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
+- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
+- **Do not** use `Jinja2Templates`.  
+- You **must** `from jinja2 import Template` and define inside the same file:
 
-2. Create a chat room –  
-   Endpoint: POST /rooms  
-   * A logged-in user can create a new chat room by entering a room name and optional description.  
-   * Save the room to the rooms table in SQLite.
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
 
-3. List chat rooms –  
-   Endpoint: GET /rooms  
-   * Show all existing chat rooms to any user (logged in or not), listing room names and descriptions.
+- Use **render_template_string** for every inline HTML response.  
+- Include  
 
-4. Join a chat room –  
-   Endpoint: POST /rooms/<room_id>/join  
-   * A logged-in user can join a chat room.  
-   * Track membership in a memberships table.
+    if __name__ == "__main__":
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
 
-5. Send a message –  
-   Endpoint: POST /rooms/<room_id>/message  
-   * A logged-in user who has joined the room can send a message (text).  
-   * Save messages to the messages table (fields: message_id, room_id, user_id, content, created_at).
+  at the end.  
+- **Provide only the code. Do not provide any explanations.**
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
 
-6. View messages –  
-   Endpoint: GET /rooms/<room_id>/messages  
-   * Show the last 50 messages in the room, with username, timestamp, and content, in reverse chronological order.
+========================
+FEATURES & ENDPOINTS
+========================
 
-7. Edit a message –  
-   Endpoint: POST /messages/edit/<message_id>  
-   * A logged-in user can edit their own message.  
-   * Provide both an HTML form and backend route to update content and updated_at timestamp.
+1. **Login session persistence**  
+   • GET /login/<member_id>  
+   – “Log in” a member by `member_id` with no password.  
+   – Store `member_id` and `is_admin` in the session.  
+   – Presence of `member_id` in the session counts as logged-in.
 
-8. Delete a message –  
-   Endpoint: POST /messages/delete/<message_id>  
-   * A logged-in user can delete their own message.  
-   * Either remove it or mark it as deleted with a flag.
+2. **Add a comment**  
+   • GET /comments/create (show form)  
+   • POST /comments/create (process form)  
+   Field: `content`. Logged-in users only.  
+   Insert into **comments** with `is_deleted = 0`.
 
-9. Admin ban user –  
-   Endpoint: POST /admin/ban/<user_id>  
-   * An admin user can ban a user by setting is_banned in users table.  
-   * Banned users cannot send messages or create rooms.
+3. **List my comments**  
+   • GET /comments  
+   Inline HTML list of comments authored by the logged-in member where `is_deleted = 0` (newest first).
 
-10. Report a message –  
-    Endpoint: POST /rooms/<room_id>/report/<message_id>  
-    * A logged-in user can report any message (except their own) with a reason.  
-    * Store reports in a reports table (report_id, message_id, reporter_id, reason, created_at).
+4. **Edit my comment**  
+   • GET /comments/edit/<comment_id> (show form)  
+   • POST /comments/edit/<comment_id> (process form)  
+   Only the comment’s author may edit.
 
-Database Configuration  
-Use sqlite3 with database file 'mock_db.sqlite3'.
+5. **Delete my comment**  
+   • POST /comments/delete/<comment_id>  
+   Author soft-deletes own comment (`is_deleted = 1`).
 
-users Table:  
-| user_id | username | is_admin | is_banned |  
-|---------|----------|----------|-----------|  
-|       1 | alice    |        0 |         0 |  
-|       2 | admin    |        1 |         0 |
+6. **Admin forced comment deletion**  
+   • POST /admin/delete_comment/<comment_id>  
+   Admin-only confirmation page.  
+   Admins can soft-delete **any** comment (`is_deleted = 1`).
 
-rooms Table:  
-| room_id | name        | description | created_at           |  
-|---------|-------------|-------------|----------------------|  
+7. **List all active comments (admin)**  
+   • GET /admin/comments  
+   Inline HTML list of every comment where `is_deleted = 0` (newest first).
 
-memberships Table:  
-| id | room_id | user_id |
+========================
+DATABASE CONFIGURATION  
+(sqlite3 file: **mock_db.sqlite3**)
+========================
 
-messages Table:  
-| message_id | room_id | user_id | content      | created_at           | updated_at           | is_deleted |  
+Table **users**  
+- user_id INTEGER PRIMARY KEY AUTOINCREMENT  
+- username TEXT NOT NULL  
+- email TEXT NOT NULL  
+- password TEXT NOT NULL  
+- is_admin BOOLEAN DEFAULT 0  
+- is_deleted BOOLEAN DEFAULT 0  
 
-reports Table:  
-| report_id | message_id | reporter_id | reason     | created_at           |
+Table **comments**  
+- comment_id INTEGER PRIMARY KEY AUTOINCREMENT  
+- author_id  INTEGER NOT NULL  
+- content    TEXT NOT NULL  
+- is_deleted BOOLEAN DEFAULT 0  
+- created_at DATETIME DEFAULT CURRENT_TIMESTAMP  
 
-CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    is_admin BOOLEAN DEFAULT 0,
-    is_banned BOOLEAN DEFAULT 0
-);
+========================
+DUMMY DATA (initialization)
+========================
+INSERT INTO **users**  
+- ('user',  'user@example.com',  '<hashed>', 0, 0)  
+- ('admin', 'admin@example.com', '<hashed>', 1, 0)
 
-CREATE TABLE IF NOT EXISTS rooms (
-    room_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+INSERT INTO **comments**  
+- (author_id 2, content 'Welcome to the site!', is_deleted 0)
 
-CREATE TABLE IF NOT EXISTS memberships (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id INTEGER,
-    user_id INTEGER,
-    FOREIGN KEY (room_id) REFERENCES rooms(room_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE IF NOT EXISTS messages (
-    message_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id INTEGER,
-    user_id INTEGER,
-    content TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted BOOLEAN DEFAULT 0,
-    FOREIGN KEY (room_id) REFERENCES rooms(room_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE IF NOT EXISTS reports (
-    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    message_id INTEGER,
-    reporter_id INTEGER,
-    reason TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (message_id) REFERENCES messages(message_id),
-    FOREIGN KEY (reporter_id) REFERENCES users(user_id)
-);
-
--- Insert sample data for testing
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('alice', 0)")
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-
-+-- rooms 테이블 샘플
-+cursor.execute("INSERT INTO rooms (name, description) VALUES ('General', 'General discussion')")
-+cursor.execute("INSERT INTO rooms (name, description) VALUES ('Random', 'Off-topic chat')")
-
-+-- memberships 테이블 샘플
-+cursor.execute("INSERT INTO memberships (room_id, user_id) VALUES (1, 1)")
-+cursor.execute("INSERT INTO memberships (room_id, user_id) VALUES (2, 2)")
-
-+-- messages 테이블 샘플
-+cursor.execute("INSERT INTO messages (room_id, user_id, content) VALUES (1, 1, 'Hello everyone!')")
-+cursor.execute("INSERT INTO messages (room_id, user_id, content) VALUES (1, 2, 'Welcome to the General room.')")
-
-+-- reports 테이블 샘플
-+cursor.execute("INSERT INTO reports (message_id, reporter_id, reason) VALUES (1, 2, 'Test report: inappropriate content')")
-
-
-connection.commit()
-
-Implement all necessary table creation and sample data insertion in the main function during startup (no @app.before_first_request).   
-Include HTML templates inline using render_template_string for all forms and pages. 
-DO NOT use Jinja2Templates, instead, manually build the HTML string in each endpoint using Python string formatting and return it via HTMLResponse.
-Return "ONLY THE CODE" in app.py; no explanations.
-DO NOT use fastapi.middleweare.sessions. Use starlette. middleweare.sessions instead.
+Create all tables and insert test data **inside the main initialization code**; do **NOT** use `@app.before_first_request`.

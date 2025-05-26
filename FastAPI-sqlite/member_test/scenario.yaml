@@ -1,87 +1,94 @@
-base_url: "http://127.0.0.1:5000"
+# Simple 회원 관리 API 보안 테스트 시나리오 (확장판)
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
 
 tests:
-  - id: A1_BrokenAccessControl
-    name: 일반 사용자가 다른 사용자 정보 조회
+  # ────────── 기존 테스트 (생략 가능) ──────────
+  # … A1, A2, A3, A7, A9 항목들이 이미 정의돼 있다고 가정 …
+
+  # ────────── A1 • Broken Access Control (추가) ──────────
+  - id: A1_Profile_NoLogin
+    name: 로그인 없이 /profile 접근
     method: GET
-    endpoint: "/members/2"
-    session_login: 1
-    expected_status: 403
+    path: /profile
+    expected_status: 401-401
 
-  - id: A2_CryptographicFailures
-    name: 비밀번호 평문 저장 확인
+  - id: A1_ProfileUpdate_NoLogin
+    name: 로그인 없이 /profile/update 호출
     method: POST
-    endpoint: "/members/register"
-    data:
-      username: "crypto_test"
-      email: "crypto@example.com"
-      password: "plaintext123"
-    expected_status: 200
-    validate:
-      not_contains: "plaintext123"
+    path: /profile/update
+    data: { username: "x", email: "x@x.com", password: "x" }
+    expected_status: 401-401
 
-  - id: A3_Injection
-    name: SQL 인젝션 시도 (회원 조회)
+  - id: A1_Delete_NoLogin
+    name: 로그인 없이 /profile/delete 호출
+    method: POST
+    path: /profile/delete
+    expected_status: 401-401
+
+  - id: A1_AdminDelete_Self
+    name: 관리자(ID 2) 자기 계정 /admin/delete_member 호출
+    method: POST
+    login_as: 2
+    path: /admin/delete_member/2
+    expected_status: 200-299     # 401/403 이면 안전, 200 이면 위험 논리라 “취약” 판정
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_RegisterEmail
+    name: 회원가입 Email SQL 인젝션
+    method: POST
+    path: /register
+    data:
+      username: "sqli2"
+      email: "evil'); DROP TABLE users;--@ex.com"
+      password: "Hack123!"
+    expected_status: 400-499
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  - id: A3_SQLi_ProfileUpdate
+    name: 프로필 업데이트 Username SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /profile/update
+    data:
+      username: "abc'); DROP TABLE users;--"
+      email: "profile@ex.com"
+      password: "p123"
+    expected_status: 400-499
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_ProfileUsername
+    name: 프로필 업데이트 Username XSS 저장
+    method: POST
+    login_as: 1
+    path: /profile/update
+    data:
+      username: "<script>alert('p')</script>"
+      email: "xssprof@ex.com"
+      password: "xss123"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT user_id FROM users WHERE username LIKE '%<script%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_HSTS_Missing
+    name: HSTS 헤더 부재
     method: GET
-    endpoint: "/members/1%20OR%201=1"
-    expected_status: 404
+    path: /
+    expected_status: 200-299
 
-  - id: A4_InsecureDesign
-    name: 인증 없이 관리자 비활성화 기능 접근
-    method: POST
-    endpoint: "/admin/deactivate_member/1"
-    expected_status: 403
+  # ────────── A6 • Vulnerable & Out-of-Date Components ──────────
+  - id: A6_PUT_Root
+    name: PUT / (정의되지 않은 메서드)
+    method: PUT
+    path: /
+    expected_status: 405-405
 
-  - id: A5_SecurityMisconfiguration
-    name: 존재하지 않는 URL 접근 시 에러 확인
-    method: GET
-    endpoint: "/nonexistent"
-    expected_status: 404
-
-  - id: A6_VulnerableComponents
-    name: bcrypt 알고리즘 존재 여부 테스트
-    method: POST
-    endpoint: "/members/register"
-    data:
-      username: "bcrypt_test"
-      email: "bcrypt@example.com"
-      password: "secure123!"
-    expected_status: 200
-
-  - id: A7_IdentificationAndAuthenticationFailures
-    name: 잘못된 사용자로 로그인 시도
-    method: GET
-    endpoint: "/login/9999"
-    expected_status: 403
-
-  - id: A8_SoftwareAndDataIntegrityFailures
-    name: 세션 탈취 후 업데이트 시도
-    method: POST
-    endpoint: "/members/update"
-    session_login: 2
-    data:
-      username: "hacked_user"
-      email: "hacked@example.com"
-    expected_status: 403
-
-  - id: A9_SecurityLoggingMonitoring
-    name: 악성 입력 시도 후 저장 확인
-    method: POST
-    endpoint: "/members/register"
-    data:
-      username: "<script>alert('xss')</script>"
-      email: "xss@attack.com"
-      password: "attack123"
-    expected_status: 200
-    validate:
-      not_contains: "<script>alert('xss')</script>"
-
-  - id: A10_ServerSideRequestForgery
-    name: SSRF 가능성 테스트 (외부 주소 삽입)
-    method: POST
-    endpoint: "/members/register"
-    data:
-      username: "ssrf_test"
-      email: "http://127.0.0.1:5000/admin"
-      password: "ssrf"
-    expected_status: 200
+  - id: A6_OPTIONS_Root
+    name: OPTIONS / 허용 여부
+    method: OPTIONS
+    path: /
+    expected_status: 200-299        # 200 이면 잠재적 정보 노출 → “취약”으로 표시

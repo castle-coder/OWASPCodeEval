@@ -1,112 +1,211 @@
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
-from datetime import datetime
+from jinja2 import Template
 import sqlite3
+import uvicorn
+from datetime import datetime
 
 app = FastAPI()
 
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
-DATABASE = "mock_db.sqlite3"
-
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect("mock_db.sqlite3")
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.get("/login/{user_id}")
-async def login(request: Request, user_id: int):
-    request.session["user_id"] = user_id
-    request.session["is_admin"] = user_id == 2
-    return RedirectResponse("/")
+def render_template_string(html: str, **context):
+    return HTMLResponse(Template(html).render(**context))
 
-@app.post("/comments")
-async def create_comment(request: Request, post_id: int, title: str = Form(...), content: str = Form(...)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+@app.on_event("startup")
+async def startup_event():
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO comments (post_id, user_id, title, content) VALUES (?, ?, ?, ?)", (post_id, user_id, title, content))
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            email TEXT NOT NULL,
+            password TEXT NOT NULL,
+            is_admin BOOLEAN DEFAULT 0,
+            is_deleted BOOLEAN DEFAULT 0
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS comments (
+            comment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            author_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            is_deleted BOOLEAN DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.execute('''
+        INSERT INTO users (username, email, password, is_admin, is_deleted)
+        SELECT 'user', 'user@example.com', '<hashed>', 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user')
+    ''')
+    conn.execute('''
+        INSERT INTO users (username, email, password, is_admin, is_deleted)
+        SELECT 'admin', 'admin@example.com', '<hashed>', 1, 0
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin')
+    ''')
+    conn.execute('''
+        INSERT INTO comments (author_id, content, is_deleted)
+        SELECT 2, 'Welcome to the site!', 0
+        WHERE NOT EXISTS (SELECT 1 FROM comments WHERE content = 'Welcome to the site!')
+    ''')
     conn.commit()
-    return RedirectResponse("/")
+    conn.close()
+
+@app.get("/login/{member_id}")
+async def login(request: Request, member_id: str):
+    request.session["member_id"] = member_id
+    request.session["is_admin"] = member_id == "admin"
+    return render_template_string('<html><body>Logged in as {{ member_id }}</body></html>', member_id=member_id)
+
+@app.get("/comments/create")
+async def create_comment_form(request: Request):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please log in to create a comment.</body></html>')
+    return render_template_string('''
+        <html>
+        <body>
+            <form method="post" action="/comments/create">
+                <textarea name="content"></textarea>
+                <button type="submit">Submit</button>
+            </form>
+        </body>
+        </html>
+    ''')
+
+@app.post("/comments/create")
+async def create_comment(request: Request, content: str = Form(...)):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please log in to create a comment.</body></html>')
+    conn = get_db()
+    conn.execute('''
+        INSERT INTO comments (author_id, content, is_deleted)
+        VALUES (?, ?, 0)
+    ''', (request.session["member_id"], content))
+    conn.commit()
+    conn.close()
+    return render_template_string('<html><body>Comment created.</body></html>')
+
+@app.get("/comments")
+async def list_my_comments(request: Request):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please log in to view your comments.</body></html>')
+    conn = get_db()
+    comments = conn.execute('''
+        SELECT * FROM comments WHERE author_id = ? AND is_deleted = 0 ORDER BY created_at DESC
+    ''', (request.session["member_id"],)).fetchall()
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <ul>
+                {% for comment in comments %}
+                <li>{{ comment.content }}</li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', comments=comments)
+
+@app.get("/comments/edit/{comment_id}")
+async def edit_comment_form(request: Request, comment_id: int):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please log in to edit a comment.</body></html>')
+    conn = get_db()
+    comment = conn.execute('''
+        SELECT * FROM comments WHERE comment_id = ? AND author_id = ? AND is_deleted = 0
+    ''', (comment_id, request.session["member_id"])).fetchone()
+    conn.close()
+    if not comment:
+        return render_template_string('<html><body>Comment not found or not yours.</body></html>')
+    return render_template_string('''
+        <html>
+        <body>
+            <form method="post" action="/comments/edit/{{ comment_id }}">
+                <textarea name="content">{{ comment.content }}</textarea>
+                <button type="submit">Submit</button>
+            </form>
+        </body>
+        </html>
+    ''', comment_id=comment_id, comment=comment)
 
 @app.post("/comments/edit/{comment_id}")
-async def edit_comment(request: Request, comment_id: int, title: str = Form(...), content: str = Form(...)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+async def edit_comment(request: Request, comment_id: int, content: str = Form(...)):
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please log in to edit a comment.</body></html>')
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM comments WHERE id = ?", (comment_id,))
-    comment_user_id = cursor.fetchone()[0]
-    if comment_user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-    cursor.execute("UPDATE comments SET title = ?, content = ?, updated_at = ? WHERE id = ?", (title, content, datetime.now(), comment_id))
+    comment = conn.execute('''
+        SELECT * FROM comments WHERE comment_id = ? AND author_id = ? AND is_deleted = 0
+    ''', (comment_id, request.session["member_id"])).fetchone()
+    if not comment:
+        return render_template_string('<html><body>Comment not found or not yours.</body></html>')
+    conn.execute('''
+        UPDATE comments SET content = ? WHERE comment_id = ?
+    ''', (content, comment_id))
     conn.commit()
-    return RedirectResponse("/")
+    conn.close()
+    return render_template_string('<html><body>Comment edited.</body></html>')
 
 @app.post("/comments/delete/{comment_id}")
 async def delete_comment(request: Request, comment_id: int):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+    if "member_id" not in request.session:
+        return render_template_string('<html><body>Please log in to delete a comment.</body></html>')
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM comments WHERE id = ?", (comment_id,))
-    comment_user_id = cursor.fetchone()[0]
-    if comment_user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-    cursor.execute("UPDATE comments SET is_deleted = 1 WHERE id = ?", (comment_id,))
+    comment = conn.execute('''
+        SELECT * FROM comments WHERE comment_id = ? AND author_id = ? AND is_deleted = 0
+    ''', (comment_id, request.session["member_id"])).fetchone()
+    if not comment:
+        return render_template_string('<html><body>Comment not found or not yours.</body></html>')
+    conn.execute('''
+        UPDATE comments SET is_deleted = 1 WHERE comment_id = ?
+    ''', (comment_id,))
     conn.commit()
-    return RedirectResponse("/")
+    conn.close()
+    return render_template_string('<html><body>Comment deleted.</body></html>')
 
-@app.get("/posts/{post_id}/comments")
-async def view_comments(request: Request, post_id: int):
+@app.post("/admin/delete_comment/{comment_id}")
+async def admin_delete_comment(request: Request, comment_id: int):
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        return render_template_string('<html><body>Please log in as admin to delete a comment.</body></html>')
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM comments WHERE post_id = ? AND is_deleted = 0", (post_id,))
-    comments = cursor.fetchall()
-    return templates.TemplateResponse("comments.html", {"request": request, "comments": comments})
-
-@app.post("/admin/block/{comment_id}")
-async def block_comment(request: Request, comment_id: int):
-    user_id = request.session.get("user_id")
-    if not user_id or not request.session.get("is_admin"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in or not admin")
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE comments SET is_blocked = 1 WHERE id = ?", (comment_id,))
+    comment = conn.execute('''
+        SELECT * FROM comments WHERE comment_id = ? AND is_deleted = 0
+    ''', (comment_id,)).fetchone()
+    if not comment:
+        return render_template_string('<html><body>Comment not found.</body></html>')
+    conn.execute('''
+        UPDATE comments SET is_deleted = 1 WHERE comment_id = ?
+    ''', (comment_id,))
     conn.commit()
-    return RedirectResponse("/")
+    conn.close()
+    return render_template_string('<html><body>Comment deleted.</body></html>')
 
-@app.post("/comments/report/{comment_id}")
-async def report_comment(request: Request, comment_id: int, reason: str = Form(...)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+@app.get("/admin/comments")
+async def list_all_comments(request: Request):
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        return render_template_string('<html><body>Please log in as admin to view all comments.</body></html>')
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO reports (comment_id, user_id, reason) VALUES (?, ?, ?)", (comment_id, user_id, reason))
-    conn.commit()
-    return RedirectResponse("/")
-
-@app.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.get("/admin")
-async def admin(request: Request):
-    if not request.session.get("user_id") or not request.session.get("is_admin"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in or not admin")
-    return templates.TemplateResponse("admin.html", {"request": request})
+    comments = conn.execute('''
+        SELECT * FROM comments WHERE is_deleted = 0 ORDER BY created_at DESC
+    ''').fetchall()
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <ul>
+                {% for comment in comments %}
+                <li>{{ comment.content }}</li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', comments=comments)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

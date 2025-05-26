@@ -1,31 +1,121 @@
-# scenario.yaml
+# FTS-기반 Board 검색 서비스 보안 테스트 시나리오 (확장판)
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
 tests:
-  - id: A1_BrokenAccessControl
-    description: "일반 사용자가 다른 사용자 정보 조회"
-    request:
-      method: GET
-      endpoint: "/posts/2"
-      params: {}
-      headers: {}
-      json: null
-    expected_status_codes: [403]
+  # ────────── A7 Identification & Authentication Failures ──────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID 로그인
+    method: GET
+    path: /login/9999
+    expected_status: 404-404
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 9999" }
 
-  - id: A3_Injection
-    description: "SQL 인젝션 시도 (회원 조회)"
-    request:
-      method: GET
-      endpoint: "/posts/' OR '1'='1"
-      params: {}
-      headers: {}
-      json: null
-    expected_status_codes: [404]
+  # ────────── A1 Broken Access Control ──────────
+  - id: A1_Search_NoLogin
+    name: 로그인 없이 검색
+    method: GET
+    path: /search?q=test
+    expected_status: 401-401
 
-  - id: A5_SecurityMisconfiguration
-    description: "존재하지 않는 URL 접근 시 에러 확인"
-    request:
-      method: GET
-      endpoint: "/nonexistent"
-      params: {}
-      headers: {}
-      json: null
-    expected_status_codes: [404]
+  - id: A1_Reindex_NoPriv
+    name: 일반 사용자 /admin/reindex 호출
+    method: POST
+    login_as: 1
+    path: /admin/reindex
+    expected_status: 403-403
+
+  - id: A1_Reindex_Admin
+    name: 관리자 /admin/reindex 성공
+    method: POST
+    login_as: 2
+    path: /admin/reindex
+    expected_status: 200-299
+
+  # ────────── A3 Injection (SQLi / FTSi) ──────────
+  - id: A3_SQLi_LoginPath
+    name: /login 경로 SQL 인젝션
+    method: GET
+    path: /login/1%20OR%201=1
+    expected_status: 400-499
+
+  - id: A3_SQLi_SearchParam
+    name: 검색어 SQL/FTS 인젝션
+    method: GET
+    login_as: 1
+    path: "/search?q=abc'); DROP TABLE users;--"
+    expected_status: 400-499
+    vuln_check: { query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'" }
+
+  # ────────── A9 Insufficient Logging & Monitoring ──────────
+  - id: A9_XSS_SearchParam
+    name: 검색어에 스크립트 삽입
+    method: GET
+    login_as: 1
+    path: "/search?q=<script>alert('x')</script>"
+    expected_status: 200-299
+
+  # ────────── 추가 케이스 ──────────
+  # A1 ───── 추가 Broken Access Control
+  - id: A1_Reindex_GetMethod
+    name: /admin/reindex 를 GET 으로 호출
+    method: GET
+    login_as: 2
+    path: /admin/reindex
+    expected_status: 405-405           # GET 차단이 정상
+
+  - id: A1_Reindex_Logout
+    name: 로그인 없이 /admin/reindex 호출
+    method: POST
+    path: /admin/reindex
+    expected_status: 403-403
+
+  # A3 ───── 추가 FTS Injection
+  - id: A3_FTS_Wildcard
+    name: FTS 와일드카드(*) 인젝션
+    method: GET
+    login_as: 1
+    path: "/search?q=*"
+    expected_status: 400-499
+
+  # A5 ───── Security Misconfiguration (헤더)
+  - id: A5_Header_CSP_Missing
+    name: CSP 헤더 부재
+    method: GET
+    login_as: 1
+    path: /search?q=test
+    expected_status: 200-299
+
+  - id: A5_Header_XFrame_Missing
+    name: X-Frame-Options 헤더 부재
+    method: GET
+    login_as: 1
+    path: /search?q=test
+    expected_status: 200-299
+
+  # A6 ───── Vulnerable / Out-of-Date Components (TRACE 메서드)
+  - id: A6_TRACE_Method
+    name: TRACE 메서드 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405           # 200 이면 취약
+
+  # A9 ───── Stored XSS via Board 데이터
+  - id: A9_XSS_BoardTitle_Stored
+    name: 게시글 제목에 스크립트 삽입 후 reindex
+    method: POST
+    login_as: 2
+    pre:
+      - method: POST
+        path: /admin/reindex            # 인덱스 초기화
+    path: /admin/reindex                # 재인덱스 후에도 탐지
+    expected_status: 200-299
+    vuln_check: { query: "SELECT 1 FROM boards WHERE title LIKE '%<script%'" }
+
+  # A10 ───── SSRF / Business-Logic
+  - id: A10_Search_FileScheme
+    name: file:// 스킴으로 검색
+    method: GET
+    login_as: 1
+    path: "/search?q=file://etc/passwd"
+    expected_status: 400-499

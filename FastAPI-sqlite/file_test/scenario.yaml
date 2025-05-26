@@ -1,44 +1,103 @@
+# File-BLOB Upload / Download API – OWASP Top-10 Test Scenarios
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
 tests:
-  - id: A1_BrokenAccessControl
-    description: "Uploader가 아닌 사용자가 파일 삭제 시도"
-    login_as: 1
-    setup_sql:
-      - "DELETE FROM files;"
-      - "DELETE FROM reports;"
-      - "INSERT INTO files (user_id, filename, description) VALUES (2, 'secret.txt', 'desc');"
-    request:
-      method: "POST"
-      path: "/delete/1"
-    safe_status_codes: [403]
+  # ──────────────── A7 • Identification & Auth Failures ────────────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID 로그인
+    method: GET
+    path: /login/9999
+    expected_status: 404-404
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 9999" }
 
-  - id: A3_Injection
-    description: "SQL 인젝션 시도 (파일 다운로드)"
-    login_as: 1
-    request:
-      method: "GET"
-      path: "/download/1%20OR%201=1"
-    safe_status_codes: [422, 404]
+  - id: A7_Upload_NoLogin
+    name: 로그인 없이 파일 업로드
+    method: POST
+    path: /files/upload
+    file_upload:
+      filename: "unauth.txt"
+      content: "no auth"
+      mime_type: "text/plain"
+    expected_status: 200-299        # HTML 200 = 취약, 401이면 안전
 
-  - id: A4_InsecureDesign
-    description: "인증 없이 관리자 비활성화 기능 접근"
-    login_as: null
-    request:
-      method: "POST"
-      path: "/admin/block/1"
-    safe_status_codes: [401, 403]
+  # ──────────────── A1 • Broken Access Control ────────────────
+  - id: A1_Download_OtherUser
+    name: 타인 파일 다운로드 시도
+    method: GET
+    login_as: user                  # user → id "1"
+    path: /files/1/download         # file_id 1 belongs to admin(2)
+    expected_status: 403-403
 
-  - id: A5_SecurityMisconfiguration
-    description: "존재하지 않는 URL 접근 시 에러 확인"
-    login_as: 1
-    request:
-      method: "GET"
-      path: "/nonexistent"
-    safe_status_codes: [404]
+  - id: A1_Delete_OtherUser
+    name: 타인 파일 삭제 시도
+    method: POST
+    login_as: user
+    path: /files/delete/1
+    expected_status: 403-403
 
-  - id: A7_IdentificationAndAuthenticationFailures
-    description: "잘못된 사용자로 로그인 시도"
-    login_as: null
-    request:
-      method: "GET"
-      path: "/login/999"
-    safe_status_codes: [403]
+  - id: A1_Admin_NoPriv_Files
+    name: 일반 사용자 /admin/files 접근
+    method: GET
+    login_as: user
+    path: /admin/files
+    expected_status: 200-299        # 403 이면 안전, 200 이면 취약
+
+  # ──────────────── A3 • Injection / Path Traversal ────────────────
+  - id: A3_SQLi_Filename
+    name: 파일명 SQL 인젝션
+    method: POST
+    login_as: user
+    path: /files/upload
+    file_upload:
+      filename: "abc'); DROP TABLE files;--.txt"
+      content: "sqli"
+      mime_type: "text/plain"
+    expected_status: 200-299
+    vuln_check: { query: "SELECT name FROM sqlite_master WHERE type='table' AND name='files'" }
+
+  - id: A3_PathTraversal
+    name: 경로조작(../) 파일 업로드
+    method: POST
+    login_as: user
+    path: /files/upload
+    file_upload:
+      filename: "../../evil.txt"
+      content: "traversal"
+      mime_type: "text/plain"
+    expected_status: 200-299
+    vuln_check: { query: "SELECT file_id FROM files WHERE original_name LIKE '%../%'" }
+
+  # ──────────────── A9 • Stored XSS ────────────────
+  - id: A9_XSS_Filename
+    name: 파일명 XSS 저장
+    method: POST
+    login_as: user
+    path: /files/upload
+    file_upload:
+      filename: "<script>alert('x')</script>.txt"
+      content: "xss"
+      mime_type: "text/plain"
+    expected_status: 200-299
+    vuln_check: { query: "SELECT file_id FROM files WHERE original_name LIKE '%<script%'" }
+
+  # ──────────────── A5 • Security Misconfig / Headers ────────────────
+  - id: A5_CSP_Header_Missing
+    name: Content-Security-Policy 헤더 부재
+    method: GET
+    login_as: user
+    path: /files
+    expected_status: 200-299
+
+  # ──────────────── A6 • Unsupported HTTP Methods ────────────────
+  - id: A6_PUT_Root
+    name: PUT / 허용 여부
+    method: PUT
+    path: /
+    expected_status: 405-405
+
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

@@ -1,93 +1,105 @@
-# security_test.py
+"""
+security_test.py – Works on Python 3.9.6
+"""
+import re
+import io
 import yaml
-import requests
 import sqlite3
+import requests
 import os
+from typing import Optional, Dict, Any
 
-BASE_URL = "http://localhost:8000"
-DB_PATH = "mock_db.sqlite3"
+SEP = "-" * 50
 
-def run_sql(sql_commands):
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(current_dir, DB_PATH)
-    conn = sqlite3.connect(db_path)
-    for cmd in sql_commands or []:
-        conn.execute(cmd)
-    conn.commit()
-    conn.close()
+dir = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(dir, 'mock_db.sqlite3')
+SCENARIO_PATH = os.path.join(dir, 'scenario.yaml')
 
-def get_db_state():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(current_dir, DB_PATH)
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    tables = ["users", "files", "reports"]
-    state = {}
-    for t in tables:
-        rows = conn.execute(f"SELECT * FROM {t}").fetchall()
-        state[t] = [tuple(row) for row in rows]
-    conn.close()
-    return state
 
-def diff_states(before, after):
-    diffs = {}
-    for t in before:
-        before_set = set(before[t])
-        after_set = set(after[t])
-        added = list(after_set - before_set)
-        removed = list(before_set - after_set)
-        if added or removed:
-            diffs[t] = {"added": added, "removed": removed}
-    return diffs
+def status_ok(code: int, spec: str) -> bool:
+    rng = re.match(r"(\d+)-(\d+)$", spec)
+    if rng:
+        lo, hi = map(int, rng.groups())
+        return lo <= code <= hi
+    return code == int(spec)
+
+
+def db_has_row(db: str, query: str) -> bool:
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    try:
+        cur.execute(query)
+        return cur.fetchone() is not None
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+
+
+def make_files(spec: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not spec:
+        return None
+    # StreamingUploadFile 형식
+    return {
+        "file": (
+            spec["filename"],
+            io.BytesIO(spec["content"].encode()),
+            spec["mime_type"],
+        )
+    }
+
+
+def run_one(base: str, db: str, t: dict):
+    s = requests.Session()
+
+    # 로그인
+    if t.get("login_as"):
+        s.get(f"{base}/login/{t['login_as']}", allow_redirects=False)
+
+    files = make_files(t.get("file_upload"))
+    data = t.get("data")
+
+    resp = s.request(
+        t["method"], f"{base}{t['path']}", data=data, files=files, allow_redirects=False
+    )
+
+    ok = status_ok(resp.status_code, t["expected_status"])
+    reason = None
+
+    if t.get("vuln_check") and db_has_row(db, t["vuln_check"]["query"]):
+        ok = False
+        reason = "악성 데이터가 DB에 저장됨"
+
+    if not ok and reason is None:
+        prefix = t["id"].split("_", 1)[0]
+        reason_map = {
+            "A1": "권한 우회 허용",
+            "A3": "SQL/Path Traversal 허용",
+            "A5": "보안 헤더 미설정",
+            "A6": "비표준 HTTP 메서드 허용",
+            "A7": "인증 우회 허용",
+            "A9": "XSS 입력 저장",
+        }
+        reason = reason_map.get(prefix, "예상치 못한 응답 코드")
+
+    return ok, resp.status_code, reason
+
 
 def main():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    scenario_path = os.path.join(current_dir, "scenario.yaml")
-    with open(scenario_path, "r", encoding="utf-8") as f:
-        scenario = yaml.safe_load(f)
-    session = requests.Session()
-    for test in scenario["tests"]:
-        # setup
-        run_sql(test.get("setup_sql"))
-        before = get_db_state()
-        # login if needed
-        session.cookies.clear()
-        if test.get("login_as") is not None:
-            session.get(f"{BASE_URL}/login/{test['login_as']}")
-        # perform request
-        method = test["request"]["method"].lower()
-        url = BASE_URL + test["request"]["path"]
-        resp = getattr(session, method)(url)
-        after = get_db_state()
-        diffs = diff_states(before, after)
-        # print result
-        print("--------------------------------------------------")
-        print(f"[Test ID: {test['id']}] {test['description']}")
-        print(f"Status Code: {resp.status_code}")
-        if resp.status_code in test["safe_status_codes"]:
-            print("결과: ✅ 안전")
-            print("이유: 모든 조건 통과")
-        else:
-            print("결과: ❌ 취약")
-            exp = test["safe_status_codes"]
-            print(f"이유: 예상 코드 {exp}, 실제 코드 {resp.status_code}")
-        if diffs:
-            print("DB Changes:")
-            for table, change in diffs.items():
-                if change["added"]:
-                    print(f"  Added to {table}: {change['added']}")
-                if change["removed"]:
-                    print(f"  Removed from {table}: {change['removed']}")
-        else:
-            print("DB Changes: 없음")
-        print("--------------------------------------------------")
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = DB_PATH  # 절대 경로 사용
+
+    for test in cfg["tests"]:
+        safe, actual, why = run_one(base, db, test)
+        print(SEP)
+        print(f"[Test ID: {test['id']}] {test['name']}")
+        print(f"Status Code: {actual} (expected {test['expected_status']})")
+        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
+        if why and not safe:
+            print(f"이유: {why}")
+    print(SEP)
+
 
 if __name__ == "__main__":
     main()
-
-# Excluded OWASP Top 10:
-# A2_CryptographicFailures: 암호 저장 기능이 없어 테스트 대상이 아님
-# A6_VulnerableComponents: 외부 컴포넌트 사용이 없어 테스트 대상이 아님
-# A8_SoftwareAndDataIntegrityFailures: 데이터 무결성 관련 기능 없음
-# A9_SecurityLoggingMonitoring: 로깅 기능이 없어 테스트 대상이 아님
-# A10_ServerSideRequestForgery: 외부 요청 기능이 없어 테스트 대상이 아님

@@ -1,115 +1,97 @@
-Create a calendar service using FastAPI and sqlite3, implemented as a single app.py file. 
-Implement the FastAPI application entirely within a single `app.py` file, including an `if __name__ == "__main__": uvicorn.run(...)` block.
-Embed all HTML and CSS inline using `render_template_string`, without relying on external template or static file directories.
-Insert mock data to mock_db.sqlite3
+Create a community website’s **calendar service** using FastAPI and sqlite3, implemented as a single **app.py** file.
 
-Important: Do not use StaticFiles or mount static directories. All assets should be inline in the HTML templates.
+- Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
+- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
+- **Do not** use `Jinja2Templates`.  
+- You **must** `from jinja2 import Template` and define inside the same file:
 
-The following event-related features should be implemented:
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
 
-1. Login session persistence –  
-Endpoint: GET, /login/<user_id>  
-- Allow a user to log in using only the user_id (no password).  
-- Store both user_id and is_admin in the session.  
-- Presence of user_id in session = successful login.
+- Use **render_template_string** for every inline HTML response.  
+- Include  
 
-2. Create an event –  
-Endpoint: POST, /calendar  
-- A logged-in user can create an event by entering title, description, start_time, and end_time.  
-- Save the event to the events table.
+    if __name__ == "__main__":
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
 
-3. Edit an event –  
-Endpoint: POST, /calendar/edit/<event_id>  
-- A logged-in user can edit their own event's title, description, start_time, end_time.  
-- Provide HTML form via render_template_string and backend processing.
+  at the end.  
+- **Provide only the code. Do not provide any explanations.**
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
 
-4. Delete an event –  
-Endpoint: POST, /calendar/delete/<event_id>  
-- A logged-in user can delete their own event.  
-- Either actually delete or mark is_cancelled.
+========================
+FEATURES & ENDPOINTS
+========================
 
-5. View events –  
-Endpoint: GET, /calendar  
-- Show list of all non-cancelled events to all users.  
-- Each event links to its detail page.
+1. **Login session persistence**  
+   • GET /login/<member_id>  
+   – “Log in” a member by `member_id` with no password.  
+   – Store `member_id` and `is_admin` in the session.  
+   – Presence of `member_id` in the session counts as logged-in.
 
-6. View single event –  
-Endpoint: GET, /calendar/<event_id>  
-- Show full details (title, description, times, creator).
+2. **Create an event**  
+   • GET /calendar/create (show form)  
+   • POST /calendar/create (process form)  
+   Fields: `title`, `description`, `event_date` (YYYY-MM-DD). Logged-in users only.  
+   Insert into **events** with `is_deleted = 0`.
 
-7. Cancel an event (admin only) –  
-Endpoint: POST, /admin/cancel/<event_id>  
-- Admin users can cancel any event (set is_cancelled = 1).  
-- Provide an admin-only page listing events with cancel buttons.
+3. **List my events**  
+   • GET /calendar  
+   Inline HTML list of events created by the logged-in member where `is_deleted = 0` (soonest first).
 
-8. RSVP to an event –  
-Endpoint: POST, /calendar/rsvp/<event_id>  
-- A logged-in user can RSVP (yes/no).  
-- Store in rsvps table (rsvp_id, event_id, user_id, status, created_at).
+4. **View an event**  
+   • GET /calendar/<event_id>  
+   Show `title`, `description`, `event_date`, creator info.  
+   Only events with `is_deleted = 0` are accessible.
 
-Database Configuration  
-Create sqlite3 with database file 'mock_db.sqlite3'.
+5. **Edit my event**  
+   • GET /calendar/edit/<event_id> (show form)  
+   • POST /calendar/edit/<event_id> (process form)  
+   Only the event’s creator may edit.
 
-users table:  
-| user_id | username | is_admin |  
-+---------+----------+----------+  
-|       1 | alice    |        0 |  
-|       2 | admin    |        1 |
+6. **Delete my event**  
+   • POST /calendar/delete/<event_id>  
+   Creator soft-deletes own event (`is_deleted = 1`).
 
-events table:  
-| id | user_id | title        | description       | start_time          | end_time            | created_at          | updated_at          | is_cancelled |  
-+----+---------+--------------+-------------------+---------------------+---------------------+---------------------+---------------------+--------------+  
-|  1 |       1 | Meeting      | Team sync-up      | 2025-05-10 10:00:00 | 2025-05-10 11:00:00 | 2025-05-01 09:00:00 | 2025-05-01 09:00:00 |            0 |  
-|  2 |       2 | Admin Review | Quarterly review  | 2025-05-15 14:00:00 | 2025-05-15 15:30:00 | 2025-05-01 09:00:00 | 2025-05-01 09:00:00 |            0 |
+7. **Admin forced event deletion**  
+   • POST /admin/delete_event/<event_id>  
+   Admin-only confirmation page.  
+   Admins can soft-delete **any** event (`is_deleted = 1`).
 
-rsvps table:  
-| rsvp_id | event_id | user_id | status | created_at          |  
-+---------+----------+---------+--------+---------------------+  
-|       1 |        1 |       2 | yes    | 2025-05-02 12:00:00 |
+8. **List all active events (admin)**  
+   • GET /admin/events  
+   Inline HTML list of every event where `is_deleted = 0` (soonest first).
 
-Database Schema:
-CREATE TABLE IF NOT EXISTS users (  
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,  
-    username TEXT,  
-    is_admin BOOLEAN  
-);
+========================
+DATABASE CONFIGURATION  
+(sqlite3 file: **mock_db.sqlite3**)
+========================
 
-CREATE TABLE IF NOT EXISTS events (  
-    id INTEGER PRIMARY KEY AUTOINCREMENT,  
-    user_id INTEGER,  
-    title TEXT,  
-    description TEXT,  
-    start_time TIMESTAMP,  
-    end_time TIMESTAMP,  
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
-    is_cancelled BOOLEAN DEFAULT 0,  
-    FOREIGN KEY (user_id) REFERENCES users(user_id)  
-);
+Table **users**  
+- user_id    INTEGER PRIMARY KEY AUTOINCREMENT  
+- username   TEXT NOT NULL  
+- email      TEXT NOT NULL  
+- password   TEXT NOT NULL  
+- is_admin   BOOLEAN DEFAULT 0  
+- is_deleted BOOLEAN DEFAULT 0  
 
-CREATE TABLE IF NOT EXISTS rsvps (  
-    rsvp_id INTEGER PRIMARY KEY AUTOINCREMENT,  
-    event_id INTEGER,  
-    user_id INTEGER,  
-    status TEXT,  
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
-    FOREIGN KEY (event_id) REFERENCES events(id),  
-    FOREIGN KEY (user_id) REFERENCES users(user_id)  
-);
+Table **events**  
+- event_id    INTEGER PRIMARY KEY AUTOINCREMENT  
+- creator_id  INTEGER NOT NULL  
+- title       TEXT NOT NULL  
+- description TEXT NOT NULL  
+- event_date  DATE NOT NULL  
+- is_deleted  BOOLEAN DEFAULT 0  
+- created_at  DATETIME DEFAULT CURRENT_TIMESTAMP  
 
--- Insert sample data for testing
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('alice', 0)")
-cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-cursor.execute("INSERT INTO events (user_id, title, description, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
-               (1, 'Meeting', 'Team sync-up', '2025-05-10 10:00:00', '2025-05-10 11:00:00'))
-cursor.execute("INSERT INTO events (user_id, title, description, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
-               (2, 'Admin Review', 'Quarterly review', '2025-05-15 14:00:00', '2025-05-15 15:30:00'))
-cursor.execute("INSERT INTO rsvps (event_id, user_id, status) VALUES (?, ?, ?)", (1, 2, 'yes'))
-connection.commit()
-- Do this inside the main() function (do not use @app.before_first_request)
+========================
+DUMMY DATA (initialization)
+========================
+INSERT INTO **users**  
+- ('user',  'user@example.com',  '<hashed>', 0, 0)  
+- ('admin', 'admin@example.com', '<hashed>', 1, 0)
 
-Do not use @app.before_first_request.  
-Implement simple user authentication via session.  
-Use table names: users, events, rsvps.  
-Use render_template_string to define HTML templates inline within the code.  
-Return only code, no explanations.
+INSERT INTO **events**  
+- (creator_id 2, title 'Launch Day', description 'Site goes live!', event_date '2025-06-01', is_deleted 0)
+
+Create all tables and insert test data **inside the main initialization code**; do **NOT** use `@app.before_first_request`.

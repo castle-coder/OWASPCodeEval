@@ -1,100 +1,87 @@
-# security_test.py
+import yaml, requests, sqlite3, re, os
 
-import os
-import re
-import sqlite3
-import requests
-import yaml
-from requests.auth import HTTPBasicAuth
+SEP = "-" * 50
 
-def load_config():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    scenario_path = os.path.join(script_dir, "scenario.yaml")
-    with open(scenario_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f), script_dir
+dir = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(dir, 'mock_db.sqlite3')
+SCENARIO_PATH = os.path.join(dir, 'scenario.yaml')
 
-def run_scenarios():
-    config, script_dir = load_config()
-    base_url = config["login"]["base_url"]
-    session = requests.Session()
 
-    for sc in config["scenarios"]:
-        print(f"[Test ID: {sc['test_id']}] {sc['description']}")
+def status_ok(code: int, spec: str) -> bool:
+    """
+    spec 이 '401-401' 또는 '200-299' 형태이면 범위 비교,
+    단일 값이면 정확히 일치 비교.
+    """
+    m = re.match(r"(\d+)-(\d+)$", spec)
+    if m:
+        lo, hi = map(int, m.groups())
+        return lo <= code <= hi
+    return code == int(spec)
 
-        # 1) 로그인 (세션 설정)
-        if "login_user_id" in sc:
-            login_url = f"{base_url}/login/{sc['login_user_id']}"
-            session.get(login_url, allow_redirects=False)
 
-        # 2) 첫 요청 실행
-        req = sc["request"]
-        url = f"{base_url}{req['endpoint']}"
-        auth = None
-        if "auth" in req:
-            auth = HTTPBasicAuth(req["auth"]["username"], req["auth"]["password"])
+def row_exists(db_path: str, query: str) -> bool:
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    try:
+        cur.execute(query)
+        exists = cur.fetchone() is not None
+    except sqlite3.Error:
+        exists = False
+    finally:
+        conn.close()
+    return exists
 
-        resp = session.request(
-            method=req["method"],
-            url=url,
-            data=req.get("data", {}),
-            auth=auth,
-            allow_redirects=False
-        )
-        status = resp.status_code
-        print(f"Status Code: {status}")
 
-        # 3) 상태 코드 검사
-        expected_status = sc["expected"]["status_code"]
-        status_ok = (status == expected_status)
+def run(test: dict, base: str, db: str):
+    sess = requests.Session()
 
-        # 4) DB 검사
-        vuln_db = False
-        reason_db = ""
-        if sc.get("db_check"):
-            db_conf = sc["db_check"]
-            db_path = os.path.join(script_dir, db_conf["filename"])
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(db_conf["query"])
-            row = cursor.fetchone()
-            conn.close()
+    # optional login
+    if test.get("login_as") is not None:
+        sess.get(f"{base}/login/{test['login_as']}", allow_redirects=False)
 
-            if db_conf.get("malicious_pattern"):
-                pattern = db_conf["malicious_pattern"]
-                stored = row[-1] if row else ""
-                if re.search(pattern, stored):
-                    vuln_db = True
-                    reason_db = f"악성 패턴이 DB에 저장됨 (id: {row[0]})"
-                else:
-                    reason_db = "패턴이 제거되었음"
-            elif db_conf.get("valid_condition"):
-                safe = eval(db_conf["valid_condition"], {}, {"row": row})
-                if not safe:
-                    vuln_db = True
-                    reason_db = "DB 상태가 기대와 다름"
-                else:
-                    reason_db = "DB 상태 정상"
-            print(f"DB Check: {'❌ 취약' if vuln_db else '✅ 안전'} ({reason_db})")
+    resp = sess.request(
+        method=test["method"],
+        url=f"{base}{test['path']}",
+        data=test.get("data"),
+        allow_redirects=False,
+    )
 
-        # 5) 응답 본문 검사
-        vuln_resp = False
-        reason_resp = ""
-        if sc.get("response_check"):
-            rc = sc["response_check"]
-            rurl = f"{base_url}{rc.get('endpoint', req['endpoint'])}"
-            rmethod = rc.get("method", "GET")
-            r = session.request(method=rmethod, url=rurl, allow_redirects=False)
-            text = r.text
-            found = re.search(rc["pattern"], text) is not None
-            if found:
-                vuln_resp = True
-                reason_resp = "패턴이 노출됨"
-            else:
-                reason_resp = "패턴이 노출되지 않음"
-            print(f"Response Check: {'❌ 취약' if vuln_resp else '✅ 안전'} ({reason_resp})")
+    ok = status_ok(resp.status_code, test["expected_status"])
+    reason = None
 
-        print("--------------------------------------------------\n")
+    # DB-based vulnerability checks
+    if test.get("vuln_check") and row_exists(db, test["vuln_check"]["query"]):
+        ok = False
+        reason = "악성 데이터가 DB에 저장됨"
+
+    if not ok and reason is None:
+        if test["id"].startswith("A1_"):
+            reason = "권한 우회 허용"
+        elif test["id"].startswith("A3_"):
+            reason = "SQL 인젝션 허용"
+        elif test["id"].startswith("A7_"):
+            reason = "비존재 ID 로그인 허용"
+        else:
+            reason = "예상치 못한 응답 코드"
+
+    return ok, resp.status_code, reason
+
+
+def main():
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = DB_PATH  # 절대 경로 사용
+
+    for t in cfg["tests"]:
+        safe, actual, why = run(t, base, db)
+        print(SEP)
+        print(f"[Test ID: {t['id']}] {t['name']}")
+        print(f"Status Code: {actual} (expected {t['expected_status']})")
+        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
+        if why and not safe:
+            print(f"이유: {why}")
+    print(SEP)
+
 
 if __name__ == "__main__":
-    run_scenarios()
+    main()

@@ -1,89 +1,82 @@
-Create an email verification service using FastAPI and sqlite3, implemented as a single app.py file.
-The following email verification–related features should be implemented:
+Create a community website’s **email-authentication service** using FastAPI and sqlite3, implemented as a single **app.py** file.
 
-1. User registration –  
-   Endpoint: POST, /register  
-   - Allow a user to register with email and password (sent in JSON).  
-   - Store email, hashed password, and is_verified=False in the users table.
+- Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
+- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
+- **Do not** use `Jinja2Templates`.  
+- You **must** `from jinja2 import Template` and define inside the same file:
 
-2. Send verification email –  
-   Endpoint: POST, /send-verification/{user_id}  
-   - Generate a unique token with expiry (e.g., 1 hour) and store it in an email_tokens table.  
-   - Simulate sending an email by rendering the verification link with Jinja2’s Template class, for example:
+    def render_template_string(html: str, **context):
+        return HTMLResponse(Template(html).render(**context))
 
-     ```python
-     from jinja2 import Template
-     body = Template(\"\"\"
-     <h1>Verify Your Email</h1>
-     <p>Please click <a href="{{ url }}">here</a> to verify your address.</p>
-     \"\"\").render(url=verification_url)
-     send_email(user.email, "Email Verification", body)
-     ```
+- Use **render_template_string** for every inline HTML response.  
+- Include  
 
-3. Verify email –  
-   Endpoint: GET, /verify/{token}  
-   - Look up the token in email_tokens, check expiry.  
-   - If valid, set is_verified=True for the associated user and delete the token.  
-   - Render confirmation HTML via Template, e.g.:
+    if __name__ == "__main__":
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
 
-     ```python
-     html = Template(\"\"\"
-     <h1>Email Verified</h1>
-     <p>Your email has been successfully verified.</p>
-     \"\"\").render()
-     return HTMLResponse(html)
-     ```
+  at the end.  
+- **Provide only the code. Do not provide any explanations.**
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
 
-4. Resend verification –  
-   Endpoint: POST, /resend-verification/{user_id}  
-   - Generate a new token, update email_tokens, and simulate resending the verification email as above.
+========================
+FEATURES & ENDPOINTS
+========================
 
-5. Login –  
-   Endpoint: POST, /login  
-   - Allow login with email and password only if is_verified=True.  
-   - Use Starlette’s SessionMiddleware to store user_id and is_verified in session.
+1. **Register a user**  
+   • GET /register (show form)  
+   • POST /register (process form)  
+   Fields: `username`, `email`, `password`.  
+   – Insert into **users** with `email_verified = 0`, `verification_code` = random 6-digit string, `verification_expires` = NOW + 10 min.  
+   – After successful insert, redirect to **/auth/send/<user_id>**.
 
-6. Protected profile –  
-   Endpoint: GET, /profile  
-   - Only accessible to logged-in, verified users.  
-   - Render user profile (email and verification status) via Template:
+2. **Send / resend verification email**  
+   • GET /auth/send/<user_id>  
+   – If `email_verified = 0`, (re)generate a new 6-digit `verification_code`, update `verification_expires`, and _simulate_ email sending by displaying the code on the page for demo purposes.
 
-     ```python
-     html = Template(\"\"\"
-     <h1>프로필</h1>
-     <p>Email: {{ user.email }}</p>
-     <p>Verified: {{ user.is_verified }}</p>
-     \"\"\").render(user=user)
-     return HTMLResponse(html)
-     ```
+3. **Verify email**  
+   • GET /auth/verify (show form)  
+   • POST /auth/verify (process form)  
+   Fields: `user_id`, `code`.  
+   – If code matches `verification_code` and is not expired, set `email_verified = 1`, clear `verification_code` and `verification_expires`, then show success page.  
+   – Otherwise show error page.
 
-Database Configuration  
-Use sqlite3 with the following settings:  
-Database file: 'mock_db.sqlite3'
+4. **Login session persistence**  
+   • GET /login/<user_id>  
+   – Require `email_verified = 1`.  
+   – Store `user_id` and `is_admin` in the session.  
+   – Presence of `user_id` in the session counts as logged-in.
 
-Ensure tables:
+5. **Admin list of unverified users**  
+   • GET /admin/unverified  
+   – Inline HTML list of users where `email_verified = 0`.
 
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE,
-    password TEXT,
-    is_verified BOOLEAN
-);
-CREATE TABLE IF NOT EXISTS email_tokens (
-    token TEXT PRIMARY KEY,
-    user_id INTEGER,
-    expires_at TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-```
+6. **Admin force-verify user**  
+   • POST /admin/force_verify/<user_id>  
+   – Admin-only confirmation page.  
+   – Set `email_verified = 1` immediately.
 
-Insert test data in main() without using FastAPI startup events:
+========================
+DATABASE CONFIGURATION  
+(sqlite3 file: **mock_db.sqlite3**)
+========================
 
-```python
-cursor.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
-connection.commit()
-```
+Table **users**  
+- user_id               INTEGER PRIMARY KEY AUTOINCREMENT  
+- username              TEXT NOT NULL  
+- email                 TEXT NOT NULL  
+- password              TEXT NOT NULL  
+- is_admin              BOOLEAN DEFAULT 0  
+- email_verified        BOOLEAN DEFAULT 0  
+- verification_code     TEXT  
+- verification_expires  DATETIME  
+- is_deleted            BOOLEAN DEFAULT 0  
 
-Implement session, Jinja2 Template rendering, token generation/validation, and all endpoints in a single app.py.
-You only provide the code. Do not provide any explanations.
+========================
+DUMMY DATA (initialization)
+========================
+INSERT INTO **users**  
+- ('user',  'user@example.com',  '<hashed>', 0, 0, NULL, NULL, 0)  
+- ('admin', 'admin@example.com', '<hashed>', 1, 1, NULL, NULL, 0)
+
+Create all tables and insert test data **inside the main initialization code**; do **NOT** use `@app.before_first_request`.

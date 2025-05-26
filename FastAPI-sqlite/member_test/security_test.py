@@ -1,53 +1,80 @@
-import yaml
-import requests
-import os
+import yaml, requests, sqlite3, re, os
 
-def load_scenarios(path=None):
-    if path is None:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(current_dir, "scenario.yaml")
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+SEP = "-" * 50
 
-def login_as_user(base_url, user_id):
-    return requests.get(f"{base_url}/login/{user_id}")
+dir = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(dir, 'mock_db.sqlite3')
+SCENARIO_PATH = os.path.join(dir, 'scenario.yaml')
 
-def run_test(test, base_url):
-    url = base_url + test["endpoint"]
-    method = test["method"].lower()
-    session = requests.Session()
 
-    if "session_login" in test:
-        resp = login_as_user(base_url, test["session_login"])
-        if resp.status_code != 200:
-            return test["id"], "❌ 실패", f"로그인 실패 (user_id: {test['session_login']})"
+def status_in_range(code: int, spec: str) -> bool:
+    """`spec` 이 '401-401' 또는 '200-299' 형태이면 범위, 단일 값이면 정확 비교"""
+    m = re.match(r"(\d+)-(\d+)$", spec)
+    if m:
+        lo, hi = map(int, m.groups())
+        return lo <= code <= hi
+    return code == int(spec)
 
-    resp = getattr(session, method)(url, data=test.get("data", {}), allow_redirects=False)
 
-    # 상태 코드 검증
-    expected = test.get("expected_status", 200)
-    if resp.status_code != expected:
-        return test["id"], "❌ 취약", f"이유: 예상 코드 {expected}, 실제 코드 {resp.status_code}"
+def db_row_exists(db_path: str, query: str) -> bool:
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    try:
+        cur.execute(query)
+        row = cur.fetchone()
+    except sqlite3.Error:
+        row = None
+    finally:
+        conn.close()
+    return row is not None
 
-    # 콘텐츠 검증
-    if "validate" in test:
-        if "not_contains" in test["validate"]:
-            if test["validate"]["not_contains"] in resp.text:
-                return test["id"], "❌ 취약", f"이유: 악성 내용이 포함됨 ({test['validate']['not_contains']})"
 
-    return test["id"], "✅ 안전", "이유: 모든 조건 통과"
+def run_test(base: str, db: str, t: dict):
+    sess = requests.Session()
+
+    # 선택적 로그인
+    if t.get("login_as") is not None:
+        sess.get(f"{base}/login/{t['login_as']}", allow_redirects=False)
+
+    resp = sess.request(
+        method=t["method"],
+        url=f"{base}{t['path']}",
+        data=t.get("data"),
+        allow_redirects=False,
+    )
+
+    ok = status_in_range(resp.status_code, t["expected_status"])
+    reason = None
+
+    # 추가 DB 취약 검사
+    if t.get("vuln_check") and db_row_exists(db, t["vuln_check"]["query"]):
+        ok = False
+        reason = "악성 데이터가 DB에 저장됨"
+
+    # 일반 오류 메시지
+    if not ok and reason is None:
+        prefix = t["id"].split("_", 1)[0]
+        msg_map = {"A1": "권한 우회 허용", "A3": "SQL 인젝션 허용", "A7": "인증 우회 허용"}
+        reason = msg_map.get(prefix, "예상치 못한 응답 코드")
+
+    return ok, resp.status_code, reason
+
 
 def main():
-    scenarios = load_scenarios()
-    base_url = scenarios["base_url"]
-    print("-" * 50)
-    for test in scenarios["tests"]:
-        test_id, result, reason = run_test(test, base_url)
-        print(f"[Test ID: {test_id}] {test['name']}")
-        print(f"Status Code: {test.get('expected_status', 200)}")
-        print(f"결과: {result}")
-        print(f"{reason}")
-        print("-" * 50)
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = DB_PATH  # 절대 경로 사용
+
+    for t in cfg["tests"]:
+        safe, actual, why = run_test(base, db, t)
+        print(SEP)
+        print(f"[Test ID: {t['id']}] {t['name']}")
+        print(f"Status Code: {actual} (expected {t['expected_status']})")
+        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
+        if why and not safe:
+            print(f"이유: {why}")
+    print(SEP)
+
 
 if __name__ == "__main__":
     main()

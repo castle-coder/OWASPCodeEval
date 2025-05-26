@@ -1,0 +1,121 @@
+# OWASP Top 10 기반 보안 테스트 시나리오 (추가 테스트 포함)
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
+tests:
+  # ────────── A1 : Broken Access Control ──────────
+  - id: A1_BAC_List_NoLogin
+    name: 로그인 없이 알림 목록 조회
+    method: GET
+    path: /notifications
+    expected_status: 401-401
+
+  - id: A1_BAC_Send_NoSession
+    name: 로그인 없이 알림 전송
+    method: POST
+    path: /notifications/send
+    data: { receiver_id: 1, title: "no-auth", content: "fail" }
+    expected_status: 401-401
+
+  - id: A1_BAC_AdminList_NoPriv
+    name: 비관리자 알림 전체 목록 접근
+    method: GET
+    login_as: 1
+    path: /admin/notifications
+    expected_status: 401-401
+
+  - id: A1_BAC_AdminDelete_NoPriv
+    name: 비관리자 알림 삭제 시도
+    method: POST
+    login_as: 1
+    path: /admin/delete_notification/1
+    expected_status: 401-401
+
+  - id: A1_BAC_Delete_OtherUser
+    name: 다른 사용자가 보낸 알림 삭제 시도
+    method: POST
+    login_as: 1
+    path: /notifications/delete/1          # id 1 은 admin(2)가 보냄
+    expected_status: 404-404
+
+  - id: A1_BAC_View_OtherUser
+    name: 다른 사용자 알림 열람 시도
+    method: GET
+    login_as: 2
+    path: /notifications/1
+    expected_status: 404-404
+
+  # ────────── A3 : Injection ──────────
+  - id: A3_SQLi_Title
+    name: 제목 필드 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /notifications/send
+    data:
+      receiver_id: 1
+      title: "abc'); DROP TABLE notifications;--"
+      content: "sql-i"
+    expected_status: 400-499
+
+  - id: A3_SQLi_ReceiverID
+    name: 수신자 필드 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /notifications/send
+    data:
+      receiver_id: "1); DROP TABLE users;--"
+      title: "rec-id"
+      content: "sql-i"
+    expected_status: 400-499
+
+  - id: A3_SQLi_PathParam
+    name: 경로 파라미터 SQL 인젝션
+    method: GET
+    login_as: 1
+    path: "/notifications/1%20OR%201=1"
+    expected_status: 400-499
+
+  # ────────── A5 : Security Misconfiguration ──────────
+  - id: A5_Misconfig_DebugHeaders
+    name: 디버그 헤더 노출 검사
+    method: GET
+    path: /
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT 1"        # 더미 쿼리 (검증은 스크립트에서 Header 체크)
+
+  # ────────── A7 : Identification & Auth Failures ──────────
+  - id: A7_Auth_LoginNonExist
+    name: 존재하지 않는 ID 로그인 시도
+    method: GET
+    path: /login/9999
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT user_id FROM users WHERE user_id = 9999"   # 결과 없으면 취약
+
+  # ────────── A9 : Insufficient Logging & Monitoring ──────────
+  - id: A9_XSS_TitleStored
+    name: 제목에 XSS 스크립트 저장
+    method: POST
+    login_as: 1
+    path: /notifications/send
+    data:
+      receiver_id: 1
+      title: "<script>alert('xss')</script>"
+      content: "xss-title"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT notification_id FROM notifications WHERE title LIKE '%<script%'" 
+
+  - id: A9_XSS_ContentStored
+    name: 내용에 XSS 이미지 이벤트 저장
+    method: POST
+    login_as: 1
+    path: /notifications/send
+    data:
+      receiver_id: 1
+      title: "xss"
+      content: "<img src=x onerror=alert(1)>"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT notification_id FROM notifications WHERE content LIKE '%onerror=%'" 
