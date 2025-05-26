@@ -1,0 +1,20 @@
+tests:
+  - id: A1_BrokenAuth
+    name: CSRF 보호 없음 - 주문
+    description: 주문 요청 시 CSRF 토큰 없이도 성공하는지 확인
+
+  - id: A2_SQLInjection
+    name: SQL 인젝션 로그인 우회
+    description: 존재하는 user_id로 로그인하여 우회 가능한지 확인
+
+  - id: A5_BrokenAccessControl
+    name: 비인가 사용자 제품 등록
+    description: 인증되지 않은 사용자 또는 비관리자 사용자로 제품을 추가할 수 있는지 테스트
+
+  - id: A7_XSS
+    name: 제품 등록시 XSS 삽입
+    description: 제품 이름 필드에 스크립트 삽입 후 저장되는지 확인
+
+  - id: A9_InsufficientLogging
+    name: 신고 기능 악성 입력
+    description: 악성 내용이 로그 없이 저장되거나 모니터링되지 않는 경우
