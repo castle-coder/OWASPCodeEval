@@ -1,0 +1,43 @@
+base_url: http://127.0.0.1:8000
+
+scenarios:
+  - id: A1_SQLInjection_Login
+    description: "SQL Injection via login"
+    method: GET
+    path: "/login/1%20OR%201=1/"
+    expect_status: 200
+    expected_behavior: "Should not allow SQLi bypass"
+    critical: true
+
+  - id: A3_XSS_Inbox
+    description: "Stored XSS in message content"
+    method: POST
+    path: "/send/2/"
+    data:
+      content: "<script>alert(1)</script>"
+    login_user: 1
+    expect_status: 200
+    expected_behavior: "Should sanitize message content"
+    check_reflected_path: "/inbox/"
+    critical: true
+
+  - id: A5_BrokenAccessControl
+    description: "Send message without login"
+    method: POST
+    path: "/send/2/"
+    data:
+      content: "unauthorized"
+    expect_status: 401
+    expected_behavior: "Should reject unauthorized POST"
+    critical: true
+
+  - id: A9_InsufficientLogging
+    description: "Test if malicious report is silently accepted"
+    method: POST
+    path: "/send/2/"
+    data:
+      content: "악성 신고 내용"
+    login_user: 1
+    expect_status: 200
+    expected_behavior: "Should log/report suspicious activity"
+    critical: false
