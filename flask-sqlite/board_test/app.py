@@ -5,109 +5,86 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-DATABASE = 'mock_db.sqlite3'
-
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect('mock_db.sqlite3')
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.route('/login/<user_id>')
+@app.before_request
+def before_request():
+    if 'user_id' in session:
+        g.user_id = session['user_id']
+        g.is_admin = session['is_admin']
+    else:
+        g.user_id = None
+        g.is_admin = False
+
+@app.route('/login/<user_id>', methods=['GET'])
 def login(user_id):
     session['user_id'] = user_id
     session['is_admin'] = user_id == 'admin'
     return redirect(url_for('board'))
 
-@app.route('/board', methods=['GET', 'POST'])
-def board():
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
-    if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
-        conn = get_db_connection()
-        conn.execute('INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)', (session['user_id'], title, content))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('board'))
+@app.route('/board', methods=['POST'])
+def create_post():
+    if g.user_id is None:
+        return "Login required", 401
+    title = request.form['title']
+    content = request.form['content']
     conn = get_db_connection()
-    posts = conn.execute('SELECT * FROM boards WHERE is_blocked = 0').fetchall()
-    conn.close()
-    return render_template_string('''
-        <h1>Board</h1>
-        <form method="post">
-            <input type="text" name="title" placeholder="Title" required>
-            <textarea name="content" placeholder="Content" required></textarea>
-            <button type="submit">Create Post</button>
-        </form>
-        <ul>
-            {% for post in posts %}
-            <li>
-                <h2>{{ post['title'] }}</h2>
-                <p>{{ post['content'] }}</p>
-                <a href="{{ url_for('post', post_id=post['id']) }}">View</a>
-                {% if post['user_id'] == session['user_id'] %}
-                <a href="{{ url_for('edit_post', post_id=post['id']) }}">Edit</a>
-                <a href="{{ url_for('delete_post', post_id=post['id']) }}">Delete</a>
-                {% endif %}
-                {% if session['is_admin'] %}
-                <a href="{{ url_for('block_post', post_id=post['id']) }}">Block</a>
-                {% endif %}
-            </li>
-            {% endfor %}
-        </ul>
-    ''', posts=posts)
-
-@app.route('/board/<post_id>')
-def post(post_id):
-    conn = get_db_connection()
-    post = conn.execute('SELECT * FROM boards WHERE id = ?', (post_id,)).fetchone()
-    conn.close()
-    return render_template_string('''
-        <h1>{{ post['title'] }}</h1>
-        <p>{{ post['content'] }}</p>
-        <a href="{{ url_for('board') }}">Back to Board</a>
-    ''', post=post)
-
-@app.route('/board/edit/<post_id>', methods=['GET', 'POST'])
-def edit_post(post_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
-    if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
-        conn = get_db_connection()
-        conn.execute('UPDATE boards SET title = ?, content = ?, updated_at = ? WHERE id = ?', (title, content, datetime.now(), post_id))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('board'))
-    conn = get_db_connection()
-    post = conn.execute('SELECT * FROM boards WHERE id = ?', (post_id,)).fetchone()
-    conn.close()
-    return render_template_string('''
-        <h1>Edit Post</h1>
-        <form method="post">
-            <input type="text" name="title" value="{{ post['title'] }}" required>
-            <textarea name="content" required>{{ post['content'] }}</textarea>
-            <button type="submit">Update Post</button>
-        </form>
-        <a href="{{ url_for('board') }}">Back to Board</a>
-    ''', post=post)
-
-@app.route('/board/delete/<post_id>', methods=['POST'])
-def delete_post(post_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
-    conn = get_db_connection()
-    conn.execute('UPDATE boards SET is_blocked = 1 WHERE id = ?', (post_id,))
+    conn.execute('INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)', (g.user_id, title, content))
     conn.commit()
     conn.close()
     return redirect(url_for('board'))
 
+@app.route('/board/edit/<post_id>', methods=['POST'])
+def edit_post(post_id):
+    if g.user_id is None:
+        return "Login required", 401
+    title = request.form['title']
+    content = request.form['content']
+    conn = get_db_connection()
+    conn.execute('UPDATE boards SET title = ?, content = ?, updated_at = ? WHERE id = ? AND user_id = ?', (title, content, datetime.now(), post_id, g.user_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('board'))
+
+@app.route('/board/delete/<post_id>', methods=['POST'])
+def delete_post(post_id):
+    if g.user_id is None:
+        return "Login required", 401
+    conn = get_db_connection()
+    conn.execute('UPDATE boards SET is_blocked = 1 WHERE id = ? AND user_id = ?', (post_id, g.user_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('board'))
+
+@app.route('/board/<post_id>', methods=['GET'])
+def view_post(post_id):
+    conn = get_db_connection()
+    post = conn.execute('SELECT * FROM boards WHERE id = ?', (post_id,)).fetchone()
+    conn.close()
+    if post is None:
+        return "Post not found", 404
+    return render_template_string('''
+        <h1>{{ post.title }}</h1>
+        <p>{{ post.content }}</p>
+        {% if g.user_id == post.user_id %}
+            <form action="{{ url_for('edit_post', post_id=post.id) }}" method="post">
+                <input type="text" name="title" value="{{ post.title }}">
+                <input type="text" name="content" value="{{ post.content }}">
+                <button type="submit">Edit</button>
+            </form>
+            <form action="{{ url_for('delete_post', post_id=post.id) }}" method="post">
+                <button type="submit">Delete</button>
+            </form>
+        {% endif %}
+    ''', post=post)
+
 @app.route('/admin/block/<post_id>', methods=['POST'])
 def block_post(post_id):
-    if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='user'))
+    if not g.is_admin:
+        return "Admin access required", 403
     conn = get_db_connection()
     conn.execute('UPDATE boards SET is_blocked = 1 WHERE id = ?', (post_id,))
     conn.commit()
@@ -116,11 +93,11 @@ def block_post(post_id):
 
 @app.route('/board/report/<post_id>', methods=['POST'])
 def report_post(post_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id='user'))
+    if g.user_id is None:
+        return "Login required", 401
     reason = request.form['reason']
     conn = get_db_connection()
-    conn.execute('INSERT INTO reports (post_id, user_id, reason) VALUES (?, ?, ?)', (post_id, session['user_id'], reason))
+    conn.execute('INSERT INTO reports (post_id, user_id, reason) VALUES (?, ?, ?)', (post_id, g.user_id, reason))
     conn.commit()
     conn.close()
     return redirect(url_for('board'))

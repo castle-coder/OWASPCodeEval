@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 Create the required tables in the database before handling any requests.
 
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
 Insert a test user in main() using sqlite3 directly (not Flask hooks):
 cursor.execute("INSERT INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
 connection.commit()

@@ -12,6 +12,58 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+@app.before_first_request
+def init_db():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            is_admin BOOLEAN
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS quizzes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            title TEXT,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            quiz_id INTEGER,
+            question TEXT,
+            options TEXT,
+            correct_answer TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            quiz_id INTEGER,
+            score INTEGER,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+        )
+    ''')
+    conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+    conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+    conn.execute("INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)", (1, 'Math Quiz', 'Basic mathematics questions'))
+    conn.execute("INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)", (2, 'Science Quiz', 'General science questions'))
+    conn.execute("INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)", (1, 'What is 2+2?', '["3","4","5","6"]', '4'))
+    conn.execute("INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)", (1, 'What is 3*3?', '["6","7","8","9"]', '9'))
+    conn.commit()
+    conn.close()
+
 @app.route('/login/<user_id>')
 def login(user_id):
     session['user_id'] = user_id
@@ -58,8 +110,9 @@ def delete_quiz(quiz_id):
     if 'user_id' not in session:
         return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
-    conn.execute('DELETE FROM questions WHERE quiz_id = ?', (quiz_id,))
     conn.execute('DELETE FROM quizzes WHERE id = ?', (quiz_id,))
+    conn.execute('DELETE FROM questions WHERE quiz_id = ?', (quiz_id,))
+    conn.execute('DELETE FROM results WHERE quiz_id = ?', (quiz_id,))
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
@@ -78,10 +131,10 @@ def take_quiz(quiz_id):
             <p>{{ quiz.description }}</p>
             {% for question in questions %}
                 <p>{{ question.question }}</p>
-                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[0] }}"> {{ question.options[0] }}<br>
-                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[1] }}"> {{ question.options[1] }}<br>
-                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[2] }}"> {{ question.options[2] }}<br>
-                <input type="radio" name="answer{{ question.id }}" value="{{ question.options[3] }}"> {{ question.options[3] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="option1"> {{ question.options[0] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="option2"> {{ question.options[1] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="option3"> {{ question.options[2] }}<br>
+                <input type="radio" name="answer{{ question.id }}" value="option4"> {{ question.options[3] }}<br>
             {% endfor %}
             <input type="submit" value="Submit">
         </form>
@@ -95,22 +148,26 @@ def quiz_results(quiz_id):
     quiz = conn.execute('SELECT * FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
     questions = conn.execute('SELECT * FROM questions WHERE quiz_id = ?', (quiz_id,)).fetchall()
     answers = request.form.getlist('answer[]')
-    score = sum(1 for answer, correct_answer in zip(answers, [question.correct_answer for question in questions]) if answer == correct_answer)
+    score = 0
+    for i, answer in enumerate(answers):
+        question = questions[i]
+        if answer == question.correct_answer:
+            score += 1
     conn.execute('INSERT INTO results (user_id, quiz_id, score) VALUES (?, ?, ?)', (session['user_id'], quiz_id, score))
     conn.commit()
     conn.close()
     return render_template_string('''
         <h1>Quiz Results</h1>
         <p>Score: {{ score }}</p>
-        {% for question, answer in zip(questions, answers) %}
-            <p>{{ question.question }} - {{ 'Correct' if answer == question.correct_answer else 'Incorrect' }}</p>
+        {% for question in questions %}
+            <p>{{ question.question }}</p>
+            <p>Your Answer: {{ answers[loop.index0] }}</p>
+            <p>Correct Answer: {{ question.correct_answer }}</p>
         {% endfor %}
     ''', quiz=quiz, questions=questions, answers=answers, score=score)
 
-@app.route('/quiz/leaderboard', methods=['GET'])
+@app.route('/quiz/leaderboard')
 def quiz_leaderboard():
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     results = conn.execute('SELECT * FROM results ORDER BY score DESC').fetchall()
     conn.close()
@@ -136,35 +193,17 @@ def quiz_leaderboard():
 
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        return redirect(url_for('login', user_id=1))
     conn = get_db_connection()
     quizzes = conn.execute('SELECT * FROM quizzes').fetchall()
     conn.close()
     return render_template_string('''
         <h1>Quizzes</h1>
-        <a href="/quiz">Create Quiz</a>
-        {% for quiz in quizzes %}
-            <h2>{{ quiz.title }}</h2>
-            <p>{{ quiz.description }}</p>
-            <a href="/quiz/{{ quiz.id }}">Take Quiz</a>
-            <a href="/quiz/edit/{{ quiz.id }}">Edit Quiz</a>
-            <a href="/quiz/delete/{{ quiz.id }}">Delete Quiz</a>
-        {% endfor %}
+        <ul>
+            {% for quiz in quizzes %}
+                <li><a href="/quiz/{{ quiz.id }}">{{ quiz.title }}</a></li>
+            {% endfor %}
+        </ul>
     ''', quizzes=quizzes)
 
 if __name__ == '__main__':
-    conn = get_db_connection()
-    conn.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, is_admin BOOLEAN)')
-    conn.execute('CREATE TABLE IF NOT EXISTS quizzes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, title TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id))')
-    conn.execute('CREATE TABLE IF NOT EXISTS questions (id INTEGER PRIMARY KEY AUTOINCREMENT, quiz_id INTEGER, question TEXT, options TEXT, correct_answer TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (quiz_id) REFERENCES quizzes(id))')
-    conn.execute('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, quiz_id INTEGER, score INTEGER, completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id), FOREIGN KEY (quiz_id) REFERENCES quizzes(id))')
-    conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-    conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-    conn.execute("INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)", (1, 'Math Quiz', 'Basic mathematics questions'))
-    conn.execute("INSERT INTO quizzes (user_id, title, description) VALUES (?, ?, ?)", (2, 'Science Quiz', 'General science questions'))
-    conn.execute("INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)", (1, 'What is 2+2?', '["3","4","5","6"]', '4'))
-    conn.execute("INSERT INTO questions (quiz_id, question, options, correct_answer) VALUES (?, ?, ?, ?)", (1, 'What is 3*3?', '["6","7","8","9"]', '9'))
-    conn.commit()
-    conn.close()
     app.run(debug=True)

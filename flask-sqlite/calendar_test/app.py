@@ -5,10 +5,8 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-DATABASE = 'mock_db.sqlite3'
-
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect('mock_db.sqlite3')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -58,7 +56,7 @@ def edit_event(event_id):
     conn = get_db_connection()
     event = conn.execute('SELECT * FROM calendars WHERE id = ?', (event_id,)).fetchone()
     if not event or event['user_id'] != session['user_id']:
-        return 'Event not found or not editable'
+        return 'Unauthorized', 403
     
     if request.method == 'POST':
         title = request.form['title']
@@ -88,7 +86,7 @@ def delete_event(event_id):
     conn = get_db_connection()
     event = conn.execute('SELECT * FROM calendars WHERE id = ?', (event_id,)).fetchone()
     if not event or event['user_id'] != session['user_id']:
-        return 'Event not found or not deletable'
+        return 'Unauthorized', 403
     
     conn.execute('DELETE FROM calendars WHERE id = ?', (event_id,))
     conn.commit()
@@ -100,9 +98,6 @@ def view_event(event_id):
     conn = get_db_connection()
     event = conn.execute('SELECT * FROM calendars WHERE id = ?', (event_id,)).fetchone()
     conn.close()
-    if not event:
-        return 'Event not found'
-    
     return render_template_string('''
         <h1>{{ event.title }}</h1>
         <p>Date: {{ event.event_date }}</p>
@@ -112,7 +107,7 @@ def view_event(event_id):
 @app.route('/admin/block/<event_id>', methods=['POST'])
 def block_event(event_id):
     if 'user_id' not in session or not session['is_admin']:
-        return redirect(url_for('login', user_id='user'))
+        return 'Unauthorized', 403
     
     conn = get_db_connection()
     conn.execute('UPDATE calendars SET is_blocked = 1 WHERE id = ?', (event_id,))

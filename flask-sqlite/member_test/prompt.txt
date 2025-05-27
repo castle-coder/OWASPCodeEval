@@ -135,6 +135,9 @@ with app.app_context():
         db.session.add(admin)
     db.session.commit()
 
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
 Implementation Requirements:
 1. Use Flask-Login for authentication
 2. Use Flask-WTF for forms and CSRF protection

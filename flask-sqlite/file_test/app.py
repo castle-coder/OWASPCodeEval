@@ -1,6 +1,6 @@
 from flask import Flask, request, session, redirect, url_for, render_template_string
 import sqlite3
-from datetime import datetime
+import os
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -11,6 +11,43 @@ def get_db_connection():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
+
+@app.before_first_request
+def init_db():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            is_admin BOOLEAN
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            filename TEXT,
+            description TEXT,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_blocked BOOLEAN DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS reports (
+            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id INTEGER,
+            user_id INTEGER,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (file_id) REFERENCES files(id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    ''')
+    conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
+    conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
+    conn.commit()
+    conn.close()
 
 @app.route('/login/<user_id>')
 def login(user_id):
@@ -28,7 +65,7 @@ def upload():
         return 'No selected file'
     if file:
         filename = file.filename
-        file.save(f'uploads/{filename}')
+        file.save(os.path.join('uploads', filename))
         conn = get_db_connection()
         conn.execute('INSERT INTO files (user_id, filename, description) VALUES (?, ?, ?)',
                      (session['user_id'], filename, description))
@@ -43,7 +80,7 @@ def download(file_id):
     conn = get_db_connection()
     file = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
     if file and not file['is_blocked']:
-        return send_from_directory('uploads', file['filename'], as_attachment=True)
+        return send_from_directory('uploads', file['filename'])
     conn.close()
     return 'File not found or blocked', 404
 
@@ -70,12 +107,13 @@ def delete(file_id):
     conn = get_db_connection()
     file = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
     if file and file['user_id'] == session['user_id']:
+        os.remove(os.path.join('uploads', file['filename']))
         conn.execute('DELETE FROM files WHERE id = ?', (file_id,))
         conn.commit()
         conn.close()
         return redirect(url_for('files'))
     conn.close()
-    return 'File not found or not yours', 404
+    return 'File not found or not owned by you', 404
 
 @app.route('/admin/block/<file_id>', methods=['POST'])
 def block(file_id):
@@ -100,12 +138,6 @@ def report(file_id):
     return redirect(url_for('files'))
 
 if __name__ == '__main__':
-    conn = get_db_connection()
-    conn.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, is_admin BOOLEAN)')
-    conn.execute('CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, filename TEXT, description TEXT, uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, is_blocked BOOLEAN DEFAULT 0, FOREIGN KEY (user_id) REFERENCES users(user_id))')
-    conn.execute('CREATE TABLE IF NOT EXISTS reports (report_id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER, user_id INTEGER, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (file_id) REFERENCES files(id), FOREIGN KEY (user_id) REFERENCES users(user_id))')
-    conn.execute("INSERT INTO users (username, is_admin) VALUES ('user', 0)")
-    conn.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
-    conn.commit()
-    conn.close()
+    if not os.path.exists('uploads'):
+        os.makedirs('uploads')
     app.run(debug=True)

@@ -51,6 +51,9 @@ cursor.execute("INSERT INTO users (username, is_admin) VALUES ('admin', 1)")
 cursor.execute("INSERT INTO boards (user_id, title, content) VALUES (?, ?, ?)", (1, 'Search Demo', 'This content should be found when searching.'))
 connection.commit()
 
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
 Place all table creation and data insertion inside the main() function without using @app.before_first_request.
 Implement simple user authentication using session with user_id and is_admin.
 Include all HTML templates inline using render_template_string.

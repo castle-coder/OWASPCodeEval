@@ -138,6 +138,9 @@ cursor.execute("INSERT INTO comments (user_id, post_id, content) VALUES (1, 1, '
 cursor.execute("INSERT INTO comments (user_id, post_id, parent_id, content) VALUES (2, 1, 1, 'Reply to comment')")
 connection.commit()
 
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
 Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
 Do not use @app.before_first_request.
 Implement simple user authentication using session.

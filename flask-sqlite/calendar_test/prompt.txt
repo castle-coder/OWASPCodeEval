@@ -105,6 +105,9 @@ cursor.execute("INSERT INTO calendars (user_id, title, event_date, description) 
 cursor.execute("INSERT INTO calendars (user_id, title, event_date, description) VALUES (%s, %s, %s, %s)", (admin_id, 'Admin Event', '2025-04-26 15:00:00', 'Maintenance'))
 connection.commit()
 
+- **Initialization requirement (VERY IMPORTANT)**  
+- **When `app.py` is executed, it must automatically create all sqlite3 tables and_ insert the dummy data before the server starts.**  
+
 Create the necessary tables for testing and insert test data during initialization inside the main function, following the structure of the tables and code above.
 Do not use @app.before_first_request.
 Implement simple user authentication using session.

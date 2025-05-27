@@ -1,64 +1,88 @@
+# Flask Board API – OWASP-oriented Test Scenarios
+base_url: http://127.0.0.1:5000
+database: mock_db.sqlite3
+
 tests:
-  - id: A1_BrokenAccess_Edit
-    description: 일반 사용자가 다른 사용자의 게시글 수정 시도
-    login_user: 1
-    endpoint: /board/edit/2
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID(login/999) 로그인
+    method: GET
+    path: /login/999
+    expected_status: 404-404
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 999" }
+
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_BoardCreate_NoLogin
+    name: 로그인 없이 게시글 생성 POST
+    method: POST
+    path: /board/create
+    data: { title: "unauth", content: "fail" }
+    expected_status: 302-302               # redirect to /login/user
+
+  - id: A1_AdminPosts_NoPriv
+    name: 일반 사용자 /admin/posts 접근
+    method: GET
+    login_as: user
+    path: /admin/posts
+    expected_status: 403-403
+
+  - id: A1_AdminPosts_WithPriv
+    name: 관리자(admin) /admin/posts 접근 성공
+    method: GET
+    login_as: admin
+    path: /admin/posts
+    expected_status: 200-299
+
+  - id: A1_Delete_OtherUser
+    name: 타인 게시글 삭제 시도
+    method: POST
+    login_as: user
+    path: /board/delete/1                  # post_id 1 은 admin 소유
+    expected_status: 404-404
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Title
+    name: 게시글 제목 SQL 인젝션 시도
+    method: POST
+    login_as: user
+    path: /board/create
     data:
-      title: Hacked Title
-      content: Hacked Content
-    expected_status: 403
-    expect_db_unchanged: true
+      title: "abc'); DROP TABLE users;--"
+      content: "sqli"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
 
-  - id: A1_BrokenAccess_Delete
-    description: 일반 사용자가 다른 사용자의 게시글 삭제 시도
-    login_user: 1
-    endpoint: /board/delete/2
-    data: {}
-    expected_status: 403
-    expect_db_unchanged: true
+  - id: A3_SQLi_LoginPath
+    name: /login 경로 SQL 인젝션
+    method: GET
+    path: /login/1%20OR%201=1
+    expected_status: 400-499
 
-  - id: A1_BrokenAccess_Block
-    description: 일반 사용자가 게시글 차단 시도
-    login_user: 1
-    endpoint: /admin/block/1
-    data: {}
-    expected_status: 403
-    expect_db_unchanged: true
-
-  - id: A1_SQLi
-    description: SQL Injection 테스트
-    login_user: 1
-    endpoint: /board
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Title
+    name: 게시글 제목 XSS 저장
+    method: POST
+    login_as: user
+    path: /board/create
     data:
-      title: "Test'; DROP TABLE boards; --"
-      content: "SQL Injection Test"
-    expected_status: 302
-    check_db_title: "Test'; DROP TABLE boards; --"
+      title: "<script>alert('x')</script>"
+      content: "xss"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT post_id FROM boards WHERE title LIKE '%<script%'"
 
-  - id: A3_XSS
-    description: XSS 테스트
-    login_user: 1
-    endpoint: /board
-    data:
-      title: "<script>alert(1)</script>"
-      content: "XSS attack"
-    expected_status: 302
-    check_db_title: "<script>alert(1)</script>"
+  # ────────── A5 • Security Misconfiguration (헤더) ──────────
+  - id: A5_Header_CSP_Missing
+    name: /board 페이지 CSP 헤더 부재
+    method: GET
+    login_as: user
+    path: /board
+    expected_status: 200-299
 
-  - id: A7_MissingAuth
-    description: 로그인하지 않고 일정 작성 시도
-    login_user: null
-    endpoint: /board
-    data:
-      title: "Unauthorized Post"
-      content: "Should not succeed"
-    expected_status: 401
-
-  - id: A9_InsufficientLogging
-    description: 신고 기능 악성 입력
-    login_user: 1
-    endpoint: /board/report/2
-    data:
-      reason: "<script>alert('xss')</script>"
-    expected_status: 302
-    check_report_reason: "<script>alert('xss')</script>"
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405
