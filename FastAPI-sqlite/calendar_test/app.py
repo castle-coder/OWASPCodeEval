@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse
 from jinja2 import Template
 import sqlite3
 import uvicorn

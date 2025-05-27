@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse
 from jinja2 import Template
 import sqlite3
 import uvicorn
@@ -62,18 +62,17 @@ async def startup_event():
 async def login(request: Request, member_id: str):
     request.session["member_id"] = member_id
     request.session["is_admin"] = member_id == "admin"
-    return render_template_string('<html><body><h1>Logged in as {{ member_id }}</h1></body></html>', member_id=member_id)
+    return render_template_string('<html><body>Logged in as {{ member_id }}</body></html>', member_id=member_id)
 
 @app.get("/comments/create")
 async def create_comment_form(request: Request):
     if "member_id" not in request.session:
-        return render_template_string('<html><body><h1>Please log in to create a comment.</h1></body></html>')
+        return render_template_string('<html><body>Please log in to create a comment.</body></html>')
     return render_template_string('''
         <html>
         <body>
-            <h1>Create Comment</h1>
             <form method="post" action="/comments/create">
-                <textarea name="content" required></textarea><br>
+                <textarea name="content"></textarea>
                 <button type="submit">Submit</button>
             </form>
         </body>
@@ -83,7 +82,7 @@ async def create_comment_form(request: Request):
 @app.post("/comments/create")
 async def create_comment(request: Request, content: str = Form(...)):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+        raise HTTPException(status_code=403, detail="Not logged in")
     conn = get_db()
     conn.execute('''
         INSERT INTO comments (author_id, content, is_deleted)
@@ -91,12 +90,12 @@ async def create_comment(request: Request, content: str = Form(...)):
     ''', (request.session["member_id"], content))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body><h1>Comment created successfully.</h1></body></html>')
+    return render_template_string('<html><body>Comment created.</body></html>')
 
 @app.get("/comments")
 async def list_my_comments(request: Request):
     if "member_id" not in request.session:
-        return render_template_string('<html><body><h1>Please log in to view your comments.</h1></body></html>')
+        return render_template_string('<html><body>Please log in to view your comments.</body></html>')
     conn = get_db()
     comments = conn.execute('''
         SELECT * FROM comments WHERE author_id = ? AND is_deleted = 0 ORDER BY created_at DESC
@@ -105,10 +104,9 @@ async def list_my_comments(request: Request):
     return render_template_string('''
         <html>
         <body>
-            <h1>My Comments</h1>
             <ul>
                 {% for comment in comments %}
-                <li>{{ comment.content }} - {{ comment.created_at }}</li>
+                <li>{{ comment.content }}</li>
                 {% endfor %}
             </ul>
         </body>
@@ -118,20 +116,19 @@ async def list_my_comments(request: Request):
 @app.get("/comments/edit/{comment_id}")
 async def edit_comment_form(request: Request, comment_id: int):
     if "member_id" not in request.session:
-        return render_template_string('<html><body><h1>Please log in to edit a comment.</h1></body></html>')
+        return render_template_string('<html><body>Please log in to edit a comment.</body></html>')
     conn = get_db()
     comment = conn.execute('''
-        SELECT * FROM comments WHERE comment_id = ? AND author_id = ? AND is_deleted = 0
+        SELECT * FROM comments WHERE comment_id = ? AND author_id = ?
     ''', (comment_id, request.session["member_id"])).fetchone()
     conn.close()
     if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found or not yours")
+        raise HTTPException(status_code=404, detail="Comment not found")
     return render_template_string('''
         <html>
         <body>
-            <h1>Edit Comment</h1>
             <form method="post" action="/comments/edit/{{ comment_id }}">
-                <textarea name="content" required>{{ comment.content }}</textarea><br>
+                <textarea name="content">{{ comment.content }}</textarea>
                 <button type="submit">Submit</button>
             </form>
         </body>
@@ -141,58 +138,43 @@ async def edit_comment_form(request: Request, comment_id: int):
 @app.post("/comments/edit/{comment_id}")
 async def edit_comment(request: Request, comment_id: int, content: str = Form(...)):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+        raise HTTPException(status_code=403, detail="Not logged in")
     conn = get_db()
-    comment = conn.execute('''
-        SELECT * FROM comments WHERE comment_id = ? AND author_id = ? AND is_deleted = 0
-    ''', (comment_id, request.session["member_id"])).fetchone()
-    if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found or not yours")
     conn.execute('''
-        UPDATE comments SET content = ? WHERE comment_id = ?
-    ''', (content, comment_id))
+        UPDATE comments SET content = ? WHERE comment_id = ? AND author_id = ?
+    ''', (content, comment_id, request.session["member_id"]))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body><h1>Comment edited successfully.</h1></body></html>')
+    return render_template_string('<html><body>Comment edited.</body></html>')
 
 @app.post("/comments/delete/{comment_id}")
 async def delete_comment(request: Request, comment_id: int):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+        raise HTTPException(status_code=403, detail="Not logged in")
     conn = get_db()
-    comment = conn.execute('''
-        SELECT * FROM comments WHERE comment_id = ? AND author_id = ? AND is_deleted = 0
-    ''', (comment_id, request.session["member_id"])).fetchone()
-    if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found or not yours")
     conn.execute('''
-        UPDATE comments SET is_deleted = 1 WHERE comment_id = ?
-    ''', (comment_id,))
+        UPDATE comments SET is_deleted = 1 WHERE comment_id = ? AND author_id = ?
+    ''', (comment_id, request.session["member_id"]))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body><h1>Comment deleted successfully.</h1></body></html>')
+    return render_template_string('<html><body>Comment deleted.</body></html>')
 
 @app.post("/admin/delete_comment/{comment_id}")
 async def admin_delete_comment(request: Request, comment_id: int):
     if "member_id" not in request.session or not request.session["is_admin"]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not an admin")
+        raise HTTPException(status_code=403, detail="Not an admin")
     conn = get_db()
-    comment = conn.execute('''
-        SELECT * FROM comments WHERE comment_id = ? AND is_deleted = 0
-    ''', (comment_id,)).fetchone()
-    if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
     conn.execute('''
         UPDATE comments SET is_deleted = 1 WHERE comment_id = ?
     ''', (comment_id,))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body><h1>Comment deleted successfully.</h1></body></html>')
+    return render_template_string('<html><body>Comment deleted.</body></html>')
 
 @app.get("/admin/comments")
 async def list_all_comments(request: Request):
     if "member_id" not in request.session or not request.session["is_admin"]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not an admin")
+        raise HTTPException(status_code=403, detail="Not an admin")
     conn = get_db()
     comments = conn.execute('''
         SELECT * FROM comments WHERE is_deleted = 0 ORDER BY created_at DESC
@@ -201,10 +183,9 @@ async def list_all_comments(request: Request):
     return render_template_string('''
         <html>
         <body>
-            <h1>All Comments</h1>
             <ul>
                 {% for comment in comments %}
-                <li>{{ comment.content }} - {{ comment.created_at }} - {{ comment.author_id }}</li>
+                <li>{{ comment.content }}</li>
                 {% endfor %}
             </ul>
         </body>

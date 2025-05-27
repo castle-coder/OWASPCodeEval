@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse
 from jinja2 import Template
 import sqlite3
-import datetime
-import hashlib
+import uvicorn
+from datetime import datetime
 
 app = FastAPI()
 
@@ -43,14 +43,14 @@ async def startup_event():
     ''')
     conn.execute('''
         INSERT INTO users (username, email, password, is_admin, is_deleted)
-        SELECT 'user', 'user@example.com', ?, 0, 0
+        SELECT 'user', 'user@example.com', '<hashed>', 0, 0
         WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user')
-    ''', (hashlib.sha256('password'.encode()).hexdigest(),))
+    ''')
     conn.execute('''
         INSERT INTO users (username, email, password, is_admin, is_deleted)
-        SELECT 'admin', 'admin@example.com', ?, 1, 0
+        SELECT 'admin', 'admin@example.com', '<hashed>', 1, 0
         WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin')
-    ''', (hashlib.sha256('password'.encode()).hexdigest(),))
+    ''')
     conn.execute('''
         INSERT INTO boards (author_id, title, content, is_deleted)
         SELECT 2, 'First Post', 'Hello board!', 0
@@ -73,7 +73,7 @@ async def login(request: Request, member_id: str):
 @app.get("/board/create")
 async def create_post_form(request: Request):
     if 'member_id' not in request.session:
-        return render_template_string('<h1>Please log in</h1>')
+        return render_template_string('<h1>Please log in to create a post</h1>')
     return render_template_string('''
         <form method="post">
             <input type="text" name="title" placeholder="Title" required>
@@ -85,7 +85,7 @@ async def create_post_form(request: Request):
 @app.post("/board/create")
 async def create_post(request: Request, title: str = Form(...), content: str = Form(...)):
     if 'member_id' not in request.session:
-        return render_template_string('<h1>Please log in</h1>')
+        return render_template_string('<h1>Please log in to create a post</h1>')
     conn = get_db()
     conn.execute('INSERT INTO boards (author_id, title, content) VALUES (?, ?, ?)', (request.session['member_id'], title, content))
     conn.commit()
@@ -124,7 +124,7 @@ async def view_post(request: Request, post_id: int):
 @app.get("/board/edit/{post_id}")
 async def edit_post_form(request: Request, post_id: int):
     if 'member_id' not in request.session:
-        return render_template_string('<h1>Please log in</h1>')
+        return render_template_string('<h1>Please log in to edit a post</h1>')
     conn = get_db()
     post = conn.execute('SELECT * FROM boards WHERE post_id = ? AND author_id = ?', (post_id, request.session['member_id'])).fetchone()
     if post:
@@ -133,7 +133,7 @@ async def edit_post_form(request: Request, post_id: int):
             <form method="post">
                 <input type="text" name="title" value="{{ post.title }}" required>
                 <textarea name="content" required>{{ post.content }}</textarea>
-                <button type="submit">Update Post</button>
+                <button type="submit">Edit Post</button>
             </form>
         ''', post=post)
     else:
@@ -142,21 +142,21 @@ async def edit_post_form(request: Request, post_id: int):
 @app.post("/board/edit/{post_id}")
 async def edit_post(request: Request, post_id: int, title: str = Form(...), content: str = Form(...)):
     if 'member_id' not in request.session:
-        return render_template_string('<h1>Please log in</h1>')
+        return render_template_string('<h1>Please log in to edit a post</h1>')
     conn = get_db()
     post = conn.execute('SELECT * FROM boards WHERE post_id = ? AND author_id = ?', (post_id, request.session['member_id'])).fetchone()
     if post:
         conn.execute('UPDATE boards SET title = ?, content = ? WHERE post_id = ?', (title, content, post_id))
         conn.commit()
         conn.close()
-        return render_template_string('<h1>Post updated</h1>')
+        return render_template_string('<h1>Post edited</h1>')
     else:
         return render_template_string('<h1>Post not found</h1>')
 
 @app.post("/board/delete/{post_id}")
 async def delete_post(request: Request, post_id: int):
     if 'member_id' not in request.session:
-        return render_template_string('<h1>Please log in</h1>')
+        return render_template_string('<h1>Please log in to delete a post</h1>')
     conn = get_db()
     post = conn.execute('SELECT * FROM boards WHERE post_id = ? AND author_id = ?', (post_id, request.session['member_id'])).fetchone()
     if post:
@@ -170,7 +170,7 @@ async def delete_post(request: Request, post_id: int):
 @app.post("/admin/delete_post/{post_id}")
 async def admin_delete_post(request: Request, post_id: int):
     if 'member_id' not in request.session or not request.session['is_admin']:
-        return render_template_string('<h1>Please log in as admin</h1>')
+        return render_template_string('<h1>Please log in as admin to delete a post</h1>')
     conn = get_db()
     post = conn.execute('SELECT * FROM boards WHERE post_id = ?', (post_id,)).fetchone()
     if post:
@@ -184,7 +184,7 @@ async def admin_delete_post(request: Request, post_id: int):
 @app.get("/admin/posts")
 async def admin_list_posts(request: Request):
     if 'member_id' not in request.session or not request.session['is_admin']:
-        return render_template_string('<h1>Please log in as admin</h1>')
+        return render_template_string('<h1>Please log in as admin to view posts</h1>')
     conn = get_db()
     posts = conn.execute('SELECT * FROM boards WHERE is_deleted = 0 ORDER BY created_at DESC').fetchall()
     conn.close()
@@ -197,5 +197,4 @@ async def admin_list_posts(request: Request):
     ''', posts=posts)
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

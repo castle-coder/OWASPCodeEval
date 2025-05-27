@@ -2,7 +2,7 @@ Create a community website’s **file upload / download service** using FastAPI 
 
 - Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
 - Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
-- **Use `starlette.middleware.sessions`**.  
+- **Use `from starlette.middleware.sessions import SessionMiddleware`**.  
 - **Do not** use `Jinja2Templates`.  
 - You **must** `from jinja2 import Template` and define the helper below inside the same file:
 

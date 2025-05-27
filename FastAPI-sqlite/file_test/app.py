@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, File, UploadFile, status
 from fastapi.responses import HTMLResponse, StreamingResponse
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import FileResponse
+from starlette.responses import Response
+from starlette.status import HTTP_403_FORBIDDEN
 from jinja2 import Template
 import sqlite3
 import uvicorn
@@ -71,11 +72,10 @@ async def login(request: Request, member_id: str):
 @app.get("/files/upload")
 async def upload_form(request: Request):
     if "member_id" not in request.session:
-        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to upload files.</body></html>')
+        return render_template_string('<html><body><a href="/login/user">Login</a></body></html>')
     return render_template_string('''
         <html>
         <body>
-            <h1>Upload File</h1>
             <form action="/files/upload" method="post" enctype="multipart/form-data">
                 <input type="file" name="file">
                 <input type="submit" value="Upload">
@@ -87,7 +87,7 @@ async def upload_form(request: Request):
 @app.post("/files/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
     if "member_id" not in request.session:
-        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to upload files.</body></html>')
+        return render_template_string('<html><body><a href="/login/user">Login</a></body></html>')
     file_data = await file.read()
     conn = get_db()
     conn.execute('''
@@ -96,12 +96,12 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     ''', (request.session["member_id"], file.filename, len(file_data), file.content_type, file_data))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body>File uploaded successfully.</body></html>')
+    return render_template_string('<html><body>File uploaded successfully</body></html>')
 
 @app.get("/files")
 async def list_files(request: Request):
     if "member_id" not in request.session:
-        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to view your files.</body></html>')
+        return render_template_string('<html><body><a href="/login/user">Login</a></body></html>')
     conn = get_db()
     files = conn.execute('''
         SELECT file_id, original_name, size, created_at
@@ -113,7 +113,6 @@ async def list_files(request: Request):
     return render_template_string('''
         <html>
         <body>
-            <h1>My Files</h1>
             <ul>
                 {% for file in files %}
                 <li><a href="/files/{{ file.file_id }}/download">{{ file.original_name }} ({{ file.size }} bytes, {{ file.created_at }})</a></li>
@@ -136,12 +135,12 @@ async def download_file(request: Request, file_id: int):
         raise HTTPException(status_code=404, detail="File not found")
     if request.session["member_id"] != str(file["owner_id"]) and not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
-    return StreamingResponse(file["data"], media_type=file["mime_type"], headers={"Content-Disposition": f"attachment; filename={file['original_name']}"})
+    return StreamingResponse(io.BytesIO(file["data"]), media_type=file["mime_type"], headers={"Content-Disposition": f"attachment; filename={file['original_name']}"})
 
 @app.post("/files/delete/{file_id}")
 async def delete_file(request: Request, file_id: int):
     if "member_id" not in request.session:
-        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to delete files.</body></html>')
+        return render_template_string('<html><body><a href="/login/user">Login</a></body></html>')
     conn = get_db()
     file = conn.execute('''
         SELECT file_id, owner_id
@@ -153,22 +152,6 @@ async def delete_file(request: Request, file_id: int):
         raise HTTPException(status_code=404, detail="File not found")
     if request.session["member_id"] != str(file["owner_id"]) and not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
-    return render_template_string('''
-        <html>
-        <body>
-            <h1>Delete File</h1>
-            <p>Are you sure you want to delete this file?</p>
-            <form action="/files/delete/{{ file_id }}" method="post">
-                <input type="submit" value="Delete">
-            </form>
-        </body>
-        </html>
-    ''', file_id=file_id)
-
-@app.post("/files/delete/{file_id}", response_class=HTMLResponse)
-async def delete_file_confirm(request: Request, file_id: int):
-    if "member_id" not in request.session:
-        return render_template_string('<html><body>Please <a href="/login/user">log in</a> to delete files.</body></html>')
     conn = get_db()
     conn.execute('''
         UPDATE files
@@ -177,12 +160,12 @@ async def delete_file_confirm(request: Request, file_id: int):
     ''', (file_id,))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body>File deleted successfully.</body></html>')
+    return render_template_string('<html><body>File deleted successfully</body></html>')
 
 @app.get("/admin/files")
 async def admin_list_files(request: Request):
     if "member_id" not in request.session or not request.session.get("is_admin"):
-        return render_template_string('<html><body>Please <a href="/login/admin">log in as admin</a> to view all files.</body></html>')
+        return render_template_string('<html><body><a href="/login/admin">Login as admin</a></body></html>')
     conn = get_db()
     files = conn.execute('''
         SELECT file_id, owner_id, original_name, size, created_at
@@ -193,7 +176,6 @@ async def admin_list_files(request: Request):
     return render_template_string('''
         <html>
         <body>
-            <h1>Admin Files</h1>
             <ul>
                 {% for file in files %}
                 <li><a href="/files/{{ file.file_id }}/download">{{ file.original_name }} ({{ file.size }} bytes, {{ file.created_at }})</a></li>
@@ -206,7 +188,7 @@ async def admin_list_files(request: Request):
 @app.post("/admin/delete_file/{file_id}")
 async def admin_delete_file(request: Request, file_id: int):
     if "member_id" not in request.session or not request.session.get("is_admin"):
-        return render_template_string('<html><body>Please <a href="/login/admin">log in as admin</a> to delete files.</body></html>')
+        return render_template_string('<html><body><a href="/login/admin">Login as admin</a></body></html>')
     conn = get_db()
     file = conn.execute('''
         SELECT file_id
@@ -216,22 +198,6 @@ async def admin_delete_file(request: Request, file_id: int):
     conn.close()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
-    return render_template_string('''
-        <html>
-        <body>
-            <h1>Delete File</h1>
-            <p>Are you sure you want to delete this file?</p>
-            <form action="/admin/delete_file/{{ file_id }}" method="post">
-                <input type="submit" value="Delete">
-            </form>
-        </body>
-        </html>
-    ''', file_id=file_id)
-
-@app.post("/admin/delete_file/{file_id}", response_class=HTMLResponse)
-async def admin_delete_file_confirm(request: Request, file_id: int):
-    if "member_id" not in request.session or not request.session.get("is_admin"):
-        return render_template_string('<html><body>Please <a href="/login/admin">log in as admin</a> to delete files.</body></html>')
     conn = get_db()
     conn.execute('''
         UPDATE files
@@ -240,7 +206,7 @@ async def admin_delete_file_confirm(request: Request, file_id: int):
     ''', (file_id,))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body>File deleted successfully.</body></html>')
+    return render_template_string('<html><body>File deleted successfully</body></html>')
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
