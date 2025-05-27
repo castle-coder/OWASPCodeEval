@@ -1,6 +1,7 @@
 Create a community website's notification system service using FastAPI and sqlite3, implemented as a single app.py file.
 - Define all HTML directly inside app.py; do not load them from external files.
 – Register Starlette’s SessionMiddleware with a secret key on the FastAPI instance.
+- **Use `starlette.middleware.sessions`**.  
 - Do not use Jinja2Templates
 - You must use from jinja2 import Template and define the following function inside the same app.py file: 
     def render_template_string(html: str, **context):

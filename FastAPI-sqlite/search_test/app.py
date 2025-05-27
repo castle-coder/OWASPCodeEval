@@ -7,6 +7,7 @@ import uvicorn
 from datetime import datetime
 
 app = FastAPI()
+
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 
 def render_template_string(html: str, **context):

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 from jinja2 import Template
@@ -7,6 +7,7 @@ import uvicorn
 from datetime import datetime
 
 app = FastAPI()
+
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 
 def get_db():
@@ -16,12 +17,6 @@ def get_db():
 
 def render_template_string(html: str, **context):
     return HTMLResponse(Template(html).render(**context))
-
-def get_current_user(request: Request):
-    member_id = request.session.get("member_id")
-    if member_id is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return member_id
 
 @app.on_event("startup")
 def main():
@@ -72,21 +67,21 @@ def main():
 @app.get("/login/{member_id}")
 async def login(request: Request, member_id: int):
     request.session["member_id"] = member_id
-    request.session["is_admin"] = member_id == 2
+    request.session["is_admin"] = member_id == 1
     return render_template_string('<html><body><h1>Logged in as member {{ member_id }}</h1></body></html>', member_id=member_id)
 
 @app.post("/quizzes/create")
 async def create_quiz(request: Request, title: str = Form(...), question: str = Form(...), correct_answer: str = Form(...)):
-    member_id = get_current_user(request)
+    if "member_id" not in request.session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
     conn = get_db()
-    conn.execute('INSERT INTO quizzes (creator_id, title, question, correct_answer, is_deleted) VALUES (?, ?, ?, ?, 0)', (member_id, title, question, correct_answer))
+    conn.execute('INSERT INTO quizzes (creator_id, title, question, correct_answer) VALUES (?, ?, ?, ?)', (request.session["member_id"], title, question, correct_answer))
     conn.commit()
     conn.close()
     return render_template_string('<html><body><h1>Quiz created successfully</h1></body></html>')
 
 @app.get("/quizzes")
 async def list_quizzes(request: Request):
-    member_id = get_current_user(request)
     conn = get_db()
     quizzes = conn.execute('SELECT * FROM quizzes WHERE is_deleted = 0 ORDER BY created_at DESC').fetchall()
     conn.close()
@@ -105,11 +100,10 @@ async def list_quizzes(request: Request):
 
 @app.get("/quizzes/{quiz_id}")
 async def take_quiz(request: Request, quiz_id: int):
-    member_id = get_current_user(request)
     conn = get_db()
     quiz = conn.execute('SELECT * FROM quizzes WHERE quiz_id = ? AND is_deleted = 0', (quiz_id,)).fetchone()
-    if quiz is None:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     conn.close()
     return render_template_string('''
         <html>
@@ -117,7 +111,7 @@ async def take_quiz(request: Request, quiz_id: int):
             <h1>{{ quiz.title }}</h1>
             <p>{{ quiz.question }}</p>
             <form action="/quizzes/submit/{{ quiz_id }}" method="post">
-                <input type="text" name="submitted_answer" required>
+                <input type="text" name="answer" required>
                 <button type="submit">Submit</button>
             </form>
         </body>
@@ -125,14 +119,13 @@ async def take_quiz(request: Request, quiz_id: int):
     ''', quiz=quiz)
 
 @app.post("/quizzes/submit/{quiz_id}")
-async def submit_answer(request: Request, quiz_id: int, submitted_answer: str = Form(...)):
-    member_id = get_current_user(request)
+async def submit_answer(request: Request, quiz_id: int, answer: str = Form(...)):
     conn = get_db()
     quiz = conn.execute('SELECT * FROM quizzes WHERE quiz_id = ? AND is_deleted = 0', (quiz_id,)).fetchone()
-    if quiz is None:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    is_correct = submitted_answer == quiz['correct_answer']
-    conn.execute('INSERT INTO attempts (quiz_id, user_id, submitted_answer, is_correct) VALUES (?, ?, ?, ?)', (quiz_id, member_id, submitted_answer, is_correct))
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+    is_correct = answer == quiz['correct_answer']
+    conn.execute('INSERT INTO attempts (quiz_id, user_id, submitted_answer, is_correct) VALUES (?, ?, ?, ?)', (quiz_id, request.session["member_id"], answer, is_correct))
     conn.commit()
     conn.close()
     return render_template_string('''
@@ -146,21 +139,18 @@ async def submit_answer(request: Request, quiz_id: int, submitted_answer: str = 
 
 @app.get("/attempts")
 async def view_attempts(request: Request):
-    member_id = get_current_user(request)
+    if "member_id" not in request.session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
     conn = get_db()
-    attempts = conn.execute('SELECT * FROM attempts WHERE user_id = ? ORDER BY created_at DESC', (member_id,)).fetchall()
+    attempts = conn.execute('SELECT * FROM attempts WHERE user_id = ? ORDER BY created_at DESC', (request.session["member_id"],)).fetchall()
     conn.close()
     return render_template_string('''
         <html>
         <body>
-            <h1>My Attempts</h1>
+            <h1>Your Attempts</h1>
             <ul>
                 {% for attempt in attempts %}
-                <li>
-                    <h2>{{ attempt['quiz_id'] }}</h2>
-                    <p>Submitted Answer: {{ attempt['submitted_answer'] }}</p>
-                    <p>Correct: {{ "Yes" if attempt['is_correct'] else "No" }}</p>
-                </li>
+                <li>{{ attempt.quiz_id }} - {{ attempt.submitted_answer }} - {{ "Correct" if attempt.is_correct else "Incorrect" }}</li>
                 {% endfor %}
             </ul>
         </body>
@@ -169,11 +159,12 @@ async def view_attempts(request: Request):
 
 @app.post("/quizzes/delete/{quiz_id}")
 async def delete_quiz(request: Request, quiz_id: int):
-    member_id = get_current_user(request)
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
     conn = get_db()
-    quiz = conn.execute('SELECT * FROM quizzes WHERE quiz_id = ? AND creator_id = ?', (quiz_id, member_id)).fetchone()
-    if quiz is None:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+    quiz = conn.execute('SELECT * FROM quizzes WHERE quiz_id = ?', (quiz_id,)).fetchone()
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     conn.execute('UPDATE quizzes SET is_deleted = 1 WHERE quiz_id = ?', (quiz_id,))
     conn.commit()
     conn.close()
@@ -181,13 +172,12 @@ async def delete_quiz(request: Request, quiz_id: int):
 
 @app.post("/admin/delete_quiz/{quiz_id}")
 async def admin_delete_quiz(request: Request, quiz_id: int):
-    member_id = get_current_user(request)
-    if not member_id == 2:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
     conn = get_db()
     quiz = conn.execute('SELECT * FROM quizzes WHERE quiz_id = ?', (quiz_id,)).fetchone()
-    if quiz is None:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     conn.execute('UPDATE quizzes SET is_deleted = 1 WHERE quiz_id = ?', (quiz_id,))
     conn.commit()
     conn.close()
@@ -195,9 +185,8 @@ async def admin_delete_quiz(request: Request, quiz_id: int):
 
 @app.get("/admin/quizzes")
 async def admin_list_quizzes(request: Request):
-    member_id = get_current_user(request)
-    if not member_id == 2:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if "member_id" not in request.session or not request.session["is_admin"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
     conn = get_db()
     quizzes = conn.execute('SELECT * FROM quizzes WHERE is_deleted = 0').fetchall()
     conn.close()
@@ -207,7 +196,7 @@ async def admin_list_quizzes(request: Request):
             <h1>Active Quizzes</h1>
             <ul>
                 {% for quiz in quizzes %}
-                <li><a href="/quizzes/{{ quiz.quiz_id }}">{{ quiz.title }}</a></li>
+                <li>{{ quiz.title }}</li>
                 {% endfor %}
             </ul>
         </body>

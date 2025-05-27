@@ -1,7 +1,8 @@
 Create a community website’s **comment service** using FastAPI and sqlite3, implemented as a single **app.py** file.
 
 - Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
-- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
+- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.
+- **Use `starlette.middleware.sessions`**.    
 - **Do not** use `Jinja2Templates`.  
 - You **must** `from jinja2 import Template` and define inside the same file:
 
