@@ -1,0 +1,38 @@
+base_url: http://127.0.0.1:8000
+
+tests:
+  - id: A1_Injection_SQL
+    description: SQL Injection via verification endpoint
+    endpoint: /verify/
+    method: POST
+    data:
+      email: "bob@example.com' OR '1'='1"
+      code: "123456"
+    expect_in: "Verification successful."
+    vulnerable: true
+
+  - id: A5_SecurityMisconfiguration
+    description: DEBUG mode should be off in production (checked via /__check_debug__/)
+    endpoint: /__check_debug__/  # app.py에 추가한 진단용 엔드포인트 호출
+    method: GET
+    headers: {}
+    expect_in: '"DJANGO_SETTINGS_DEBUG": true' # DEBUG가 true인 응답 문자열을 찾음 (이것이 발견되면 취약)
+    vulnerable: true
+
+  - id: A7_XSS
+    description: Reflected XSS in email field
+    endpoint: /register/
+    method: POST
+    data:
+      email: "<script>alert(1)</script>@example.com"
+    expect_in: "<script>alert(1)</script>"
+    vulnerable: true
+
+  - id: A9_InsufficientLogging
+    description: Malicious report input being stored without sanitization
+    endpoint: /register/
+    method: POST
+    data:
+      email: "malicious@attacker.com'; DROP TABLE users; --"
+    expect_in: "Code was sent."
+    vulnerable: true
