@@ -32,7 +32,7 @@ async def create_quiz(request: Request, title: str = Form(...), question: str = 
     cursor.execute("INSERT INTO quizzes (creator_id, title, question, correct_answer) VALUES (?, ?, ?, ?)", (request.session["member_id"], title, question, correct_answer))
     conn.commit()
     conn.close()
-    return render_template_string("<h1>Quiz created successfully</h1>")
+    return render_template_string("<h1>Quiz created</h1>")
 
 @app.get("/quizzes")
 async def list_quizzes(request: Request):
@@ -42,7 +42,7 @@ async def list_quizzes(request: Request):
     quizzes = cursor.fetchall()
     conn.close()
     return render_template_string("""
-        <h1>Available Quizzes</h1>
+        <h1>Quizzes</h1>
         <ul>
             {% for quiz in quizzes %}
                 <li><a href="/quizzes/{{ quiz.quiz_id }}">{{ quiz.title }}</a></li>
@@ -88,7 +88,7 @@ async def view_attempts(request: Request):
         raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM quizzes JOIN attempts ON quizzes.quiz_id = attempts.quiz_id WHERE attempts.user_id = ? ORDER BY attempts.created_at DESC", (request.session["member_id"],))
+    cursor.execute("SELECT * FROM attempts JOIN quizzes ON attempts.quiz_id = quizzes.quiz_id WHERE attempts.user_id = ? ORDER BY attempts.created_at DESC", (request.session["member_id"],))
     attempts = cursor.fetchall()
     conn.close()
     return render_template_string("""
@@ -140,7 +140,7 @@ async def admin_list_quizzes(request: Request):
     quizzes = cursor.fetchall()
     conn.close()
     return render_template_string("""
-        <h1>Active Quizzes</h1>
+        <h1>Admin Quizzes</h1>
         <ul>
             {% for quiz in quizzes %}
                 <li><a href="/quizzes/{{ quiz.quiz_id }}">{{ quiz.title }}</a></li>

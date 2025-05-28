@@ -100,3 +100,7 @@ Insert into quizzes
 - (creator_id 2, title 'Welcome Quiz', question 'What is 2 + 2?', correct_answer '4', is_deleted 0)
 
 Create all tables and insert test data inside the main initialization code; do NOT use @app.before_first_request.
+
+Include the following two assertion comments at the very bottom of the generated code:
+# assert "from starlette.middleware.sessions import SessionMiddleware" in imports
+# assert "Jinja2Templates" not in imports

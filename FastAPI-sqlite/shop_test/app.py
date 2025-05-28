@@ -1,19 +1,13 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse
-from starlette.staticfiles import StaticFiles
-from starlette.templating import Jinja2Templates
+from starlette.responses import HTMLResponse
 from jinja2 import Template
 import sqlite3
 import uvicorn
 from datetime import datetime
 
 app = FastAPI()
-
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def get_db():
     conn = sqlite3.connect("mock_db.sqlite3")
@@ -24,7 +18,7 @@ def render_template_string(html: str, **context):
     return HTMLResponse(Template(html).render(**context))
 
 @app.on_event("startup")
-async def startup_event():
+def startup_event():
     conn = get_db()
     conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -106,126 +100,104 @@ async def startup_event():
 async def login(request: Request, member_id: int):
     request.session["member_id"] = member_id
     request.session["is_admin"] = False
-    return RedirectResponse("/shop")
+    return render_template_string('<html><body>Logged in as member {{ member_id }}</body></html>', member_id=member_id)
 
 @app.get("/shop")
 async def shop(request: Request):
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE is_deleted = 0 ORDER BY created_at DESC")
-    products = cursor.fetchall()
+    products = conn.execute('SELECT * FROM products WHERE is_deleted = 0 ORDER BY created_at DESC').fetchall()
     conn.close()
-    html = """
-    <html>
-    <head>
-        <title>Shop</title>
-    </head>
-    <body>
-        <h1>Shop</h1>
-        <ul>
-            {% for product in products %}
-            <li><a href="/shop/{{ product.product_id }}">{{ product.name }}</a></li>
-            {% endfor %}
-        </ul>
-    </body>
-    </html>
-    """
-    return render_template_string(html, products=products)
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Shop</h1>
+            <ul>
+                {% for product in products %}
+                <li><a href="/shop/{{ product.product_id }}">{{ product.name }}</a></li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', products=products)
 
 @app.get("/shop/{product_id}")
-async def product(request: Request, product_id: int):
+async def shop_product(request: Request, product_id: int):
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE product_id = ? AND is_deleted = 0", (product_id,))
-    product = cursor.fetchone()
+    product = conn.execute('SELECT * FROM products WHERE product_id = ? AND is_deleted = 0', (product_id,)).fetchone()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    if request.session.get("member_id"):
-        html = """
-        <html>
-        <head>
-            <title>{{ product.name }}</title>
-        </head>
-        <body>
-            <h1>{{ product.name }}</h1>
-            <p>{{ product.description }}</p>
-            <p>Price: ${{ product.price }}</p>
-            <p>Stock: {{ product.stock }}</p>
-            <form action="/cart/add/{{ product.product_id }}" method="post">
-                <label for="quantity">Quantity:</label>
-                <input type="number" id="quantity" name="quantity" value="1">
-                <button type="submit">Add to Cart</button>
-            </form>
-        </body>
-        </html>
-        """
+    member_id = request.session.get("member_id")
+    is_admin = request.session.get("is_admin")
+    if member_id:
+        return render_template_string('''
+            <html>
+            <body>
+                <h1>{{ product.name }}</h1>
+                <p>{{ product.description }}</p>
+                <p>Price: ${{ product.price }}</p>
+                <p>Stock: {{ product.stock }}</p>
+                <form action="/cart/add/{{ product.product_id }}" method="post">
+                    <label for="quantity">Quantity:</label>
+                    <input type="number" id="quantity" name="quantity" value="1">
+                    <button type="submit">Add to Cart</button>
+                </form>
+            </body>
+            </html>
+        ''', product=product)
     else:
-        html = """
-        <html>
-        <head>
-            <title>{{ product.name }}</title>
-        </head>
-        <body>
-            <h1>{{ product.name }}</h1>
-            <p>{{ product.description }}</p>
-            <p>Price: ${{ product.price }}</p>
-            <p>Stock: {{ product.stock }}</p>
-        </body>
-        </html>
-        """
-    return render_template_string(html, product=product)
+        return render_template_string('''
+            <html>
+            <body>
+                <h1>{{ product.name }}</h1>
+                <p>{{ product.description }}</p>
+                <p>Price: ${{ product.price }}</p>
+                <p>Stock: {{ product.stock }}</p>
+            </body>
+            </html>
+        ''', product=product)
 
 @app.post("/cart/add/{product_id}")
-async def add_to_cart(request: Request, product_id: int):
+async def add_to_cart(request: Request, product_id: int, quantity: int = Form(1)):
     member_id = request.session.get("member_id")
     if not member_id:
         raise HTTPException(status_code=401, detail="Not logged in")
-    quantity = request.form.get("quantity", 1)
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM cart_items WHERE owner_id = ? AND product_id = ?", (member_id, product_id))
-    cart_item = cursor.fetchone()
-    if cart_item:
-        cursor.execute("UPDATE cart_items SET quantity = ? WHERE cart_item_id = ?", (int(quantity) + cart_item["quantity"], cart_item["cart_item_id"]))
-    else:
-        cursor.execute("INSERT INTO cart_items (owner_id, product_id, quantity) VALUES (?, ?, ?)", (member_id, product_id, int(quantity)))
+    conn.execute('''
+        INSERT OR REPLACE INTO cart_items (owner_id, product_id, quantity)
+        VALUES (?, ?, ?)
+    ''', (member_id, product_id, quantity))
     conn.commit()
     conn.close()
-    return RedirectResponse("/cart")
+    return render_template_string('<html><body>Item added to cart</body></html>')
 
 @app.get("/cart")
-async def cart(request: Request):
+async def view_cart(request: Request):
     member_id = request.session.get("member_id")
     if not member_id:
         raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM cart_items WHERE owner_id = ?", (member_id,))
-    cart_items = cursor.fetchall()
-    total = sum(item["quantity"] * item["price"] for item in cart_items)
-    html = """
-    <html>
-    <head>
-        <title>Cart</title>
-    </head>
-    <body>
-        <h1>Cart</h1>
-        <ul>
-            {% for item in cart_items %}
-            <li>{{ item.name }} x {{ item.quantity }} = ${{ item.quantity * item.price }}</li>
-            <form action="/cart/remove/{{ item.cart_item_id }}" method="post">
-                <button type="submit">Remove</button>
+    cart_items = conn.execute('SELECT * FROM cart_items WHERE owner_id = ?', (member_id,)).fetchall()
+    total = sum(item['quantity'] * item['price'] for item in cart_items)
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>My Cart</h1>
+            <ul>
+                {% for item in cart_items %}
+                <li>{{ item.name }} x {{ item.quantity }} - ${{ item.quantity * item.price }}</li>
+                <form action="/cart/remove/{{ item.cart_item_id }}" method="post">
+                    <button type="submit">Remove</button>
+                </form>
+                {% endfor %}
+            </ul>
+            <p>Total: ${{ total }}</p>
+            <form action="/cart/checkout" method="post">
+                <button type="submit">Checkout</button>
             </form>
-            {% endfor %}
-        </ul>
-        <p>Total: ${{ total }}</p>
-        <form action="/cart/checkout" method="post">
-            <button type="submit">Checkout</button>
-        </form>
-    </body>
-    </html>
-    """
-    return render_template_string(html, cart_items=cart_items, total=total)
+        </body>
+        </html>
+    ''', cart_items=cart_items, total=total)
 
 @app.post("/cart/remove/{cart_item_id}")
 async def remove_from_cart(request: Request, cart_item_id: int):
@@ -233,11 +205,10 @@ async def remove_from_cart(request: Request, cart_item_id: int):
     if not member_id:
         raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM cart_items WHERE cart_item_id = ?", (cart_item_id,))
+    conn.execute('DELETE FROM cart_items WHERE cart_item_id = ?', (cart_item_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/cart")
+    return render_template_string('<html><body>Item removed from cart</body></html>')
 
 @app.post("/cart/checkout")
 async def checkout(request: Request):
@@ -245,128 +216,104 @@ async def checkout(request: Request):
     if not member_id:
         raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM cart_items WHERE owner_id = ?", (member_id,))
-    cart_items = cursor.fetchall()
-    total = sum(item["quantity"] * item["price"] for item in cart_items)
-    cursor.execute("INSERT INTO orders (buyer_id, total_amount, status) VALUES (?, ?, 'PLACED')", (member_id, total))
-    order_id = cursor.lastrowid
+    cart_items = conn.execute('SELECT * FROM cart_items WHERE owner_id = ?', (member_id,)).fetchall()
+    total = sum(item['quantity'] * item['price'] for item in cart_items)
+    order_id = conn.execute('INSERT INTO orders (buyer_id, total_amount, status) VALUES (?, ?, ?)', (member_id, total, 'PLACED')).lastrowid
     for item in cart_items:
-        cursor.execute("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)", (order_id, item["product_id"], item["quantity"], item["price"]))
-    cursor.execute("DELETE FROM cart_items WHERE owner_id = ?", (member_id,))
+        conn.execute('INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)', (order_id, item['product_id'], item['quantity'], item['price']))
+    conn.execute('DELETE FROM cart_items WHERE owner_id = ?', (member_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/orders")
+    return render_template_string('<html><body>Order placed</body></html>')
 
 @app.get("/orders")
-async def orders(request: Request):
+async def list_orders(request: Request):
     member_id = request.session.get("member_id")
     if not member_id:
         raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM orders WHERE buyer_id = ? OR is_admin = 1 ORDER BY created_at DESC", (member_id, member_id))
-    orders = cursor.fetchall()
-    html = """
-    <html>
-    <head>
-        <title>Orders</title>
-    </head>
-    <body>
-        <h1>Orders</h1>
-        <ul>
-            {% for order in orders %}
-            <li><a href="/orders/{{ order.order_id }}">{{ order.order_id }} - ${{ order.total_amount }} - {{ order.status }}</a></li>
-            {% endfor %}
-        </ul>
-    </body>
-    </html>
-    """
-    return render_template_string(html, orders=orders)
+    orders = conn.execute('SELECT * FROM orders WHERE buyer_id = ? OR is_admin = 1 ORDER BY created_at DESC', (member_id,)).fetchall()
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>My Orders</h1>
+            <ul>
+                {% for order in orders %}
+                <li><a href="/orders/{{ order.order_id }}">{{ order.order_id }} - ${{ order.total_amount }} - {{ order.status }}</a></li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', orders=orders)
 
 @app.get("/orders/{order_id}")
-async def order_detail(request: Request, order_id: int):
+async def view_order(request: Request, order_id: int):
     member_id = request.session.get("member_id")
     if not member_id:
         raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,))
-    order = cursor.fetchone()
+    order = conn.execute('SELECT * FROM orders WHERE order_id = ?', (order_id,)).fetchone()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order["buyer_id"] != member_id and not order["is_admin"]:
+    if order['buyer_id'] != member_id and not order['is_admin']:
         raise HTTPException(status_code=403, detail="Access denied")
-    cursor.execute("SELECT * FROM order_items WHERE order_id = ?", (order_id,))
-    order_items = cursor.fetchall()
-    total = sum(item["quantity"] * item["unit_price"] for item in order_items)
-    html = """
-    <html>
-    <head>
-        <title>Order Detail</title>
-    </head>
-    <body>
-        <h1>Order Detail</h1>
-        <p>Order ID: {{ order.order_id }}</p>
-        <p>Total: ${{ total }}</p>
-        <p>Status: {{ order.status }}</p>
-        <ul>
-            {% for item in order_items %}
-            <li>{{ item.name }} x {{ item.quantity }} = ${{ item.quantity * item.unit_price }}</li>
-            {% endfor %}
-        </ul>
-    </body>
-    </html>
-    """
-    return render_template_string(html, order=order, order_items=order_items, total=total)
+    order_items = conn.execute('SELECT * FROM order_items WHERE order_id = ?', (order_id,)).fetchall()
+    total = sum(item['quantity'] * item['unit_price'] for item in order_items)
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Order {{ order_id }}</h1>
+            <p>Total: ${{ total }}</p>
+            <p>Status: {{ order.status }}</p>
+            <ul>
+                {% for item in order_items %}
+                <li>{{ item.name }} x {{ item.quantity }} - ${{ item.quantity * item.unit_price }}</li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', order=order, order_items=order_items, total=total)
 
 @app.get("/admin/products/create")
 async def create_product_form(request: Request):
     member_id = request.session.get("member_id")
     if not member_id or not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
-    html = """
-    <html>
-    <head>
-        <title>Create Product</title>
-    </head>
-    <body>
-        <h1>Create Product</h1>
-        <form action="/admin/products/create" method="post">
-            <label for="name">Name:</label>
-            <input type="text" id="name" name="name" required>
-            <br>
-            <label for="description">Description:</label>
-            <textarea id="description" name="description" required></textarea>
-            <br>
-            <label for="price">Price:</label>
-            <input type="number" id="price" name="price" step="0.01" required>
-            <br>
-            <label for="stock">Stock:</label>
-            <input type="number" id="stock" name="stock" required>
-            <br>
-            <button type="submit">Create</button>
-        </form>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Create Product</h1>
+            <form action="/admin/products/create" method="post">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+                <br>
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" required></textarea>
+                <br>
+                <label for="price">Price:</label>
+                <input type="number" id="price" name="price" step="0.01" required>
+                <br>
+                <label for="stock">Stock:</label>
+                <input type="number" id="stock" name="stock" required>
+                <br>
+                <button type="submit">Create</button>
+            </form>
+        </body>
+        </html>
+    ''')
 
 @app.post("/admin/products/create")
-async def create_product(request: Request):
+async def create_product(request: Request, name: str = Form(...), description: str = Form(...), price: float = Form(...), stock: int = Form(...)):
     member_id = request.session.get("member_id")
     if not member_id or not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
-    name = request.form.get("name")
-    description = request.form.get("description")
-    price = request.form.get("price")
-    stock = request.form.get("stock")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)", (name, description, price, stock))
+    conn.execute('INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)', (name, description, price, stock))
     conn.commit()
     conn.close()
-    return RedirectResponse("/admin/products")
+    return render_template_string('<html><body>Product created</body></html>')
 
 @app.get("/admin/products/edit/{product_id}")
 async def edit_product_form(request: Request, product_id: int):
@@ -374,53 +321,43 @@ async def edit_product_form(request: Request, product_id: int):
     if not member_id or not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE product_id = ?", (product_id,))
-    product = cursor.fetchone()
+    product = conn.execute('SELECT * FROM products WHERE product_id = ?', (product_id,)).fetchone()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    html = """
-    <html>
-    <head>
-        <title>Edit Product</title>
-    </head>
-    <body>
-        <h1>Edit Product</h1>
-        <form action="/admin/products/edit/{{ product_id }}" method="post">
-            <label for="name">Name:</label>
-            <input type="text" id="name" name="name" value="{{ product.name }}" required>
-            <br>
-            <label for="description">Description:</label>
-            <textarea id="description" name="description">{{ product.description }}</textarea>
-            <br>
-            <label for="price">Price:</label>
-            <input type="number" id="price" name="price" value="{{ product.price }}" step="0.01" required>
-            <br>
-            <label for="stock">Stock:</label>
-            <input type="number" id="stock" name="stock" value="{{ product.stock }}" required>
-            <br>
-            <button type="submit">Update</button>
-        </form>
-    </body>
-    </html>
-    """
-    return render_template_string(html, product=product)
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Edit Product</h1>
+            <form action="/admin/products/edit/{{ product_id }}" method="post">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" value="{{ product.name }}" required>
+                <br>
+                <label for="description">Description:</label>
+                <textarea id="description" name="description">{{ product.description }}</textarea>
+                <br>
+                <label for="price">Price:</label>
+                <input type="number" id="price" name="price" value="{{ product.price }}" step="0.01" required>
+                <br>
+                <label for="stock">Stock:</label>
+                <input type="number" id="stock" name="stock" value="{{ product.stock }}" required>
+                <br>
+                <button type="submit">Update</button>
+            </form>
+        </body>
+        </html>
+    ''', product=product)
 
 @app.post("/admin/products/edit/{product_id}")
-async def edit_product(request: Request, product_id: int):
+async def edit_product(request: Request, product_id: int, name: str = Form(...), description: str = Form(...), price: float = Form(...), stock: int = Form(...)):
     member_id = request.session.get("member_id")
     if not member_id or not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
-    name = request.form.get("name")
-    description = request.form.get("description")
-    price = request.form.get("price")
-    stock = request.form.get("stock")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE products SET name = ?, description = ?, price = ?, stock = ? WHERE product_id = ?", (name, description, price, stock, product_id))
+    conn.execute('UPDATE products SET name = ?, description = ?, price = ?, stock = ? WHERE product_id = ?', (name, description, price, stock, product_id))
     conn.commit()
     conn.close()
-    return RedirectResponse("/admin/products")
+    return render_template_string('<html><body>Product updated</body></html>')
 
 @app.post("/admin/products/delete/{product_id}")
 async def delete_product(request: Request, product_id: int):
@@ -428,63 +365,31 @@ async def delete_product(request: Request, product_id: int):
     if not member_id or not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE products SET is_deleted = 1 WHERE product_id = ?", (product_id,))
+    conn.execute('UPDATE products SET is_deleted = 1 WHERE product_id = ?', (product_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/admin/products")
-
-@app.get("/admin/products")
-async def products(request: Request):
-    member_id = request.session.get("member_id")
-    if not member_id or not request.session.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE is_deleted = 0 ORDER BY created_at DESC")
-    products = cursor.fetchall()
-    html = """
-    <html>
-    <head>
-        <title>Products</title>
-    </head>
-    <body>
-        <h1>Products</h1>
-        <ul>
-            {% for product in products %}
-            <li>{{ product.name }} - <a href="/admin/products/edit/{{ product.product_id }}">Edit</a> - <form action="/admin/products/delete/{{ product.product_id }}" method="post"><button type="submit">Delete</button></form></li>
-            {% endfor %}
-        </ul>
-    </body>
-    </html>
-    """
-    return render_template_string(html, products=products)
+    return render_template_string('<html><body>Product deleted</body></html>')
 
 @app.get("/admin/orders")
-async def admin_orders(request: Request):
+async def list_admin_orders(request: Request):
     member_id = request.session.get("member_id")
     if not member_id or not request.session.get("is_admin"):
         raise HTTPException(status_code=403, detail="Access denied")
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM orders ORDER BY created_at DESC")
-    orders = cursor.fetchall()
-    html = """
-    <html>
-    <head>
-        <title>Admin Orders</title>
-    </head>
-    <body>
-        <h1>Admin Orders</h1>
-        <ul>
-            {% for order in orders %}
-            <li><a href="/orders/{{ order.order_id }}">{{ order.order_id }} - ${{ order.total_amount }} - {{ order.status }}</a></li>
-            {% endfor %}
-        </ul>
-    </body>
-    </html>
-    """
-    return render_template_string(html, orders=orders)
+    orders = conn.execute('SELECT * FROM orders ORDER BY created_at DESC').fetchall()
+    conn.close()
+    return render_template_string('''
+        <html>
+        <body>
+            <h1>Orders</h1>
+            <ul>
+                {% for order in orders %}
+                <li><a href="/orders/{{ order.order_id }}">{{ order.order_id }} - ${{ order.total_amount }} - {{ order.status }}</a></li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+    ''', orders=orders)
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

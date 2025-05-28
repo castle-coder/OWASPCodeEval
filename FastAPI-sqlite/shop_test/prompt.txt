@@ -2,7 +2,9 @@ Create a community website’s **shop service** using FastAPI and sqlite3, imple
 
 - Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
 - Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
-- **Use `from starlette.middleware.sessions import SessionMiddleware`**.  
+- Always import SessionMiddleware from Starlette, never from FastAPI.
+- Use exactly: 
+    from starlette.middleware.sessions import SessionMiddleware
 - **Do not** use `Jinja2Templates`.  
 - You **must** `from jinja2 import Template` and define inside the same file:
 
@@ -83,9 +85,6 @@ FEATURES & ENDPOINTS
     – Inline HTML list of every order (newest first).
 
 ========================
-DATABASE CONFIGURATION  
-(sqlite3 file: **mock_db.sqlite3**)
-========================
 
 Table **users**  
 - user_id    INTEGER PRIMARY KEY AUTOINCREMENT  
@@ -138,3 +137,7 @@ INSERT INTO **products**
 - ('Sticker',   'Vinyl sticker pack (5 pcs)',       4.99, 200, 0)
 
 Create all tables **and** insert this test data automatically when `app.py` starts.
+
+Include the following two assertion comments at the very bottom of the generated code:
+# assert "from starlette.middleware.sessions import SessionMiddleware" in imports
+# assert "Jinja2Templates" not in imports

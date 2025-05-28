@@ -1,10 +1,9 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse
 from jinja2 import Template
 import sqlite3
 import hashlib
-import uvicorn
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
@@ -63,29 +62,29 @@ async def login(request: Request, member_id: int):
     request.session["member_id"] = member_id
     request.session["is_admin"] = False
     return render_template_string('''
-        <p>Logged in as member {member_id}</p>
+        <p>Logged in as member {{ member_id }}</p>
         <a href="/">Back to home</a>
-    ''')
+    ''', member_id=member_id)
 
 @app.get("/profile")
 async def profile_form(request: Request):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+        raise HTTPException(status_code=401, detail="Not logged in")
     return render_template_string('''
         <form method="post" action="/profile/update">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="email" name="email" placeholder="Email" required>
+            <input type="text" name="username" placeholder="Username" value="{{ username }}" required>
+            <input type="email" name="email" placeholder="Email" value="{{ email }}" required>
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit">Update Profile</button>
         </form>
-    ''')
+    ''', username=request.session["username"], email=request.session["email"])
 
 @app.post("/profile/update")
 async def update_profile(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...)):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
-    conn = get_db()
+        raise HTTPException(status_code=401, detail="Not logged in")
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    conn = get_db()
     conn.execute("UPDATE users SET username = ?, email = ?, password = ? WHERE user_id = ?", (username, email, hashed_password, request.session["member_id"]))
     conn.commit()
     conn.close()
@@ -97,7 +96,7 @@ async def update_profile(request: Request, username: str = Form(...), email: str
 @app.post("/profile/delete")
 async def delete_profile(request: Request):
     if "member_id" not in request.session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+        raise HTTPException(status_code=401, detail="Not logged in")
     conn = get_db()
     conn.execute("UPDATE users SET is_deleted = 1 WHERE user_id = ?", (request.session["member_id"],))
     conn.commit()
@@ -111,7 +110,7 @@ async def delete_profile(request: Request):
 @app.post("/admin/delete_member/{member_id}")
 async def admin_delete_member(request: Request, member_id: int):
     if "member_id" not in request.session or not request.session["is_admin"]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
+        raise HTTPException(status_code=401, detail="Not authorized")
     conn = get_db()
     conn.execute("UPDATE users SET is_deleted = 1 WHERE user_id = ?", (member_id,))
     conn.commit()
@@ -124,7 +123,7 @@ async def admin_delete_member(request: Request, member_id: int):
 @app.get("/admin/members")
 async def admin_members(request: Request):
     if "member_id" not in request.session or not request.session["is_admin"]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized")
+        raise HTTPException(status_code=401, detail="Not authorized")
     conn = get_db()
     members = conn.execute("SELECT * FROM users WHERE is_deleted = 0 ORDER BY user_id DESC").fetchall()
     conn.close()
@@ -138,4 +137,5 @@ async def admin_members(request: Request):
     ''', members=members)
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
