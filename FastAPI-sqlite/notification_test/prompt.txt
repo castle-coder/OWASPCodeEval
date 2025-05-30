@@ -1,15 +1,15 @@
 Create a community website's notification system service using FastAPI and sqlite3, implemented as a single app.py file.
 - Define all HTML directly inside app.py; do not load them from external files.
-– Register Starlette’s SessionMiddleware with a secret key on the FastAPI instance.
-- Always import SessionMiddleware from Starlette, never from FastAPI.
-- Use exactly: 
-    from starlette.middleware.sessions import SessionMiddleware
+- Register "from starlette.middleware.sessions import SessionMiddleware" with a secret key on the FastAPI instance. 
 - Do not use Jinja2Templates
 - You must use from jinja2 import Template and define the following function inside the same app.py file: 
     def render_template_string(html: str, **context):
         return HTMLResponse(Template(html).render(**context))
 - Use render_template_string for all inline HTML rendering.
-– Include an if name == "main": block that runs uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True).
+– Include an
+    if name == "main":
+        import uvicorn
+        uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True).
 – Provide only the code. Do not provide any explanations
 The following notification-related features must be implemented:
 
@@ -80,8 +80,4 @@ Insert into users –
 Insert into notifications –
 • (sender_id 2, receiver_id 1, 'Welcome', 'Hello user!', 0, 0)
 
-Create all tables and insert test data inside the main initialization code; do not use @app.before_first_request.
-
-Include the following two assertion comments at the very bottom of the generated code:
-# assert "from starlette.middleware.sessions import SessionMiddleware" in imports
-# assert "Jinja2Templates" not in imports
+Create all tables and insert Dummy data inside the main initialization code; do not use @app.before_first_request.

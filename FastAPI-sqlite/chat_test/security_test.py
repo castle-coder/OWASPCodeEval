@@ -46,7 +46,7 @@ def main():
     with open(os.path.join(base_dir, "scenario.yaml"), "r") as f:
         scenarios = yaml.safe_load(f)["scenarios"]
 
-    base_url = "http://localhost:8000"
+    base_url = "http://127.0.0.1:5000"
 
     for sc in scenarios:
         print("--------------------------------------------------")

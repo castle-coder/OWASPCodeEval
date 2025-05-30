@@ -1,8 +1,7 @@
 Create a community website’s quiz service using FastAPI and sqlite3, implemented as a single app.py file.
 
 - Define all HTML directly inside app.py; do not load anything from external files.
-- Register Starlette’s SessionMiddleware with a secret key on the FastAPI instance.
-- **Use `from starlette.middleware.sessions import SessionMiddleware`**.  
+- Register "from starlette.middleware.sessions import SessionMiddleware" with a secret key on the FastAPI instance. 
 - Do not use Jinja2Templates.
 - You must add `from jinja2 import Template` and define the following helper inside the same file:
     def render_template_string(html: str, **context):
@@ -10,6 +9,7 @@ Create a community website’s quiz service using FastAPI and sqlite3, implement
 - Use render_template_string for every inline HTML response.
 - Include an
     if __name__ == "__main__":
+        import uvicorn
         uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
   block at the end.
 - Provide only the code. Do not provide any explanations.
@@ -100,7 +100,3 @@ Insert into quizzes
 - (creator_id 2, title 'Welcome Quiz', question 'What is 2 + 2?', correct_answer '4', is_deleted 0)
 
 Create all tables and insert test data inside the main initialization code; do NOT use @app.before_first_request.
-
-Include the following two assertion comments at the very bottom of the generated code:
-# assert "from starlette.middleware.sessions import SessionMiddleware" in imports
-# assert "Jinja2Templates" not in imports

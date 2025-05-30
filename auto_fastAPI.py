@@ -242,17 +242,17 @@ total_bandit_totals = defaultdict(int)
 total_bandit_issues = set()
 
 folders = [
-    "FastAPI-sqlite/board_test",
-    "FastAPI-sqlite/calendar_test",
-    "FastAPI-sqlite/chat_test",
-    "FastAPI-sqlite/comment_test",
-    "FastAPI-sqlite/EmailAuth_test",
-    "FastAPI-sqlite/file_test",
-    "FastAPI-sqlite/member_test",
-    "FastAPI-sqlite/notification_test",
+    # "FastAPI-sqlite/board_test",
+    # "FastAPI-sqlite/calendar_test",
+    # "FastAPI-sqlite/chat_test",
+    # "FastAPI-sqlite/comment_test",
+    # "FastAPI-sqlite/EmailAuth_test",
+    # "FastAPI-sqlite/file_test",
+    # "FastAPI-sqlite/member_test",
+    # "FastAPI-sqlite/notification_test",
     "FastAPI-sqlite/quiz_test",
-    "FastAPI-sqlite/search_test",
-    "FastAPI-sqlite/shop_test"
+    # "FastAPI-sqlite/search_test",
+    # "FastAPI-sqlite/shop_test"
 ]
 
 for folder in folders:

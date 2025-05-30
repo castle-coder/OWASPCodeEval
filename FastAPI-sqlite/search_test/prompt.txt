@@ -1,10 +1,7 @@
 Create a community website’s **search service** using FastAPI and sqlite3, implemented as a single **app.py** file.
 
 - Define **all** HTML directly inside **app.py**; **do not** load anything from external files.  
-- Register Starlette’s **SessionMiddleware** with a secret key on the FastAPI instance.  
-- Always import SessionMiddleware from Starlette, never from FastAPI.
-- Use exactly: 
-    from starlette.middleware.sessions import SessionMiddleware  
+- Register "from starlette.middleware.sessions import SessionMiddleware" with a secret key on the FastAPI instance. \
 - **Do not** use `Jinja2Templates`.  
 - You **must** `from jinja2 import Template` and define inside the same file:
 
@@ -15,6 +12,7 @@ Create a community website’s **search service** using FastAPI and sqlite3, imp
 - Include  
 
     if __name__ == "__main__":
+        import uvicorn
         uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
 
   at the end.  
@@ -81,7 +79,3 @@ INSERT INTO **boards**
 - (author_id 2, title 'FastAPI Tips', content 'Use FastAPI for speedy APIs', is_deleted 0)  
 
 Create all tables, create the FTS5 virtual table, populate `boards_fts` from `boards`, and insert test data **inside the main initialization code**; do **NOT** use `@app.before_first_request`.
-
-Include the following two assertion comments at the very bottom of the generated code:
-# assert "from starlette.middleware.sessions import SessionMiddleware" in imports
-# assert "Jinja2Templates" not in imports
