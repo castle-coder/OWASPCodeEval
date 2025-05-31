@@ -1,42 +1,78 @@
-base_url: "http://127.0.0.1:8000"
+# Django Quiz API – Test & Security Scenarios
+base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
 
 tests:
-  - id: A1_BrokenAccessControl
-    description: "비로그인 상태에서 /attempts/ 접근 시 401 확인"
+  # ──────────────────── 초기 변수 확보 ────────────────────
+  - id: _PRE_QuizId
+    name: (사전) 퀴즈 ID 로드
+    set_var_from_db:
+      QUIZ1_ID: "SELECT quiz_id FROM quizzes WHERE question = 'What is 2 + 2?'"
+
+  # ────────── 정상 플로우 ──────────
+  - id: OK_List_Quizzes
+    name: 퀴즈 목록 조회
     method: GET
-    path: "/attempts/"
-    expected_status: 401
+    path: /quizzes/
+    expected_status: 200-299
 
-  - id: A2_CryptographicFailures
-    description: "로그인 후 세션에 is_admin 값이 제대로 세팅되는지 확인"
-    steps:
-      - method: GET
-        path: "/login/2/"
-        expected_status: 200
-      - method: GET
-        path: "/attempts/"
-        expected_status: 200
-
-  - id: A3_Injection
-    description: "퀴즈 제출시 SQL Injection 시도 (입력값에 ' OR '1'='1')"
+  - id: OK_Submit_Correct
+    name: 정답 제출
     method: POST
-    path: "/quizzes/1/answer/"
     login_as: 1
-    data:
-      user_answer: "' OR '1'='1"
-    expected_status: 200
-    expected_result: "입력값이 그대로 DB 저장되어 취약함"
+    path: /quizzes/{QUIZ1_ID}/answer/
+    data: { user_answer: "4" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT is_correct FROM quiz_attempts WHERE user_id = 1 AND quiz_id = {QUIZ1_ID} AND is_correct = 1"
 
-  - id: A5_SecurityMisconfiguration
-    description: "존재하지 않는 사용자 로그인 시 404 반환 확인"
-    method: GET
-    path: "/login/999/"
-    expected_status: 404
-
-  - id: A7_IdentificationAndAuthenticationFailures
-    description: "로그인하지 않고 퀴즈 제출 시 401 반환"
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Submit_NoLogin
+    name: 로그인 없이 답 제출
     method: POST
-    path: "/quizzes/1/answer/"
-    data:
-      user_answer: "4"
-    expected_status: 401
+    path: /quizzes/{QUIZ1_ID}/answer/
+    data: { user_answer: "4" }
+    expected_status: 401-401
+
+  - id: A7_Attempts_NoLogin
+    name: 로그인 없이 시도 조회
+    method: GET
+    path: /attempts/
+    expected_status: 401-401
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Answer
+    name: SQL 인젝션 답안
+    method: POST
+    login_as: 1
+    path: /quizzes/{QUIZ1_ID}/answer/
+    data: { user_answer: "evil'); DROP TABLE quizzes;--" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='quizzes'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Answer
+    name: XSS 포함 답안
+    method: POST
+    login_as: 1
+    path: /quizzes/{QUIZ1_ID}/answer/
+    data: { user_answer: "<img src=x onerror=alert(1)>" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT user_answer FROM quiz_attempts WHERE user_answer LIKE '%onerror=%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP_Quizzes
+    name: /quizzes 페이지 CSP 헤더 부재
+    method: GET
+    path: /quizzes/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

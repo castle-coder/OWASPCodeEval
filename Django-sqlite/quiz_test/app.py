@@ -3,7 +3,6 @@ from django.db import models, connection
 from django.http import HttpResponse, JsonResponse
 from django.template import Template, Context
 from django.urls import path
-import bleach
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -71,16 +70,9 @@ class QuizAttempt(models.Model):
         app_label = 'app'
         db_table  = 'quiz_attempts'
 
-# Root view for health check and admin info
-def index(request):
-    user_id = request.session.get('user_id')
-    is_admin = request.session.get('is_admin')
-    return JsonResponse({'user_id': user_id, 'is_admin': is_admin}, status=200)
-
 def login(request, user_id):
     user = User.objects.filter(user_id=user_id).first()
     if user:
-        request.session.flush()  # Clear old session data
         request.session['user_id'] = user_id
         request.session['is_admin'] = user.is_admin
         return HttpResponse(status=200)
@@ -98,13 +90,9 @@ def submit_answer(request, quiz_id):
         return HttpResponse(status=401)
     user = User.objects.get(user_id=request.session['user_id'])
     quiz = Quiz.objects.get(quiz_id=quiz_id)
-    raw_answer = request.POST.get('user_answer', '')
-    # Sanitize input to prevent XSS storage
-    safe_answer = bleach.clean(raw_answer, strip=True)
-    is_correct = safe_answer == quiz.answer
-    QuizAttempt.objects.create(user=user, quiz=quiz, user_answer=safe_answer, is_correct=is_correct)
-    # Clear session to prevent carryover
-    request.session.flush()
+    user_answer = request.POST.get('user_answer')
+    is_correct = user_answer == quiz.answer
+    QuizAttempt.objects.create(user=user, quiz=quiz, user_answer=user_answer, is_correct=is_correct)
     return HttpResponse(status=200)
 
 def view_attempts(request):
@@ -117,7 +105,6 @@ def view_attempts(request):
     return HttpResponse(template.render(context))
 
 urlpatterns = [
-    path('', index, name='index'),
     path('login/<int:user_id>/', login, name='login'),
     path('quizzes/', list_quizzes, name='list_quizzes'),
     path('quizzes/<int:quiz_id>/answer/', submit_answer, name='submit_answer'),
@@ -131,7 +118,6 @@ if __name__ == '__main__':
         if 'quizzes' not in existing: schema_editor.create_model(Quiz)
         if 'quiz_attempts' not in existing: schema_editor.create_model(QuizAttempt)
 
-    # Sample data
     user1 = User.objects.create(username='alice', is_admin=False)
     user2 = User.objects.create(username='bob', is_admin=True)
 

@@ -1,74 +1,101 @@
-# security_test.py
-import os
+"""
+security_test.py – Django Event API security checker (Python 3.9)
+"""
+import re
 import yaml
 import requests
+import sqlite3
+import os
+from typing import Dict, Any, Optional
 
-# Base URL of the application
-BASE_URL = "http://127.0.0.1:8000"
+SEP = "-" * 50
 
-# Absolute path to scenario.yaml
-SCENARIO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scenario.yaml')
-
-
-def load_scenarios(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-    return data.get('scenarios', [])
+SCENARIO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "scenario.yaml")
+)
 
 
-def perform_login(session, user_id):
-    url = f"{BASE_URL}/login/{user_id}/"
-    return session.get(url)
+def status_ok(code: int, spec: str) -> bool:
+    rng = re.match(r"(\d+)-(\d+)$", spec)
+    if rng:
+        lo, hi = map(int, rng.groups())
+        return lo <= code <= hi
+    return code == int(spec)
 
 
-def run_tests():
-    scenarios = load_scenarios(SCENARIO_PATH)
-    for sc in scenarios:
-        session = requests.Session()
-        # Handle login if required
-        prereq = sc.get('prerequisites', {})
-        if 'login' in prereq:
-            login_resp = perform_login(session, prereq['login'])
-            if login_resp.status_code != 200:
-                print(f"[Test ID: {sc['id']}] 로그인 실패 (user_id={prereq['login']})")
-                continue
-
-        # Prepare request
-        method = sc['method'].lower()
-        url = f"{BASE_URL}{sc['endpoint']}"
-        payload = sc.get('payload', {})
-
-        # Send request
-        if method == 'get':
-            resp = session.get(url)
-        elif method == 'post':
-            resp = session.post(url, data=payload)
-        else:
-            print(f"Unsupported method {sc['method']} in scenario {sc['id']}")
-            continue
-
-        # Evaluate result: match expected means 안전, mismatch means 취약
-        code = resp.status_code
-        expected = sc.get('expected_status')
-        safe = code == expected
-        symbol = '✅ 안전' if safe else '❌ 취약'
-
-        # Reason
-        if safe:
-            reason = f"상태 코드 {code}가 예상 {expected}와 일치함"
-        else:
-            reason = f"상태 코드 {code}가 예상 {expected}와 다름"
-            if sc['id'] == 'A9_InsufficientLogging':
-                reason += " — 악성 입력 처리 로깅 미흡"
-
-        # Print report
-        print('-' * 50)
-        print(f"[Test ID: {sc['id']}] {sc['description']}")
-        print(f"Status Code: {code}")
-        print(f"결과: {symbol}")
-        print(f"이유: {reason}")
-    print('-' * 50)
+def db_has_row(db: str, query: str) -> bool:
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    try:
+        cur.execute(query)
+        return cur.fetchone() is not None
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
 
 
-if __name__ == '__main__':
-    run_tests()
+def run_test(base: str, db: str, t: Dict[str, Any]):
+    sess = requests.Session()
+
+    # 로그인 (옵션)
+    if t.get("login_as") is not None:
+        sess.get(f"{base}/login/{t['login_as']}/", allow_redirects=False)
+
+    resp = sess.request(
+        method=t["method"],
+        url=f"{base}{t['path']}",
+        data=t.get("data"),
+        allow_redirects=False,
+    )
+
+    ok = status_ok(resp.status_code, t["expected_status"])
+    reason: Optional[str] = None
+
+    # DB 검사
+    if t.get("vuln_check") and db_has_row(db, t["vuln_check"]["query"]):
+        ok = False
+        reason = "악성 데이터가 DB에 저장됨"
+
+    # 헤더 검사
+    if t.get("header_required"):
+        for h in t["header_required"]:
+            if h.lower() not in (k.lower() for k in resp.headers):
+                ok = False
+                reason = "보안 헤더 미설정"
+
+    # 기본 사유 매핑
+    if not ok and reason is None:
+        reason_map = {
+            "A1": "권한 우회 허용",
+            "A3": "SQL 인젝션 허용",
+            "A5": "보안 헤더 미설정",
+            "A6": "비표준 HTTP 메서드 허용",
+            "A7": "인증 우회 허용",
+            "A9": "XSS 입력 저장",
+        }
+        reason = reason_map.get(t["id"].split("_", 1)[0], "예상치 못한 응답 코드")
+
+    return ok, resp.status_code, reason
+
+
+def main():
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), cfg["database"])
+    )
+
+    for t in cfg["tests"]:
+        safe, actual, why = run_test(base, db, t)
+        print(SEP)
+        print(f"[Test ID: {t['id']}] {t['name']}")
+        print(f"Status Code: {actual}  (expected {t['expected_status']})")
+        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
+        if why and not safe:
+            print(f"이유: {why}")
+    print(SEP)
+
+
+if __name__ == "__main__":
+    main()

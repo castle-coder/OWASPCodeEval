@@ -1,57 +1,130 @@
-# security_test.py
-import yaml
-import requests
+#!/usr/bin/env python
+"""
+Django Notification API 시나리오 러너
+사용:  python security_test.py
+"""
+import io, re, yaml, requests, sqlite3, os
+from pathlib import Path
+from typing import Dict, Any, Optional
 
-def load_scenarios(path="scenario.yaml"):
-    with open(path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+SEP  = "-" * 50
+VARS: Dict[str, Any] = {}
 
+SCENARIO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "scenario.yaml")
+)
+
+##############################################################################
+# DB helpers
+##############################################################################
+def db_exec(db: str, sql: str):
+    with sqlite3.connect(db) as conn:
+        conn.execute(sql)
+        conn.commit()
+
+def db_fetchone(db: str, query: str):
+    with sqlite3.connect(db) as conn:
+        cur = conn.execute(query)
+        return cur.fetchone()
+
+##############################################################################
+# 기타 유틸
+##############################################################################
+def status_ok(code: int, spec: str) -> bool:
+    m = re.match(r"(\d+)-(\d+)$", spec)
+    return (code == int(spec)) if not m else int(m[1]) <= code <= int(m[2])
+
+def substitute(val):
+    if isinstance(val, str):
+        for k, v in VARS.items():
+            val = val.replace(f"{{{k}}}", str(v))
+    elif isinstance(val, dict):
+        val = {k: substitute(v) for k, v in val.items()}
+    return val
+
+def login(sess: requests.Session, base: str, user_id: int):
+    sess.get(f"{base}/login/{user_id}/", allow_redirects=False, timeout=5)
+
+##############################################################################
+# 메인 실행 함수
+##############################################################################
+def run_test(base: str, db: str, t: Dict[str, Any]):
+    sess = requests.Session()
+
+    # 로그인
+    if t.get("login_as") is not None:
+        login(sess, base, t["login_as"])
+
+    # DB 사전 작업
+    for sql in t.get("db_exec", []):
+        db_exec(db, sql)
+
+    # HTTP 호출이 없는 순수 DB-pre 스텝일 수도 있음
+    if "method" not in t:
+        return
+
+    method = t["method"]
+    url    = f"{base}{substitute(t['path'])}"
+    data   = substitute(t.get("data"))
+    resp   = sess.request(method, url, data=data, allow_redirects=False, timeout=10)
+
+    # PRE 시나리오(패스/페일 판단 없음)
+    if t["id"].startswith("_PRE_"):
+        if "set_var_from_db" in t:
+            for var, q in t["set_var_from_db"].items():
+                VARS[var] = db_fetchone(db, q)[0]
+        print(f"[PRE] {t['name']} → 완료 (Status {resp.status_code})")
+        return
+
+    # 기본 판정
+    ok = status_ok(resp.status_code, t["expected_status"])
+    reason: Optional[str] = None
+
+    # DB 취약 여부
+    if ok and t.get("vuln_check"):
+        q = substitute(t["vuln_check"]["query"])
+        if db_fetchone(db, q):
+            ok, reason = False, "악성 데이터가 DB에 저장됨"
+
+    # 헤더 검사
+    if ok and t.get("header_required"):
+        for h in t["header_required"]:
+            if h.lower() not in (k.lower() for k in resp.headers):
+                ok, reason = False, "보안 헤더 미설정"
+                break
+
+    # 기본 사유
+    if not ok and reason is None:
+        reason = {
+            "A1": "권한 우회 허용",
+            "A3": "SQL 인젝션 허용",
+            "A4": "차단된 리소스 우회",
+            "A5": "보안 헤더 미설정",
+            "A6": "비표준 HTTP 메서드 허용",
+            "A7": "인증/입력 검증 실패",
+            "A9": "XSS 입력 저장",
+        }.get(t["id"].split("_")[0], "예상치 못한 응답")
+
+    # 출력
+    print(SEP)
+    print(f"[Test ID: {t['id']}] {t['name']}")
+    print(f"Status Code: {resp.status_code}  (expected {t['expected_status']})")
+    print(f"결과: {'✅ 안전' if ok else '❌ 취약'}")
+    if reason and not ok:
+        print(f"이유: {reason}")
+
+##############################################################################
+# main
+##############################################################################
 def main():
-    config = load_scenarios()
-    base = config['base_url'].rstrip('/')
-    session = requests.Session()
-
-    for s in config['scenarios']:
-        # 1) 로그인
-        if s.get('login_user_id') is not None:
-            login_url = f"{base}/login/{s['login_user_id']}/"
-            session.get(login_url)
-
-        url = f"{base}{s['endpoint']}"
-        method = s['method'].upper()
-        payload = s.get('payload', {})
-
-        if method == "GET":
-            resp = session.get(url)
-        elif method == "POST":
-            resp = session.post(url, data=payload)
-        else:
-            print(f"[{s['id']}] 지원되지 않는 메서드: {method}")
-            continue
-
-        actual = resp.status_code
-        expected = s['expected_safe_status_codes']
-        safe = actual in expected
-
-        result = "✅ 안전" if safe else "❌ 취약"
-        if safe:
-            reason = "모든 조건 통과"
-        else:
-            reason = f"예상 코드 {', '.join(map(str, expected))}, 실제 코드 {actual}"
-
-        print(f"[Test ID: {s['id']}] {s['name']}\n")
-        print(f"Status Code: {actual}\n")
-        print(f"결과: {result}\n")
-        print(f"이유: {reason}\n")
-        print(f"DB Changes: {s['db_effect']}\n")
-        print("-" * 50 + "\n")
+    cfg = yaml.safe_load(Path(SCENARIO_PATH).read_text(encoding="utf-8"))
+    base_url = cfg["base_url"].rstrip("/")
+    db_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), cfg["database"])
+    )
+    for test in cfg["tests"]:
+        run_test(base_url, db_path, test)
+    print(SEP)
 
 if __name__ == "__main__":
     main()
-
-
-# 제외된 OWASP Top10 항목 및 이유
-# A2_CryptographicFailures: 패스워드 저장·관리 기능이 구현되어 있지 않음
-# A6_VulnerableComponents: bcrypt 등 외부 암호화 컴포넌트 사용이 없음
-# A8_SoftwareAndDataIntegrityFailures: 데이터 업데이트 엔드포인트가 없어 해당 시나리오 적용 불가
-# A10_ServerSideRequestForgery: 외부 URL fetch 기능이 없어 SSRF 테스트 불필요

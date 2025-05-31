@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models, connection
 from django.http import HttpResponse, HttpResponseForbidden, FileResponse
-from django.template import Template, Context
+from django.template import Template
 from django.urls import path
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -100,7 +100,6 @@ def upload(request):
     else:
         return HttpResponse('405 Method Not Allowed')
 
-@csrf_exempt
 def download(request, file_id):
     file = File.objects.get(id=file_id)
     if not file.is_blocked:
@@ -110,32 +109,34 @@ def download(request, file_id):
     else:
         return HttpResponseForbidden('403 Forbidden')
 
-@csrf_exempt
 def files(request):
     user_id = request.session.get('user_id')
     user = User.objects.get(user_id=user_id)
-    if user.is_admin:
-        files = File.objects.all()
-    else:
-        files = File.objects.filter(is_blocked=False)
+    files = File.objects.filter(is_blocked=False) if not user.is_admin else File.objects.all()
     template = Template('''
-        <ul>
-            {% for file in files %}
-                <li>
-                    {{ file.file.name }} - {{ file.description }} - Uploaded by {{ file.user.username }} - {{ file.uploaded_at }} - 
-                    <a href="{% url 'download' file.id %}">Download</a>
-                    {% if user.is_admin %}
-                        <form method="post" action="{% url 'block' file.id %}">
-                            {% csrf_token %}
-                            <button type="submit">Block</button>
-                        </form>
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
+        <html>
+        <head><title>Files</title></head>
+        <body>
+            <h1>Files</h1>
+            <ul>
+                {% for file in files %}
+                    <li>
+                        {{ file.file.name }} - {{ file.description }} - {{ file.user.username }} - {{ file.uploaded_at }} - 
+                        <a href="{% url 'download' file.id %}">Download</a>
+                        {% if user.is_admin %}
+                            <form method="post" action="{% url 'block' file.id %}">
+                                {% csrf_token %}
+                                <button type="submit">Block</button>
+                            </form>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
     ''')
-    context = Context({'files': files, 'user': user})
-    return HttpResponse(template.render(context))
+    context = {'files': files, 'user': user}
+    return HttpResponse(template.render(context, request))
 
 @csrf_exempt
 def delete(request, file_id):

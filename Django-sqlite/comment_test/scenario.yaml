@@ -1,28 +1,105 @@
-# scenario.yaml
+# Django Comment / Report API – OWASP-Top-10 Test Scenarios
+base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
+
+# NOTE
+#   user_id 1  →  일반 사용자  “user”
+#   user_id 2  →  관리자      “admin”
+#   시나리오 시작 시 admin 이 댓글 하나(ID 1)를 남기도록 pre-step 구성
+
 tests:
-  - id: A1_BrokenAccessControl
-    description: "일반 사용자가 다른 사용자의 댓글 수정 시도"
-    login_user_id: 1
+  # ──────────────────── 초기 데이터 세팅 ────────────────────
+  - id: _PRE_AdminSeed
+    name: (사전) Admin 댓글 하나 작성
     method: POST
-    url: "/comments/edit/2/"
-    payload:
-      content: "unauthorized edit"
-    expected_status_codes: [403]
+    pre:   []                       # dummy marker; runner skips vuln check
+    login_as: 2
+    path: /comments/
+    data: { content: "seed comment by admin" }
+    expected_status: 200-299
 
-  - id: A3_Injection
-    description: "SQL 인젝션 시도 (로그인)"
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID 로그인
     method: GET
-    url: "/login/1%20or%201=1/"
-    expected_status_codes: [404]
+    path: /login/999/
+    expected_status: 404-404
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 999" }
 
-  - id: A5_SecurityMisconfiguration
-    description: "존재하지 않는 URL 접근 시 에러 확인"
-    method: GET
-    url: "/nonexistent/"
-    expected_status_codes: [404]
+  - id: A7_Post_NoLogin
+    name: 로그인 없이 댓글 작성
+    method: POST
+    path: /comments/
+    data: { content: "unauth comment" }
+    expected_status: 401-401
 
-  - id: A7_IdentificationAndAuthenticationFailures
-    description: "잘못된 사용자로 로그인 시도"
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_Edit_OtherUser
+    name: 타인 댓글 수정 시도
+    method: POST
+    login_as: 1
+    path: /comments/edit/1/
+    data: { content: "hack edit" }
+    expected_status: 403-403
+
+  - id: A1_Delete_OtherUser
+    name: 타인 댓글 삭제 시도
+    method: POST
+    login_as: 1
+    path: /comments/delete/1/
+    expected_status: 403-403
+
+  - id: A1_Admin_Delete_Foreign
+    name: 관리자(admin) 타인 댓글 삭제
+    method: POST
+    login_as: 2
+    path: /comments/delete/1/
+    expected_status: 200-299
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Content
+    name: 댓글 내용 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /comments/
+    data: { content: "abc'); DROP TABLE users;--" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  - id: A3_SQLi_ReportReason
+    name: 신고 사유 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /comments/report/1/
+    data: { reason: "'); DROP TABLE comment_reports;--" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='comment_reports'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Content
+    name: 댓글 내용 XSS 저장
+    method: POST
+    login_as: 1
+    path: /comments/
+    data: { content: "<img src=x onerror=alert(1)>" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT comment_id FROM comments WHERE content LIKE '%onerror=%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP
+    name: /comments 페이지 CSP 헤더 부재
     method: GET
-    url: "/login/999/"
-    expected_status_codes: [403]
+    login_as: 1
+    path: /comments/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

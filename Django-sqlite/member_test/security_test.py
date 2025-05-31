@@ -1,80 +1,95 @@
-import os
-import requests
-import yaml
-import sqlite3
+#!/usr/bin/env python
+"""
+Django Member API 시나리오 러너
+사용:  python security_test.py
+"""
+import re, yaml, requests, sqlite3, json, os
+from pathlib import Path
+from typing import Dict, Any, Optional
 
-from urllib.parse import urljoin
+SEP  = "-" * 50
+VARS: Dict[str, str] = {}          # 플레이스홀더 저장
 
-BASE_URL = 'http://127.0.0.1:8000'
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SCENARIO_PATH = os.path.join(SCRIPT_DIR, 'scenario.yaml')
-DB_PATH = os.path.join(SCRIPT_DIR, 'mock_db.sqlite3')
+SCENARIO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "scenario.yaml")
+)
 
-def print_result(scenario_id, status_code, success, reason):
-    icon = '✅' if success else '❌'
-    print(f"{'-'*50}")
-    print(f"[Test ID: {scenario_id}] {reason}")
-    print(f"Status Code: {status_code}")
-    print(f"결과: {icon} {'정상' if success else '취약'}")
-    print(f"이유: {reason}")
-    print(f"{'-'*50}")
+def status_ok(code: int, spec: str) -> bool:
+    m = re.match(r"(\d+)-(\d+)$", spec)
+    return (code == int(spec)) if not m else int(m[1]) <= code <= int(m[2])
 
-def run_tests():
-    with open(SCENARIO_PATH, 'r', encoding='utf-8') as f:
-        scenarios = yaml.safe_load(f)['scenarios']
+def db_fetchone(db: str, query: str):
+    with sqlite3.connect(db) as conn:
+        cur = conn.cursor()
+        cur.execute(query)
+        return cur.fetchone()
 
-    for test in scenarios:
-        method = test['method']
-        url = urljoin(BASE_URL, test['endpoint'].lstrip('/'))
-        expected_status = test.get('expected_status', 200)
-        payload = test.get('payload')
-        headers = {'Content-Type': 'application/json'}
+def substitute(obj):
+    if isinstance(obj, str):
+        for k, v in VARS.items():
+            obj = obj.replace(f"{{{k}}}", str(v))
+    elif isinstance(obj, dict):
+        obj = {k: substitute(v) for k, v in obj.items()}
+    return obj
 
-        try:
-            if method == 'GET':
-                response = requests.get(url)
-            elif method == 'POST':
-                response = requests.post(url, json=payload, headers=headers)
-            else:
-                print_result(test['id'], 0, False, f"Unsupported HTTP method: {method}")
-                continue
+def run_test(base: str, db: str, t: Dict[str, Any]):
+    session = requests.Session()
 
-            status_code = response.status_code
-            content = response.text
+    method = t["method"]
+    url    = f"{base}{substitute(t['path'])}"
+    body_json = substitute(t.get("json"))
+    resp = session.request(method, url, json=body_json, allow_redirects=False, timeout=5)
 
-            # A5: Debug Mode 노출 확인
-            if test.get('expect_debug') is not None:
-                debug_exposed = 'Traceback' in content
-                expected_debug = test['expect_debug']
-                success = debug_exposed == expected_debug
-                reason = '디버그 정보가 노출됨' if debug_exposed else '디버그 정보 없음'
-                print_result(test['id'], status_code, success, reason)
-                continue
+    # PRE 스텝 – 변수 취득 후 종료
+    if t["id"].startswith("_PRE_"):
+        if "set_var_from_db" in t:
+            for var, query in t["set_var_from_db"].items():
+                VARS[var] = db_fetchone(db, query)[0]
+        print(f"[PRE] {t['name']} → 완료 (Status {resp.status_code})")
+        return
 
-            # A9: DB 저장 확인
-            if test.get('verify_db'):
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM members WHERE email=?", (payload['email'],))
-                row = cursor.fetchone()
-                conn.close()
+    ok = status_ok(resp.status_code, t["expected_status"])
+    reason: Optional[str] = None
 
-                if row:
-                    success = False
-                    reason = f"악성 신고 내용이 DB에 저장됨 (member_id: {row[0]}, name: {row[1]})"
-                else:
-                    success = True
-                    reason = "악성 내용이 저장되지 않음"
-                print_result(test['id'], status_code, success, reason)
-                continue
+    # DB 취약 확인
+    if ok and t.get("vuln_check"):
+        if db_fetchone(db, t["vuln_check"]["query"]):
+            ok, reason = False, "악성 데이터가 DB에 저장됨"
 
-            # 일반적인 상태코드 검증
-            success = (status_code == expected_status)
-            reason = f"Expected status {expected_status}, got {status_code}"
-            print_result(test['id'], status_code, success, reason)
+    # 헤더 체크
+    if ok and t.get("header_required"):
+        for h in t["header_required"]:
+            if h.lower() not in (k.lower() for k in resp.headers):
+                ok, reason = False, "보안 헤더 미설정"
+                break
 
-        except Exception as e:
-            print_result(test['id'], 0, False, f"오류 발생: {str(e)}")
+    # 기본 사유 매핑
+    if not ok and reason is None:
+        reason = {
+            "A3": "SQL 인젝션 허용",
+            "A5": "보안 헤더 미설정",
+            "A6": "비표준 HTTP 메서드 허용",
+            "A7": "입력 검증 실패",
+            "A9": "XSS 입력 저장",
+        }.get(t["id"].split("_")[0], "예상치 못한 응답")
 
-if __name__ == '__main__':
-    run_tests()
+    # 출력
+    print(SEP)
+    print(f"[Test ID: {t['id']}] {t['name']}")
+    print(f"Status Code: {resp.status_code}  (expected {t['expected_status']})")
+    print(f"결과: {'✅ 안전' if ok else '❌ 취약'}")
+    if reason and not ok:
+        print(f"이유: {reason}")
+
+def main():
+    cfg = yaml.safe_load(Path(SCENARIO_PATH).read_text(encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), cfg["database"])
+    )
+    for test in cfg["tests"]:
+        run_test(base, db, test)
+    print(SEP)
+
+if __name__ == "__main__":
+    main()

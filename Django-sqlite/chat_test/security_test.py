@@ -1,66 +1,99 @@
+"""
+security_test.py – Django Chat API security checker (Python 3.9)
+"""
+import re
 import yaml
 import requests
+import sqlite3
 import os
+from typing import Dict, Any, Optional
 
-SCENARIO_PATH = os.path.abspath("scenario.yaml")
+SEP = "-" * 50
 
-def load_scenarios():
-    with open(SCENARIO_PATH, 'r') as f:
-        return yaml.safe_load(f)
+SCENARIO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "scenario.yaml")
+)
 
-def login(base_url, user_id, session):
-    return session.get(f"{base_url}/login/{user_id}/")
 
-def run_test_case(base_url, scenario, session):
-    url = base_url + scenario["path"]
-    method = scenario["method"].upper()
-    data = scenario.get("data", {})
+def status_ok(code: int, spec: str) -> bool:
+    rng = re.match(r"(\d+)-(\d+)$", spec)
+    if rng:
+        lo, hi = map(int, rng.groups())
+        return lo <= code <= hi
+    return code == int(spec)
 
-    # 로그인 처리
-    if scenario.get("login_user"):
-        login(base_url, scenario["login_user"], session)
 
-    # 요청 실행
-    if method == "GET":
-        response = session.get(url)
-    elif method == "POST":
-        response = session.post(url, data=data)
-    else:
-        return {"status": "❌ Unknown method", "code": 0}
+def db_has_row(db: str, query: str) -> bool:
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    try:
+        cur.execute(query)
+        return cur.fetchone() is not None
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
 
-    # 기대 상태 코드 확인
-    status_match = response.status_code == scenario["expect_status"]
-    reflected = False
 
-    # Reflected XSS 또는 결과 확인
-    check_path = scenario.get("check_reflected_path")
-    if check_path:
-        check_resp = session.get(base_url + check_path)
-        reflected = data.get("content", "") in check_resp.text
+def run_test(base: str, db: str, t: Dict[str, Any]):
+    sess = requests.Session()
 
-    # 리포트 출력
-    print("--------------------------------------------------")
-    print(f"[Test ID: {scenario['id']}] {scenario['description']}")
-    print(f"Status Code: {response.status_code}")
-    if not status_match or reflected:
-        print("결과: ❌ 취약")
-        if reflected:
-            print("이유: 입력 내용이 페이지에 반영됨 (Reflected XSS 가능성)")
-        elif scenario["id"] == "A9_InsufficientLogging":
-            print("이유: 악성 신고 내용이 DB에 저장됨 (report_id: 1, user_id: 1)")  # 모의 메시지
-        else:
-            print(f"이유: 기대한 상태코드({scenario['expect_status']})와 다름")
-    else:
-        print("결과: ✅ 안전")
-    print("--------------------------------------------------")
+    # 로그인(옵션)
+    if t.get("login_as") is not None:
+        sess.get(f"{base}/login/{t['login_as']}/", allow_redirects=False)
+
+    resp = sess.request(
+        method=t["method"],
+        url=f"{base}{t['path']}",
+        data=t.get("data"),
+        allow_redirects=False,
+    )
+
+    ok = status_ok(resp.status_code, t["expected_status"])
+    reason: Optional[str] = None
+
+    if t.get("vuln_check") and db_has_row(db, t["vuln_check"]["query"]):
+        ok = False
+        reason = "악성 데이터가 DB에 저장됨"
+
+    if t.get("header_required"):
+        for h in t["header_required"]:
+            if h.lower() not in (k.lower() for k in resp.headers):
+                ok = False
+                reason = "보안 헤더 미설정"
+
+    if not ok and reason is None:
+        category = t["id"].split("_", 1)[0]
+        reason_map = {
+            "A1": "권한 우회 허용",
+            "A3": "SQL 인젝션 허용",
+            "A5": "보안 헤더 미설정",
+            "A6": "비표준 HTTP 메서드 허용",
+            "A7": "인증 우회 허용",
+            "A9": "XSS 입력 저장",
+        }
+        reason = reason_map.get(category, "예상치 못한 응답 코드")
+
+    return ok, resp.status_code, reason
+
 
 def main():
-    scenarios_data = load_scenarios()
-    base_url = scenarios_data["base_url"]
-    session = requests.Session()
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), cfg["database"])
+    )
 
-    for scenario in scenarios_data["scenarios"]:
-        run_test_case(base_url, scenario, session)
+    for test in cfg["tests"]:
+        safe, actual, why = run_test(base, db, test)
+        print(SEP)
+        print(f"[Test ID: {test['id']}] {test['name']}")
+        print(f"Status Code: {actual}  (expected {test['expected_status']})")
+        print(f"결과: {'✅ 안전' if safe else '❌ 취약'}")
+        if why and not safe:
+            print(f"이유: {why}")
+    print(SEP)
+
 
 if __name__ == "__main__":
     main()

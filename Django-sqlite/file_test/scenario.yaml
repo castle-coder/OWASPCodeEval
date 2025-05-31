@@ -1,46 +1,113 @@
+# Django File-Upload API – OWASP-Top-10 Test Scenarios
+base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
+
 tests:
-  - id: A1_BrokenAccessControl
-    description: "일반 사용자가 다른 사용자 파일 다운로드 시도"
-    setup:
-      login: 1
-      # 반드시 테스트 전에 'user_id=2'의 사용자가 업로드한 파일(id=1)이 있어야 합니다.
-    request:
-      method: GET
-      url: "http://localhost:8000/download/1/"
-    expected_status:
-      - 403
-      - 404
-    db_change: null
+  # ──────────────────── 초기 데이터 세팅 ────────────────────
+  - id: _PRE_UserUpload
+    name: (사전) user 파일 업로드
+    method: POST
+    login_as: 1
+    path: /upload/
+    data:  { description: "user file marker" }
+    file:  { name: "user.txt", content: "dummy-user-file" }
+    expected_status: 200-299
+    set_var_from_db:
+      USER_FILE_ID: "SELECT id FROM files WHERE description='user file marker' ORDER BY id DESC LIMIT 1"
 
-  - id: A4_InsecureDesign
-    description: "인증 없이 관리자 비활성화 기능 접근"
-    setup:
-      login: null
-    request:
-      method: POST
-      url: "http://localhost:8000/admin/block/1/"
-    expected_status:
-      - 401
-    db_change: "file.is_blocked remains False"
+  - id: _PRE_AdminUpload
+    name: (사전) admin 파일 업로드
+    method: POST
+    login_as: 2
+    path: /upload/
+    data:  { description: "admin file marker" }
+    file:  { name: "admin.txt", content: "dummy-admin-file" }
+    expected_status: 200-299
+    set_var_from_db:
+      ADMIN_FILE_ID: "SELECT id FROM files WHERE description='admin file marker' ORDER BY id DESC LIMIT 1"
 
-  - id: A5_SecurityMisconfiguration
-    description: "존재하지 않는 URL 접근 시 에러 확인"
-    setup:
-      login: null
-    request:
-      method: GET
-      url: "http://localhost:8000/nonexistent/"
-    expected_status:
-      - 404
-    db_change: null
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Upload_NoLogin
+    name: 로그인 없이 파일 업로드
+    method: POST
+    path: /upload/
+    data:  { description: "anon upload" }
+    file:  { name: "anon.txt", content: "anon-file" }
+    expected_status: 401-401
 
-  - id: A7_IdentificationAndAuthenticationFailures
-    description: "잘못된 사용자로 로그인 시도"
-    setup:
-      login: null
-    request:
-      method: GET
-      url: "http://localhost:8000/login/999/"
-    expected_status:
-      - 404
-    db_change: null
+  - id: A7_Report_NoLogin
+    name: 로그인 없이 신고
+    method: POST
+    path: /report/{USER_FILE_ID}/
+    data:  { reason: "spam" }
+    expected_status: 401-401
+
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_User_Delete_AdminFile
+    name: user가 admin 파일 삭제 시도
+    method: POST
+    login_as: 1
+    path: /delete/{ADMIN_FILE_ID}/
+    expected_status: 401-401
+
+  - id: A1_User_Block_File
+    name: 일반 user가 block 시도
+    method: POST
+    login_as: 1
+    path: /admin/block/{ADMIN_FILE_ID}/
+    expected_status: 401-401
+
+  - id: A1_Admin_Block_UserFile
+    name: admin이 user 파일 block
+    method: POST
+    login_as: 2
+    path: /admin/block/{USER_FILE_ID}/
+    expected_status: 200-299
+
+  # ────────── A4 • Insecure Direct Object Reference ──────────
+  - id: A4_Download_Blocked
+    name: 차단된 파일 다운로드
+    method: GET
+    login_as: 1
+    path: /download/{USER_FILE_ID}/
+    expected_status: 403-403
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Description
+    name: SQLi description
+    method: POST
+    login_as: 1
+    path: /upload/
+    data:  { description: "abc'); DROP TABLE users;--" }
+    file:  { name: "sqli.txt", content: "malicious" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Description
+    name: XSS description 저장
+    method: POST
+    login_as: 1
+    path: /upload/
+    data:  { description: "<img src=x onerror=alert(1)>" }
+    file:  { name: "xss.txt", content: "xss-file" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT description FROM files WHERE description LIKE '%onerror=%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP_Files
+    name: /files CSP 헤더 부재
+    method: GET
+    login_as: 1
+    path: /files/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

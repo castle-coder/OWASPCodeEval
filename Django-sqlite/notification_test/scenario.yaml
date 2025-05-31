@@ -1,57 +1,112 @@
-# scenario.yaml
-base_url: "http://localhost:8000"
-scenarios:
-  - id: A1_BrokenAccessControl
-    name: "일반 사용자가 다른 사용자 알림 읽기로 표시"
-    login_user_id: 1
-    method: POST
-    endpoint: "/notifications/read/2/"
-    payload: {}
-    expected_safe_status_codes: [403]
-    db_effect: "notification.is_read 필드가 False로 유지됨"
+# Django Notification API – Test & Security Scenarios
+base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
 
-  - id: A3_Injection
-    name: "SQL 인젝션 시도 (회원 조회)"
-    login_user_id: 1
+tests:
+  # ──────────────────── 초기 데이터 세팅 ────────────────────
+  - id: _PRE_SeedNotification
+    name: (사전) admin → user 알림 1개 생성
+    login_as: 2                    # admin 세션 확보
+    db_exec:
+      - "INSERT INTO notifications (recipient_id, sender_id, message, created_at, is_read, is_blocked) \
+         VALUES (1, 2, 'hello user', datetime('now'), 0, 0);"
+    set_var_from_db:
+      NOTIF_ID: "SELECT id FROM notifications WHERE message = 'hello user' ORDER BY id DESC LIMIT 1"
+
+  # ────────── 정상 플로우 ──────────
+  - id: OK_List_User
+    name: user 알림 목록 조회
     method: GET
-    endpoint: "/login/1%20OR%201=1/"
-    payload: {}
-    expected_safe_status_codes: [404]
-    db_effect: "변경 없음"
+    login_as: 1
+    path: /notifications/
+    expected_status: 200-299
 
-  - id: A4_InsecureDesign
-    name: "인증 없이 관리자 비활성화 기능 접근"
-    login_user_id: null
+  - id: OK_Mark_Read
+    name: 알림 읽음 처리
     method: POST
-    endpoint: "/admin/block_notification/1/"
-    payload: {}
-    expected_safe_status_codes: [401, 403]
-    db_effect: "변경 없음"
+    login_as: 1
+    path: /notifications/read/{NOTIF_ID}/
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT is_read FROM notifications WHERE id = {NOTIF_ID} AND is_read = 1"
 
-  - id: A5_SecurityMisconfiguration
-    name: "존재하지 않는 URL 접근 시 에러 확인"
-    login_user_id: null
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 사용자 로그인
     method: GET
-    endpoint: "/nonexistent-url/"
-    payload: {}
-    expected_safe_status_codes: [404]
-    db_effect: "변경 없음"
+    path: /login/999/
+    expected_status: 404-404
 
-  - id: A7_IdentificationAndAuthenticationFailures
-    name: "잘못된 사용자로 로그인 시도"
-    login_user_id: null
+  - id: A7_List_NoLogin
+    name: 로그인 없이 목록
     method: GET
-    endpoint: "/login/9999/"
-    payload: {}
-    expected_safe_status_codes: [404]
-    db_effect: "변경 없음"
+    path: /notifications/
+    expected_status: 401-401
 
-  - id: A9_SecurityLoggingMonitoring
-    name: "악성 입력 시도 후 저장 확인"
-    login_user_id: 1
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_Admin_Delete_UserNotif
+    name: admin이 아닌 수신자 외 삭제 시도
     method: POST
-    endpoint: "/notifications/report/1/"
-    payload:
-      reason: "<script>alert('xss')</script>"
-    expected_safe_status_codes: [200]
-    db_effect: "NotificationReport 테이블에 악성 스크립트가 reason으로 저장됨"
+    login_as: 2
+    path: /notifications/delete/{NOTIF_ID}/
+    expected_status: 403-403
+
+  - id: A1_User_Block_Attempt
+    name: 일반 user block 시도
+    method: POST
+    login_as: 1
+    path: /admin/block_notification/{NOTIF_ID}/
+    expected_status: 401-401
+
+  - id: A1_Admin_Block
+    name: admin이 알림 block
+    method: POST
+    login_as: 2
+    path: /admin/block_notification/{NOTIF_ID}/
+    expected_status: 200-299
+
+  # ────────── A4 • IDOR / Block 우회 ──────────
+  - id: A4_User_View_Blocked
+    name: 차단 알림 읽기 시도
+    method: POST
+    login_as: 1
+    path: /notifications/read/{NOTIF_ID}/
+    expected_status: 403-403
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_ReportReason
+    name: 신고 사유 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /notifications/report/{NOTIF_ID}/
+    data: { reason: "'); DROP TABLE users;--" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_ReportReason
+    name: 신고 사유 XSS 저장
+    method: POST
+    login_as: 1
+    path: /notifications/report/{NOTIF_ID}/
+    data: { reason: "<img src=x onerror=alert(1)>" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT reason FROM notification_reports WHERE reason LIKE '%onerror=%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP
+    name: /notifications CSP 헤더 부재
+    method: GET
+    login_as: 1
+    path: /notifications/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

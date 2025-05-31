@@ -1,43 +1,98 @@
-# scenario.yaml
-scenarios:
-  - id: A1_SQLInjection
-    description: "Event title SQL Injection 시도"
-    method: POST
-    endpoint: /events/create/
-    payload:
-      title: "Test'); DROP TABLE users;--"
-      description: "desc"
-      start_time: "2025-05-15T10:00:00"
-      end_time: "2025-05-15T11:00:00"
-    expected_status: 201
+# Django Event API – OWASP Top-10 보안 테스트 시나리오
+base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
 
-  - id: A5_BrokenAccessControl
-    description: "타인 이벤트 삭제 시도"
-    prerequisites:
-      login: 1  # user_id 1 (non-admin)
-    method: POST
-    endpoint: /events/2/delete/
-    expected_status: 403
+tests:
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID 로그인
+    method: GET
+    path: /login/999/
+    expected_status: 404-404
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 999" }
 
-  - id: A7_XSS
-    description: "이벤트 설명 XSS 스크립트 삽입"
-    prerequisites:
-      login: 1
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_CreateEvent_NoLogin
+    name: 로그인 없이 일정 생성
     method: POST
-    endpoint: /events/create/
-    payload:
-      title: "XSS Test"
-      description: "<script>alert('xss')</script>"
-      start_time: "2025-05-15T12:00:00"
-      end_time: "2025-05-15T13:00:00"
-    expected_status: 201
+    path: /events/create/
+    data:
+      title: "unauth"
+      description: "fail"
+      start_time: "2025-06-01T10:00:00"
+      end_time:   "2025-06-01T11:00:00"
+    expected_status: 401-401
 
-  - id: A9_InsufficientLogging
-    description: "신고 기능 악성 입력"
-    prerequisites:
-      login: 1
+  - id: A1_Delete_OtherUser
+    name: 타인 일정 삭제 시도
     method: POST
-    endpoint: /events/1/report/
-    payload:
-      reason: "<script>malicious</script>"
-    expected_status: 302
+    login_as: 1                     # 일반 user
+    path: /events/2/delete/         # event 2 는 admin 소유
+    expected_status: 403-403
+
+  - id: A1_Admin_Delete_Foreign
+    name: 관리자(admin) 타인 일정 삭제
+    method: POST
+    login_as: 2
+    path: /events/1/delete/
+    expected_status: 200-299
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Title
+    name: 일정 제목 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /events/create/
+    data:
+      title: "abc'); DROP TABLE users;--"
+      description: "sqli"
+      start_time: "2025-06-02T09:00:00"
+      end_time:   "2025-06-02T10:00:00"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  - id: A3_SQLi_DateField
+    name: start_time 필드 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /events/create/
+    data:
+      title: "date sqli"
+      description: "attack"
+      start_time: "2025-06-02T09:00:00'); DROP TABLE events;--"
+      end_time:   "2025-06-02T10:00:00"
+    expected_status: 400-499
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='events'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Title
+    name: 일정 제목 XSS 저장
+    method: POST
+    login_as: 1
+    path: /events/create/
+    data:
+      title: "<script>alert('x')</script>"
+      description: "xss test"
+      start_time: "2025-06-03T09:00:00"
+      end_time:   "2025-06-03T10:00:00"
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT event_id FROM events WHERE title LIKE '%<script%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP
+    name: /events 페이지 CSP 헤더 부재
+    method: GET
+    login_as: 1
+    path: /events/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

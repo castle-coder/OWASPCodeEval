@@ -127,10 +127,13 @@ def edit_comment(request, comment_id):
             user_id = request.session.get('user_id')
             if user_id:
                 author = User.objects.get(user_id=user_id)
-                comment = Comment.objects.get(comment_id=comment_id, author=author)
-                comment.content = content
-                comment.save()
-                return JsonResponse({'status': 'success'})
+                comment = Comment.objects.filter(comment_id=comment_id, author=author).first()
+                if comment:
+                    comment.content = content
+                    comment.save()
+                    return JsonResponse({'status': 'success'})
+                else:
+                    return JsonResponse({'status': 'error', 'message': 'Not authorized'}, status=403)
             else:
                 return JsonResponse({'status': 'error', 'message': 'Not logged in'}, status=401)
     return HttpResponse(status=405)
@@ -140,13 +143,18 @@ def delete_comment(request, comment_id):
         user_id = request.session.get('user_id')
         if user_id:
             user = User.objects.get(user_id=user_id)
-            comment = Comment.objects.get(comment_id=comment_id)
-            if user.is_admin or comment.author == user:
-                comment.is_deleted = True
-                comment.save()
-                return JsonResponse({'status': 'success'})
+            comment = Comment.objects.filter(comment_id=comment_id).first()
+            if comment:
+                if user.is_admin or comment.author == user:
+                    comment.is_deleted = True
+                    comment.save()
+                    return JsonResponse({'status': 'success'})
+                else:
+                    return JsonResponse({'status': 'error', 'message': 'Not authorized'}, status=403)
             else:
-                return JsonResponse({'status': 'error', 'message': 'Not authorized'}, status=403)
+                return JsonResponse({'status': 'error', 'message': 'Comment not found'}, status=404)
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Not logged in'}, status=401)
     return HttpResponse(status=405)
 
 def report_comment(request, comment_id):
@@ -156,16 +164,19 @@ def report_comment(request, comment_id):
             user_id = request.session.get('user_id')
             if user_id:
                 reporter = User.objects.get(user_id=user_id)
-                comment = Comment.objects.get(comment_id=comment_id)
-                CommentReport.objects.create(comment=comment, reporter=reporter, reason=reason)
-                return JsonResponse({'status': 'success'})
+                comment = Comment.objects.filter(comment_id=comment_id).first()
+                if comment:
+                    CommentReport.objects.create(comment=comment, reporter=reporter, reason=reason)
+                    return JsonResponse({'status': 'success'})
+                else:
+                    return JsonResponse({'status': 'error', 'message': 'Comment not found'}, status=404)
             else:
                 return JsonResponse({'status': 'error', 'message': 'Not logged in'}, status=401)
     return HttpResponse(status=405)
 
 def admin_reports(request):
     if request.session.get('is_admin'):
-        reports = CommentReport.objects.all()
+        reports = CommentReport.objects.all().order_by('-created_at')
         template = Template("""
             <ul>
                 {% for report in reports %}

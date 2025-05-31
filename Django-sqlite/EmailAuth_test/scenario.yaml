@@ -1,38 +1,78 @@
+# Django Email-Verification API – OWASP-Top-10 Test Scenarios
 base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
+
+# NOTE
+#   user_id 1 → alice@example.com     (Verified)
+#   user_id 2 → bob@example.com       (Unverified)
 
 tests:
-  - id: A1_Injection_SQL
-    description: SQL Injection via verification endpoint
-    endpoint: /verify/
+  # ──────────────────── 초기 데이터 세팅 ────────────────────
+  - id: _PRE_Seed_Charlie
+    name: (사전) charlie@example.com 사전 등록
     method: POST
-    data:
-      email: "bob@example.com' OR '1'='1"
-      code: "123456"
-    expect_in: "Verification successful."
-    vulnerable: true
+    path: /register/
+    data: { email: "charlie@example.com" }
+    expected_status: 200-299
 
-  - id: A5_SecurityMisconfiguration
-    description: DEBUG mode should be off in production (checked via /__check_debug__/)
-    endpoint: /__check_debug__/  # app.py에 추가한 진단용 엔드포인트 호출
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Verify_NonExist
+    name: 존재하지 않는 이메일로 인증 시도
+    method: POST
+    path: /verify/
+    data: { email: "nobody@example.com", code: "000000" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT user_id FROM users WHERE email = 'nobody@example.com'"
+
+  - id: A7_Profile_NoSession
+    name: 세션 없이 프로필 접근
     method: GET
-    headers: {}
-    expect_in: '"DJANGO_SETTINGS_DEBUG": true' # DEBUG가 true인 응답 문자열을 찾음 (이것이 발견되면 취약)
-    vulnerable: true
+    path: /profile/
+    expected_status: 404-404
 
-  - id: A7_XSS
-    description: Reflected XSS in email field
-    endpoint: /register/
-    method: POST
-    data:
-      email: "<script>alert(1)</script>@example.com"
-    expect_in: "<script>alert(1)</script>"
-    vulnerable: true
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_Profile_OtherUser
+    name: 세션 하이재킹 (bob 세션으로 alice 프로필 열람)
+    method: GET
+    login_as: 2
+    path: /profile/
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT verified FROM users WHERE user_id = 2 AND verified = 1"
 
-  - id: A9_InsufficientLogging
-    description: Malicious report input being stored without sanitization
-    endpoint: /register/
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Register
+    name: SQL 인젝션 이메일 등록
     method: POST
-    data:
-      email: "malicious@attacker.com'; DROP TABLE users; --"
-    expect_in: "Code was sent."
-    vulnerable: true
+    path: /register/
+    data: { email: "evil@example.com'); DROP TABLE users;--" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Email
+    name: 이메일 필드 XSS 저장
+    method: POST
+    path: /register/
+    data: { email: "<script>alert(1)</script>@xss.com" }
+    expected_status: 200-299
+    vuln_check:
+      query: "SELECT email FROM users WHERE email LIKE '%<script>%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP
+    name: /profile 페이지 CSP 헤더 부재
+    method: GET
+    login_as: 1
+    path: /profile/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405

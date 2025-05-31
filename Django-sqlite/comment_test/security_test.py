@@ -1,85 +1,115 @@
-# security_test.py
+"""
+security_test.py – Django Comment / Report API security tester
+"""
+import re
 import yaml
 import requests
 import sqlite3
+import os
+from typing import Dict, Any, Optional
 
-BASE_URL = 'http://localhost:8000'
+SEP = "-" * 50
 
-def load_scenarios(path='scenario.yaml'):
-    with open(path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)['tests']
+SCENARIO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "scenario.yaml")
+)
 
-def get_db_state(db_path='mock_db.sqlite3'):
-    conn = sqlite3.connect(db_path)
+
+def status_ok(code: int, spec: str) -> bool:
+    m = re.match(r"(\d+)-(\d+)$", spec)
+    if m:
+        lo, hi = map(int, m.groups())
+        return lo <= code <= hi
+    return code == int(spec)
+
+
+def db_has_row(db: str, query: str) -> bool:
+    conn = sqlite3.connect(db)
     cur = conn.cursor()
-    tables = ['users', 'comments', 'comment_reports']
-    state = {}
-    for t in tables:
-        cur.execute(f'SELECT COUNT(*) FROM {t}')
-        state[t] = cur.fetchone()[0]
-    conn.close()
-    return state
+    try:
+        cur.execute(query)
+        return cur.fetchone() is not None
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
 
-def diff_states(before, after):
-    diffs = {}
-    for k in before:
-        delta = after[k] - before[k]
-        if delta != 0:
-            diffs[k] = delta
-    return diffs
 
-def run_test(test):
-    session = requests.Session()
+def run_test(base: str, db: str, t: Dict[str, Any]) -> None:
+    sess = requests.Session()
 
-    # Pre-login if needed
-    if 'login_user_id' in test:
-        session.get(f"{BASE_URL}/login/{test['login_user_id']}/")
+    # optional pre-steps (for seeding data etc.)
+    for step in t.get("pre", []):
+        sess.request(
+            method=step["method"],
+            url=f"{base}{step['path']}",
+            data=step.get("data"),
+            allow_redirects=False,
+        )
 
-    pre_state = get_db_state()
+    # optional login
+    if t.get("login_as") is not None:
+        sess.get(f"{base}/login/{t['login_as']}/", allow_redirects=False)
 
-    # Perform the request
-    url = BASE_URL + test['url']
-    method = test['method'].upper()
-    if method == 'GET':
-        resp = session.get(url)
-    elif method == 'POST':
-        resp = session.post(url, data=test.get('payload', {}))
-    else:
-        raise ValueError(f"Unsupported method {method}")
+    resp = sess.request(
+        method=t["method"],
+        url=f"{base}{t['path']}",
+        data=t.get("data"),
+        allow_redirects=False,
+    )
 
-    status = resp.status_code
-    is_safe = status in test['expected_status_codes']
-    icon = '✅' if is_safe else '❌'
-    result_text = '안전' if is_safe else '취약'
-    reason = f"예상 코드 {test['expected_status_codes']}, 실제 코드 {status}"
+    ok = status_ok(resp.status_code, t["expected_status"])
+    reason: Optional[str] = None
 
-    print('--------------------------------------------------')
-    print(f"[Test ID: {test['id']}] {test['description']}")
-    print(f"Status Code: {status}")
-    print(f"결과: {icon} {result_text}")
-    print(f"이유: {reason}")
+    # DB-level vuln check
+    if t.get("vuln_check") and db_has_row(db, t["vuln_check"]["query"]):
+        ok = False
+        reason = "악성 데이터가 DB에 저장됨"
 
-    if not is_safe:
-        post_state = get_db_state()
-        changes = diff_states(pre_state, post_state)
-        if changes:
-            print("DB Changes:")
-            for table, delta in changes.items():
-                sign = '+' if delta > 0 else ''
-                print(f"  {table}: {sign}{delta}")
-    print('--------------------------------------------------\n')
+    # header check
+    if t.get("header_required"):
+        for h in t["header_required"]:
+            if h.lower() not in (k.lower() for k in resp.headers):
+                ok = False
+                reason = "보안 헤더 미설정"
 
-if __name__ == '__main__':
-    scenarios = load_scenarios()
-    for scenario in scenarios:
-        run_test(scenario)
+    # default reason mapping
+    if not ok and reason is None:
+        category = t["id"].split("_", 1)[0]
+        reason_map = {
+            "A1": "권한 우회 허용",
+            "A3": "SQL 인젝션 허용",
+            "A5": "보안 헤더 미설정",
+            "A6": "비표준 HTTP 메서드 허용",
+            "A7": "인증 우회 허용",
+            "A9": "XSS 입력 저장",
+        }
+        reason = reason_map.get(category, "예상치 못한 응답 코드")
 
-"""
-# Excluded OWASP Top 10 and reasons:
-# A2_CryptographicFailures: 이 코드에서는 비밀번호 저장이나 해시 처리 로직이 없습니다.
-# A4_InsecureDesign: 관리자 비활성화 등의 기능이 구현되어 있지 않습니다.
-# A6_VulnerableComponents: 외부 취약 컴포넌트나 라이브러리를 사용하지 않습니다.
-# A8_SoftwareAndDataIntegrityFailures: 파일 무결성 검증이나 업데이트 검증 로직이 없습니다.
-# A9_SecurityLoggingMonitoring: 로깅/모니터링 기능이 전혀 구현되어 있지 않습니다.
-# A10_ServerSideRequestForgery: 외부 서버 호출을 수행하는 엔드포인트가 없습니다.
-"""
+    # output
+    print(SEP)
+    print(f"[Test ID: {t['id']}] {t['name']}")
+    print(f"Status Code: {resp.status_code}  (expected {t['expected_status']})")
+    print(f"결과: {'✅ 안전' if ok else '❌ 취약'}")
+    if reason and not ok:
+        print(f"이유: {reason}")
+
+
+def main() -> None:
+    cfg = yaml.safe_load(open(SCENARIO_PATH, encoding="utf-8"))
+    base = cfg["base_url"].rstrip("/")
+    db = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), cfg["database"])
+    )
+
+    for test in cfg["tests"]:
+        # _PRE_ prefix → seed only, no pass/fail 표시
+        if test["id"].startswith("_PRE_"):
+            run_test(base, db, test)
+            continue
+        run_test(base, db, test)
+    print(SEP)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,48 +1,94 @@
-# scenario.yaml
+# Django Board API – OWASP Top-10 기반 테스트 시나리오
+base_url: http://127.0.0.1:8000          # runserver 기본 포트
+database: mock_db.sqlite3
+
 tests:
-  - id: A1_SQLInjection
-    name: "게시판 제목 SQL Injection 시도"
-    method: "POST"
-    url: "/posts/create/"
-    login: true
-    data:
-      title: "Test'; DROP TABLE posts;--"
-      content: "SQLi"
-    expected_status: 201
-    assert_table_exists: "posts"
+  # ────────── A7 • Identification & Authentication Failures ──────────
+  - id: A7_Login_NonExist
+    name: 존재하지 않는 ID 로그인
+    method: GET
+    path: /login/999/
+    expected_status: 404-404
+    vuln_check: { query: "SELECT user_id FROM users WHERE user_id = 999" }
 
-  - id: A2_UnauthenticatedAccess
-    name: "로그인 없이 게시글 생성"
-    method: "POST"
-    url: "/posts/create/"
-    login: false
-    data:
-      title: "Hello"
-      content: "World"
-    expected_status: 401
+  # ────────── A1 • Broken Access Control ──────────
+  - id: A1_CreatePost_NoLogin
+    name: 로그인 없이 게시글 생성
+    method: POST
+    path: /posts/create/
+    data: { title: "unauth", content: "fail" }
+    expected_status: 401-401
 
-  - id: A5_BrokenAccessControl
-    name: "타인 게시글 삭제 시도"
-    method: "POST"
-    url: "/posts/1/delete/"
-    login: true
-    login_as: 2            # user_id=2 (non-owner)
-    data: {}
-    expected_status: 403
-    assert_in_db:
-      table: "posts"
-      column: "post_id"
-      value: 1
+  - id: A1_Comment_NoLogin
+    name: 로그인 없이 댓글 작성
+    method: POST
+    path: /posts/1/comment/
+    data: { content: "unauth-comment" }
+    expected_status: 401-401
 
-  - id: A7_XSS
-    name: "댓글 XSS 스크립트 삽입"
-    method: "POST"
-    url: "/posts/1/comment/"
-    login: true
+  - id: A1_Delete_OtherUser
+    name: 타인 게시글 삭제 시도
+    method: POST
+    login_as: 1                     # user_id 1 → 일반 사용자
+    path: /posts/2/delete/          # post 2 는 admin 이 작성
+    expected_status: 403-403
+
+  - id: A1_Admin_Delete_Foreign
+    name: 관리자(admin) 다른 사람 글 삭제
+    method: POST
+    login_as: 2                     # admin
+    path: /posts/1/delete/          # user 글
+    expected_status: 200-299
+
+  # ────────── A3 • Injection (SQLi) ──────────
+  - id: A3_SQLi_Title
+    name: 게시글 제목 SQL 인젝션
+    method: POST
+    login_as: 1
+    path: /posts/create/
     data:
-      content: "<script>alert('xss')</script>"
-    expected_status: 201
-    assert_not_in_db:
-      table: "comments"
-      column: "content"
-      value: "<script>alert('xss')</script>"
+      title: "abc'); DROP TABLE users;--"
+      content: "sqli"
+    expected_status: 201-201
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_PostTitle
+    name: 게시글 제목 스크립트 저장
+    method: POST
+    login_as: 1
+    path: /posts/create/
+    data:
+      title: "<script>alert('x')</script>"
+      content: "xss"
+    expected_status: 201-201
+    vuln_check:
+      query: "SELECT post_id FROM posts WHERE title LIKE '%<script%'"
+
+  - id: A9_XSS_Comment
+    name: 댓글 내용 스크립트 저장
+    method: POST
+    login_as: 1
+    path: /posts/2/comment/
+    data:
+      content: "<img src=x onerror=alert(1)>"
+    expected_status: 201-201
+    vuln_check:
+      query: "SELECT comment_id FROM comments WHERE content LIKE '%onerror=%'"
+
+  # ────────── A5 • Security Misconfiguration (헤더) ──────────
+  - id: A5_Header_CSP
+    name: Content-Security-Policy 헤더 부재
+    method: GET
+    login_as: 1
+    path: /posts/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported / Info-leak HTTP Methods ──────────
+  - id: A6_OPTIONS_Root
+    name: OPTIONS / 허용 여부
+    method: OPTIONS
+    path: /
+    expected_status: 200-299

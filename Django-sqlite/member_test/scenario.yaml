@@ -1,39 +1,77 @@
-# 🔒 OWASP Top 10 Security Testing Scenarios
-# 절대경로는 security_test.py 내에서 동적으로 처리됩니다.
+# Django Member API – Test & Security Scenarios
+base_url: http://127.0.0.1:8000
+database: mock_db.sqlite3
 
-scenarios:
-  - id: A1_UnauthorizedAccess
-    description: "로그인 없이 멤버 목록 접근"
-    method: GET
-    endpoint: "/members/"
-    expected_status: 200
-    owasp: A1
-
-  - id: A3_SQLInjection
-    description: "회원 등록 시 SQL Injection 시도"
+tests:
+  # ────────── 초기 데이터 세팅 ──────────
+  - id: _PRE_Register_Charlie
+    name: (사전) charlie@example.com 등록
     method: POST
-    endpoint: "/members/register/"
-    payload:
-      name: "attacker"
-      email: "' OR 1=1 --"
-    expected_status: 400
-    owasp: A3
+    path: /members/register/
+    json: { name: "Charlie", email: "charlie@example.com" }
+    expected_status: 201-201
+    set_var_from_db:
+      CHARLIE_ID: "SELECT member_id FROM members WHERE email='charlie@example.com'"
 
-  - id: A5_DebugMode
-    description: "Debug 모드가 켜져 있는지 테스트"
+  # ────────── 정상 플로우 확인 ──────────
+  - id: OK_List
+    name: 회원 목록 조회
     method: GET
-    endpoint: "/nonexistent/"
-    expected_status: 404
-    expect_debug: false
-    owasp: A5
+    path: /members/
+    expected_status: 200-299
 
-  - id: A9_InsufficientLogging
-    description: "신고 기능 악성 입력"
+  - id: OK_View_Charlie
+    name: 단일 회원 조회
+    method: GET
+    path: /members/{CHARLIE_ID}/
+    expected_status: 200-299
+
+  # ────────── A7 • 입력 검증 실패 ──────────
+  - id: A7_Duplicate_Email
+    name: 이메일 중복 등록
     method: POST
-    endpoint: "/members/register/"
-    payload:
-      name: "<script>alert(1)</script>"
-      email: "evil@example.com"
-    expected_status: 201
-    verify_db: true
-    owasp: A9
+    path: /members/register/
+    json: { name: "Dupe", email: "charlie@example.com" }
+    expected_status: 400-400
+
+  - id: A7_Missing_Field
+    name: 필드 누락
+    method: POST
+    path: /members/register/
+    json: { name: "NoEmail" }
+    expected_status: 400-400
+
+  # ────────── A3 • SQL Injection ──────────
+  - id: A3_SQLi_Email
+    name: SQL 인젝션 이메일
+    method: POST
+    path: /members/register/
+    json: { name: "Evil", email: "evil@example.com'); DROP TABLE members;--" }
+    expected_status: 201-201
+    vuln_check:
+      query: "SELECT name FROM sqlite_master WHERE type='table' AND name='members'"
+
+  # ────────── A9 • Stored XSS ──────────
+  - id: A9_XSS_Name
+    name: XSS 이름 저장
+    method: POST
+    path: /members/register/
+    json: { name: "<script>alert(1)</script>", email: "xss@example.com" }
+    expected_status: 201-201
+    vuln_check:
+      query: "SELECT name FROM members WHERE name LIKE '%<script>%'"
+
+  # ────────── A5 • Security Misconfiguration ──────────
+  - id: A5_Header_CSP
+    name: /members CSP 헤더 부재
+    method: GET
+    path: /members/
+    expected_status: 200-299
+    header_required: ["Content-Security-Policy"]
+
+  # ────────── A6 • Unsupported HTTP Methods ──────────
+  - id: A6_TRACE_Root
+    name: TRACE / 허용 여부
+    method: TRACE
+    path: /
+    expected_status: 405-405
