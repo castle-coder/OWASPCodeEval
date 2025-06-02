@@ -1,9 +1,4 @@
 from django.conf import settings
-from django.db import models, connection
-from django.http import HttpResponse, JsonResponse
-from django.template import Template, Context
-from django.urls import path
-
 settings.configure(
     SECRET_KEY='your-secret-key',
     DEBUG=True,
@@ -43,6 +38,10 @@ settings.configure(
 import django
 django.setup()
 
+from django.db import models, connection
+from django.http import HttpResponse, JsonResponse
+from django.template.loader import get_template
+
 class User(models.Model):
     user_id   = models.AutoField(primary_key=True)
     username  = models.CharField(max_length=150)
@@ -76,36 +75,36 @@ class Comment(models.Model):
 def login(request, user_id):
     user = User.objects.filter(user_id=user_id).first()
     if user:
-        request.session['user_id'] = user_id
+        request.session['user_id'] = user.user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse(status=200)
+        return HttpResponse('OK', status=200)
     else:
-        return HttpResponse(status=404)
+        return HttpResponse('Not Found', status=404)
 
 def view_posts(request):
     posts = Post.objects.filter(is_deleted=False)
-    template = Template('<ul>{% for post in posts %}<li>{{ post.title }} by {{ post.user.username }} ({{ post.created_at }})</li>{% endfor %}</ul>')
-    context = Context({'posts': posts})
+    template = get_template('posts.html')
+    context = {'posts': posts}
     return HttpResponse(template.render(context))
 
 def search_posts(request):
-    keyword = request.GET.get('q', '')
-    posts = Post.objects.filter(is_deleted=False, title__icontains=keyword) | Post.objects.filter(is_deleted=False, content__icontains=keyword)
-    template = Template('<ul>{% for post in posts %}<li>{{ post.title }} by {{ post.user.username }} ({{ post.created_at }})</li>{% endfor %}</ul>')
-    context = Context({'posts': posts})
+    keyword = request.GET.get('q')
+    posts = Post.objects.filter(is_deleted=False).filter(title__icontains=keyword).filter(content__icontains=keyword)
+    template = get_template('posts.html')
+    context = {'posts': posts}
     return HttpResponse(template.render(context))
 
 def add_comment(request, post_id):
-    if 'user_id' not in request.session:
-        return HttpResponse(status=401)
-    user = User.objects.get(user_id=request.session['user_id'])
-    post = Post.objects.get(post_id=post_id)
-    if request.method == 'POST':
-        content = request.POST.get('content', '')
+    if request.session.get('user_id'):
+        user = User.objects.get(user_id=request.session['user_id'])
+        post = Post.objects.get(post_id=post_id)
+        content = request.POST.get('content')
         Comment.objects.create(post=post, user=user, content=content)
-        return HttpResponse(status=200)
+        return HttpResponse('OK', status=200)
     else:
-        return HttpResponse(status=405)
+        return HttpResponse('Unauthorized', status=401)
+
+from django.urls import path
 
 urlpatterns = [
     path('login/<int:user_id>/', login, name='login'),

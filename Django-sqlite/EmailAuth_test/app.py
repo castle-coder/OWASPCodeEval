@@ -1,8 +1,10 @@
+# app.py
+
 from django.conf import settings
 from django.db import models, connection
-from django.http import HttpResponse, HttpResponseNotFound
-from django.template import Template, Context
+from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import path
+from django.template import Template, Context
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -52,51 +54,50 @@ class User(models.Model):
         app_label = 'authapp'
         db_table = 'users'
 
+existing = connection.introspection.table_names()
+with connection.schema_editor() as schema_editor:
+    if 'users' not in existing: schema_editor.create_model(User)
+
+if not User.objects.filter(email='alice@example.com').exists():
+    User.objects.create(email='alice@example.com', verified=True, verification_code='654321')
+
+if not User.objects.filter(email='bob@example.com').exists():
+    User.objects.create(email='bob@example.com', verified=False, verification_code='123456')
+
 def register(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         if not User.objects.filter(email=email).exists():
-            user = User.objects.create(email=email, verification_code='123456')
+            user = User.objects.create(email=email, verification_code=''.join([str(i) for i in range(6)]))
             print(f"Verification code sent to {email}: {user.verification_code}")
-            return HttpResponse("Code was sent.")
+            return HttpResponse("Code was sent")
         else:
-            return HttpResponse("Email already registered.")
-    return HttpResponse("""
-        <form method="post">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email">
-            <button type="submit">Register</button>
-        </form>
-    """)
+            return HttpResponse("Email already registered", status=400)
+    return HttpResponse(
+        Template('<form method="post"><input type="email" name="email"><button type="submit">Register</button></form>').render(Context({}))
+    )
 
 def verify(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         code = request.POST.get('code')
-        user = User.objects.filter(email=email, verification_code=code).first()
-        if user:
+        try:
+            user = User.objects.get(email=email, verification_code=code)
             user.verified = True
             user.save()
             request.session['user_id'] = user.user_id
-            return HttpResponse("Verification successful.")
-        else:
-            return HttpResponse("Invalid code.")
-    return HttpResponse("""
-        <form method="post">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email">
-            <label for="code">Verification Code:</label>
-            <input type="text" id="code" name="code">
-            <button type="submit">Verify</button>
-        </form>
-    """)
+            return HttpResponseRedirect('/profile/')
+        except User.DoesNotExist:
+            return HttpResponse("Invalid code", status=400)
+    return HttpResponse(
+        Template('<form method="post"><input type="email" name="email"><input type="text" name="code"><button type="submit">Verify</button></form>').render(Context({}))
+    )
 
 def profile(request):
-    if 'user_id' in request.session:
-        user = User.objects.get(user_id=request.session['user_id'])
-        return HttpResponse(f"Email: {user.email}, Verified: {user.verified}")
-    else:
-        return HttpResponseNotFound("User not logged in.")
+    if 'user_id' not in request.session:
+        return HttpResponse("You are not logged in", status=401)
+    user = User.objects.get(user_id=request.session['user_id'])
+    return HttpResponse(f"Email: {user.email}, Verified: {user.verified}")
 
 urlpatterns = [
     path('register/', register, name='register'),
@@ -105,16 +106,4 @@ urlpatterns = [
 ]
 
 if __name__ == '__main__':
-    existing = connection.introspection.table_names()
-    with connection.schema_editor() as schema_editor:
-        if 'users' not in existing: schema_editor.create_model(User)
-
-    # Create initial users
-    if not User.objects.filter(email='alice@example.com').exists():
-        User.objects.create(email='alice@example.com', verified=True, verification_code='654321')
-
-    if not User.objects.filter(email='bob@example.com').exists():
-        User.objects.create(email='bob@example.com', verified=False, verification_code='123456')
-
-    from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])

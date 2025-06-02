@@ -1,6 +1,9 @@
 from django.conf import settings
-from django.db import models, connection
-from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
+import django
+django.setup()
+
+from django.db import models, connection, transaction
+from django.http import HttpResponse, Http404, JsonResponse
 from django.template import Template, Context
 from django.utils import timezone
 from datetime import datetime
@@ -46,6 +49,8 @@ settings.configure(
 import django
 django.setup()
 
+from django.db import models
+
 class User(models.Model):
     user_id   = models.AutoField(primary_key=True)
     username  = models.CharField(max_length=150)
@@ -66,53 +71,6 @@ class Event(models.Model):
         app_label = 'app'
         db_table  = 'events'
 
-def login(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
-        request.session['user_id'] = user_id
-        request.session['is_admin'] = user.is_admin
-        return HttpResponse('200 OK')
-    else:
-        return HttpResponseNotFound('404 Not Found')
-
-def create_event(request):
-    if 'user_id' not in request.session:
-        return HttpResponse('401 Unauthorized', status=401)
-    user = User.objects.get(user_id=request.session['user_id'])
-    if request.method == 'POST':
-        title = request.POST.get('title')
-        description = request.POST.get('description')
-        start_time = timezone.make_aware(datetime.strptime(request.POST.get('start_time'), '%Y-%m-%dT%H:%M:%S'))
-        end_time = timezone.make_aware(datetime.strptime(request.POST.get('end_time'), '%Y-%m-%dT%H:%M:%S'))
-        Event.objects.create(user=user, title=title, description=description, start_time=start_time, end_time=end_time)
-        return HttpResponse('200 OK')
-    else:
-        return HttpResponse('405 Method Not Allowed', status=405)
-
-def view_events(request):
-    events = Event.objects.filter(is_deleted=False)
-    template = Template('<ul>{% for event in events %}<li>{{ event.title }} - {{ event.user.username }} - {{ event.start_time }} - {{ event.end_time }}{% if request.session.is_admin %} <form method="post" action="{% url "delete_event" event.event_id %}"><button type="submit">Delete</button></form>{% endif %}</li>{% endfor %}</ul>')
-    context = Context({'events': events})
-    return HttpResponse(template.render(context))
-
-def event_detail(request, event_id):
-    event = Event.objects.get(event_id=event_id)
-    template = Template('<h1>{{ event.title }}</h1><p>{{ event.description }}</p><p>Start: {{ event.start_time }}</p><p>End: {{ event.end_time }}</p>')
-    context = Context({'event': event})
-    return HttpResponse(template.render(context))
-
-def delete_event(request, event_id):
-    if 'user_id' not in request.session:
-        return HttpResponse('401 Unauthorized', status=401)
-    user = User.objects.get(user_id=request.session['user_id'])
-    event = Event.objects.get(event_id=event_id)
-    if user.is_admin or event.user == user:
-        event.is_deleted = True
-        event.save()
-        return HttpResponse('200 OK')
-    else:
-        return HttpResponse('403 Forbidden', status=403)
-
 from django.urls import path
 
 urlpatterns = [
@@ -123,11 +81,83 @@ urlpatterns = [
     path('events/<int:event_id>/delete/',  delete_event, name='delete_event'),
 ]
 
+def login(request, user_id):
+    try:
+        user = User.objects.get(user_id=user_id)
+        request.session['user_id'] = user.user_id
+        request.session['is_admin'] = user.is_admin
+        return HttpResponse('200')
+    except User.DoesNotExist:
+        return HttpResponse('404')
+
+def create_event(request):
+    if 'user_id' not in request.session:
+        return JsonResponse({'error': 'Not logged in'}, status=401)
+    
+    data = request.POST
+    user = User.objects.get(user_id=request.session['user_id'])
+    event = Event.objects.create(
+        user=user,
+        title=data['title'],
+        description=data['description'],
+        start_time=timezone.make_aware(datetime.strptime(data['start_time'], '%Y-%m-%dT%H:%M:%S')),
+        end_time=timezone.make_aware(datetime.strptime(data['end_time'], '%Y-%m-%dT%H:%M:%S'))
+    )
+    return JsonResponse({'event_id': event.event_id})
+
+def view_events(request):
+    events = Event.objects.filter(is_deleted=False)
+    template = Template("""
+    <html><body>
+        <h1>Events</h1>
+        <ul>
+            {% for event in events %}
+                <li>{{ event.title }} by {{ event.user.username }} ({{ event.start_time }} - {{ event.end_time }}) {% if request.session.is_admin %}<form method="POST" action="{% url 'delete_event' event.event_id %}"><input type="submit" value="Delete"></form>{% endif %}</li>
+            {% endfor %}
+        </ul>
+    </body></html>
+    """)
+    context = Context({'events': events})
+    return HttpResponse(template.render(context))
+
+def event_detail(request, event_id):
+    try:
+        event = Event.objects.get(event_id=event_id, is_deleted=False)
+        template = Template("""
+        <html><body>
+            <h1>{{ event.title }}</h1>
+            <p><strong>By:</strong> {{ event.user.username }}</p>
+            <p><strong>Time:</strong> {{ event.start_time }} - {{ event.end_time }}</p>
+            <p><strong>Description:</strong> {{ event.description }}</p>
+        </body></html>
+        """)
+        context = Context({'event': event})
+        return HttpResponse(template.render(context))
+    except Event.DoesNotExist:
+        raise Http404("Event not found")
+
+def delete_event(request, event_id):
+    if 'user_id' not in request.session:
+        return JsonResponse({'error': 'Not logged in'}, status=401)
+    
+    user = User.objects.get(user_id=request.session['user_id'])
+    event = Event.objects.get(event_id=event_id)
+    if event.user_id == user.user_id or user.is_admin:
+        event.is_deleted = True
+        event.save()
+        return JsonResponse({'status': 'success'})
+    else:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
 if __name__ == '__main__':
+    from django.db import connection
     existing = connection.introspection.table_names()
     with connection.schema_editor() as schema_editor:
         if 'users'  not in existing: schema_editor.create_model(User)
         if 'events' not in existing: schema_editor.create_model(Event)
+
+    from datetime import datetime
+    from django.utils import timezone
 
     user1 = User.objects.create(username='user',  is_admin=False)
     admin = User.objects.create(username='admin', is_admin=True)

@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.db import models, connection
-from django.http import HttpResponse, JsonResponse
 from django.template import Template, Context
+from django.db import models, connection
 from django.urls import path
-from django.utils import timezone
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.http import require_http_methods
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -73,58 +73,63 @@ class Order(models.Model):
         app_label = 'shop'
         db_table = 'orders'
 
+@require_http_methods(["GET"])
 def login(request, user_id):
     user = User.objects.filter(user_id=user_id).first()
     if user:
-        request.session['user_id'] = user_id
+        request.session['user_id'] = user.user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse('200 OK', status=200)
+        return HttpResponse(status=200)
     else:
-        return HttpResponse('404 Not Found', status=404)
+        return HttpResponse(status=404)
 
+@require_http_methods(["GET"])
 def list_products(request):
     products = Product.objects.filter(is_active=True).values('name', 'description', 'price', 'stock')
     return JsonResponse(list(products), safe=False)
 
+@require_http_methods(["POST"])
 def add_product(request):
     if request.session.get('is_admin', False):
         data = request.POST
         Product.objects.create(
-            name=data['name'],
-            description=data['description'],
-            price=data['price'],
-            stock=data['stock']
+            name=data.get('name'),
+            description=data.get('description'),
+            price=data.get('price'),
+            stock=data.get('stock'),
         )
-        return HttpResponse('200 OK', status=200)
+        return HttpResponse(status=200)
     else:
-        return HttpResponse('403 Forbidden', status=403)
+        return HttpResponse(status=403)
 
+@require_http_methods(["POST"])
 def order_product(request, product_id):
-    if request.session.get('user_id', None):
-        user = User.objects.get(user_id=request.session['user_id'])
+    user_id = request.session.get('user_id')
+    if user_id:
+        user = User.objects.get(user_id=user_id)
         product = Product.objects.get(product_id=product_id)
-        if product.stock >= int(request.POST['quantity']):
-            product.stock -= int(request.POST['quantity'])
+        if product.stock >= product.quantity:
+            product.stock -= product.quantity
             product.save()
             Order.objects.create(
                 user=user,
                 product=product,
-                quantity=int(request.POST['quantity']),
-                ordered_at=timezone.now()
+                quantity=product.quantity,
             )
-            return HttpResponse('200 OK', status=200)
+            return HttpResponse(status=200)
         else:
-            return HttpResponse('400 Bad Request', status=400)
+            return HttpResponse(status=400)
     else:
-        return HttpResponse('401 Unauthorized', status=401)
+        return HttpResponse(status=401)
 
+@require_http_methods(["GET"])
 def view_orders(request):
-    if request.session.get('user_id', None):
-        user = User.objects.get(user_id=request.session['user_id'])
-        orders = Order.objects.filter(user=user).values('product__name', 'quantity', 'ordered_at')
+    user_id = request.session.get('user_id')
+    if user_id:
+        orders = Order.objects.filter(user_id=user_id).values('product__name', 'quantity', 'ordered_at')
         return JsonResponse(list(orders), safe=False)
     else:
-        return HttpResponse('401 Unauthorized', status=401)
+        return HttpResponse(status=401)
 
 urlpatterns = [
     path('login/<int:user_id>/',                login,         name='login'),
@@ -148,8 +153,8 @@ if __name__ == '__main__':
     Product.objects.create(name='Phone', description='A smart phone', price=800.00, stock=10)
 
     from datetime import datetime
-    Order.objects.create(user=user1, product=Product.objects.get(product_id=1), quantity=1)
-    Order.objects.create(user=admin, product=Product.objects.get(product_id=2), quantity=2)
+    Order.objects.create(user=user1, product=Product.objects.first(), quantity=1)
+    Order.objects.create(user=admin, product=Product.objects.last(), quantity=2)
 
     from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])

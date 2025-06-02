@@ -8,7 +8,31 @@ import io
 from contextlib import redirect_stdout
 import tempfile
 import json
+import shutil
+import logging
+from datetime import datetime
 
+# 로깅 설정
+def setup_logging():
+    # 로그 디렉토리 생성
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # 현재 시간을 파일명에 포함
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join(log_dir, f"auto_django_{timestamp}.log")
+    
+    # 로깅 설정
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()  # 콘솔 출력도 유지
+        ]
+    )
+    
+    return log_file
 
 # RunPod API 설정
 RUN_URL = "https://api.runpod.ai/v2/sggrcbr26xtyx4/run"
@@ -35,7 +59,7 @@ def run_llm(target):
                 }
             ],
             "sampling_params": {
-                "temperature": 0,
+                "temperature": 0.7,
                 "max_tokens": 8192
             }
         }
@@ -61,12 +85,12 @@ def run_llm(target):
     if os.path.exists(db_path):
         os.remove(db_path)
     if os.path.exists(uploads_path):
-        os.remove(uploads_path)
+        shutil.rmtree(uploads_path)
 
     # 1단계: Run 요청 보내기
     run_response = requests.post(RUN_URL, headers=headers, json=payload)
     if run_response.status_code != 200:
-        print("❌ 실행 실패:", run_response.status_code, run_response.text)
+        logging.error(f"❌ 실행 실패: {run_response.status_code} {run_response.text}")
         exit()
 
     job_id = run_response.json().get("id")
@@ -98,32 +122,32 @@ def run_llm(target):
                 bandit_result = check_python_code_with_bandit(original_code)
 
                 # 결과 출력
-                print("✅ 코드 컴파일 가능 여부:", bandit_result["compile_ok"])
+                logging.info(f"✅ 코드 컴파일 가능 여부: {bandit_result['compile_ok']}")
                 if not bandit_result["compile_ok"]:
-                    print("❌ 컴파일 에러:", bandit_result["compile_err"])
+                    logging.error(f"❌ 컴파일 에러: {bandit_result['compile_err']}")
 
-                print("\n🔍 Bandit 보안 분석 결과:")
+                logging.info("\n🔍 Bandit 보안 분석 결과:")
                 bandit_totals = defaultdict(int)
                 bandit_issues = set()
                 
                 if bandit_result["bandit_ok"] is not None:
                     try:
                         bandit_json = json.loads(bandit_result["bandit_output"])
-                        print("\n📊 _totals:")
+                        logging.info("\n📊 _totals:")
                         totals = bandit_json["metrics"]["_totals"]
-                        print(json.dumps(totals, indent=2, ensure_ascii=False))
+                        logging.info(json.dumps(totals, indent=2, ensure_ascii=False))
                         
                         # totals 값 저장
                         for key, value in totals.items():
                             bandit_totals[key] = value
                         
-                        print("\n⚠️ 발견된 이슈:")
+                        logging.info("\n⚠️ 발견된 이슈:")
                         for result in bandit_json["results"]:
                             issue_text = result['issue_text']
-                            print(f"- {issue_text}")
+                            logging.info(f"- {issue_text}")
                             bandit_issues.add(issue_text)
                     except json.JSONDecodeError:
-                        print("JSON 파싱 오류:", bandit_result["bandit_output"])
+                        logging.error(f"JSON 파싱 오류: {bandit_result['bandit_output']}")
                 ######################################################################
                 
                 app_process = subprocess.Popen(["python3", "app.py"], cwd=save_dir, stdin=subprocess.DEVNULL)
@@ -139,7 +163,7 @@ def run_llm(target):
                                          text=True)
                     test_output = result.stdout
                 else:
-                    print("⚠️ security_test.py 파일이 존재하지 않습니다.")
+                    logging.warning("⚠️ security_test.py 파일이 존재하지 않습니다.")
                 
                 app_process.terminate()
                 app_process.wait()
@@ -147,11 +171,11 @@ def run_llm(target):
                 return test_output, bandit_totals, bandit_issues
                 
             except Exception as e:
-                print("오류:", e)
+                logging.error(f"오류: {e}")
                 return "", defaultdict(int), set()
             break
         elif status == "FAILED":
-            print("❌ 작업 실패:", status_data)
+            logging.error(f"❌ 작업 실패: {status_data}")
             return "", defaultdict(int), set()
         else:
             time.sleep(1.5)
@@ -198,7 +222,7 @@ def check_python_code_with_bandit(code: str):
 def run_auto_script(subfolder):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    print(f"\n LLM 실행 중...\n→ {subfolder}\n")
+    logging.info(f"\n LLM 실행 중...\n→ {subfolder}\n")
 
     overall_safe = 0
     overall_vuln = 0
@@ -214,7 +238,7 @@ def run_auto_script(subfolder):
         
         # 출력 결과 분석
         for line in test_output.split('\n'):
-            print(line)  # 원본 출력도 보여주기
+            logging.info(line)  # 원본 출력도 보여주기
 
             # 현재 테스트 ID 추출
             match = re.search(r'\[Test ID:\s*(A\d+)', line)
@@ -234,60 +258,68 @@ def run_auto_script(subfolder):
         return overall_safe, overall_vuln, result_by_category, bandit_totals, bandit_issues
 
     except Exception as e:
-        print(f"실행 중 오류 발생: {e}")
+        logging.error(f"실행 중 오류 발생: {e}")
         exit(1)
 
-# 전체 결과 집계
-total_safe = 0
-total_vuln = 0
-total_result_by_category = defaultdict(lambda: {"safe": 0, "vuln": 0})
-total_bandit_totals = defaultdict(int)
-total_bandit_issues = set()
-
-folders = [
-    "Django-sqlite/board_test",
-    "Django-sqlite/calendar_test",
-    "Django-sqlite/chat_test",
-    "Django-sqlite/comment_test",
-    "Django-sqlite/EmailAuth_test",
-    "Django-sqlite/file_test",
-    "Django-sqlite/member_test",
-    "Django-sqlite/notification_test",
-    "Django-sqlite/quiz_test",
-    "Django-sqlite/search_test",
-    "Django-sqlite/shop_test"
-]
-
-for folder in folders:
-    safe, vuln, result_by_cat, bandit_totals, bandit_issues = run_auto_script(folder)
-    total_safe += safe
-    total_vuln += vuln
+# 메인 실행 부분
+if __name__ == "__main__":
+    # 로깅 설정
+    log_file = setup_logging()
+    logging.info(f"로그 파일이 생성되었습니다: {log_file}")
     
-    # Bandit 결과 누적
-    for key, value in bandit_totals.items():
-        total_bandit_totals[key] += value
-    total_bandit_issues.update(bandit_issues)
-    
-    for category, counts in result_by_cat.items():
-        total_result_by_category[category]["safe"] += counts["safe"]
-        total_result_by_category[category]["vuln"] += counts["vuln"]
-    time.sleep(3)
+    # 전체 결과 집계
+    total_safe = 0
+    total_vuln = 0
+    total_result_by_category = defaultdict(lambda: {"safe": 0, "vuln": 0})
+    total_bandit_totals = defaultdict(int)
+    total_bandit_issues = set()
 
-# 최종 출력
-print("\n최종 테스트 결과 요약:")
-print(f"✅ 전체 안전한 테스트 수: {total_safe}")
-print(f"❌ 전체 취약한 테스트 수: {total_vuln}")
+    folders = [
+        "Django-sqlite/board_test",
+        "Django-sqlite/calendar_test",
+        "Django-sqlite/chat_test",
+        "Django-sqlite/comment_test",
+        "Django-sqlite/EmailAuth_test",
+        "Django-sqlite/file_test",
+        "Django-sqlite/member_test",
+        "Django-sqlite/notification_test",
+        "Django-sqlite/quiz_test",
+        "Django-sqlite/search_test",
+        "Django-sqlite/shop_test"
+    ]
 
-print("\n📊 A1 ~ A10 항목별 결과:")
-for i in range(1, 11):
-    key = f"A{i}"
-    counts = total_result_by_category.get(key, {"safe": 0, "vuln": 0})
-    print(f"  {key} - 안전: {counts['safe']}건 / 취약: {counts['vuln']}건")
+    for folder in folders:
+        safe, vuln, result_by_cat, bandit_totals, bandit_issues = run_auto_script(folder)
+        total_safe += safe
+        total_vuln += vuln
+        
+        # Bandit 결과 누적
+        for key, value in bandit_totals.items():
+            total_bandit_totals[key] += value
+        total_bandit_issues.update(bandit_issues)
+        
+        for category, counts in result_by_cat.items():
+            total_result_by_category[category]["safe"] += counts["safe"]
+            total_result_by_category[category]["vuln"] += counts["vuln"]
+        time.sleep(3)
 
-print("\n🔍 Bandit 보안 분석 결과:")
-print("\n📊 누적 _totals:")
-print(json.dumps(dict(total_bandit_totals), indent=2, ensure_ascii=False))
+    # 최종 출력
+    logging.info("\n최종 테스트 결과 요약:")
+    logging.info(f"✅ 전체 안전한 테스트 수: {total_safe}")
+    logging.info(f"❌ 전체 취약한 테스트 수: {total_vuln}")
 
-print("\n⚠️ 발견된 모든 이슈:")
-for issue in total_bandit_issues:
-    print(f"- {issue}")
+    logging.info("\n📊 A1 ~ A10 항목별 결과:")
+    for i in range(1, 11):
+        key = f"A{i}"
+        counts = total_result_by_category.get(key, {"safe": 0, "vuln": 0})
+        logging.info(f"  {key} - 안전: {counts['safe']}건 / 취약: {counts['vuln']}건")
+
+    logging.info("\n🔍 Bandit 보안 분석 결과:")
+    logging.info("\n📊 누적 _totals:")
+    logging.info(json.dumps(dict(total_bandit_totals), indent=2, ensure_ascii=False))
+
+    logging.info("\n⚠️ 발견된 모든 이슈:")
+    for issue in total_bandit_issues:
+        logging.info(f"- {issue}")
+        
+    logging.info(f"\n로그 파일이 저장되었습니다: {log_file}")

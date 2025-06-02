@@ -61,16 +61,18 @@ class Message(models.Model):
         db_table = 'messages'
 
 def login(request, user_id):
-    if User.objects.filter(user_id=user_id).exists():
+    try:
+        User.objects.get(user_id=user_id)
         request.session['user_id'] = user_id
         return HttpResponse(status=200)
-    else:
+    except User.DoesNotExist:
         return HttpResponse(status=404)
 
 def send_message(request, receiver_id):
     if 'user_id' not in request.session:
         return HttpResponse(status=401)
-    sender = User.objects.get(user_id=request.session['user_id'])
+    sender_id = request.session['user_id']
+    sender = User.objects.get(user_id=sender_id)
     receiver = User.objects.get(user_id=receiver_id)
     content = request.POST.get('content')
     Message.objects.create(sender=sender, receiver=receiver, content=content)
@@ -79,38 +81,36 @@ def send_message(request, receiver_id):
 def inbox(request):
     if 'user_id' not in request.session:
         return HttpResponse(status=401)
-    user = User.objects.get(user_id=request.session['user_id'])
-    messages = user.received_messages.all()
-    template = Template('<ul>{% for message in messages %}<li>{{ message.sender.username }}: {{ message.content }} ({{ message.timestamp }})</li>{% endfor %}</ul>')
-    context = Context({'messages': messages})
+    user_id = request.session['user_id']
+    messages = Message.objects.filter(receiver_id=user_id)
+    template = Template('<html><body><h1>Inbox</h1><ul>{{ messages }}</ul></body></html>')
+    context = Context({'messages': [f'<li>{msg.sender.username}: {msg.content} ({msg.timestamp})</li>' for msg in messages]})
     return HttpResponse(template.render(context))
 
 def outbox(request):
     if 'user_id' not in request.session:
         return HttpResponse(status=401)
-    user = User.objects.get(user_id=request.session['user_id'])
-    messages = user.sent_messages.all()
-    template = Template('<ul>{% for message in messages %}<li>{{ message.receiver.username }}: {{ message.content }} ({{ message.timestamp }})</li>{% endfor %}</ul>')
-    context = Context({'messages': messages})
+    user_id = request.session['user_id']
+    messages = Message.objects.filter(sender_id=user_id)
+    template = Template('<html><body><h1>Outbox</h1><ul>{{ messages }}</ul></body></html>')
+    context = Context({'messages': [f'<li>{msg.receiver.username}: {msg.content} ({msg.timestamp})</li>' for msg in messages]})
     return HttpResponse(template.render(context))
 
 urlpatterns = [
-    path('login/<int:user_id>/',      login,        name='login'),
-    path('send/<int:receiver_id>/',   send_message, name='send_message'),
-    path('inbox/',                    inbox,        name='inbox'),
-    path('outbox/',                   outbox,       name='outbox'),
+    path('login/<int:user_id>/', login, name='login'),
+    path('send/<int:receiver_id>/', send_message, name='send_message'),
+    path('inbox/', inbox, name='inbox'),
+    path('outbox/', outbox, name='outbox'),
 ]
 
 if __name__ == '__main__':
     existing = connection.introspection.table_names()
     with connection.schema_editor() as schema_editor:
-        if 'users'    not in existing: schema_editor.create_model(User)
+        if 'users' not in existing: schema_editor.create_model(User)
         if 'messages' not in existing: schema_editor.create_model(Message)
 
     user1 = User.objects.create(username='alice')
     user2 = User.objects.create(username='bob')
-
-    from datetime import datetime
     Message.objects.create(sender=user1, receiver=user2, content='Hi Bob!')
     Message.objects.create(sender=user2, receiver=user1, content='Hello Alice!')
 
