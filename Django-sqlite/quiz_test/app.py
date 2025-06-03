@@ -1,4 +1,10 @@
 from django.conf import settings
+from django.db import models, connection
+from django.template import Template, Context
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.urls import path
+
 settings.configure(
     SECRET_KEY='your-secret-key',
     DEBUG=True,
@@ -38,13 +44,6 @@ settings.configure(
 import django
 django.setup()
 
-from django.db import models, connection, transaction
-from django.http import HttpResponse, HttpResponseNotFound
-from django.template import Template, Context
-from django.views.decorators.csrf import csrf_exempt
-from django.utils import timezone
-from django.conf import settings
-
 class User(models.Model):
     user_id   = models.AutoField(primary_key=True)
     username  = models.CharField(max_length=150)
@@ -77,49 +76,42 @@ def login(request, user_id):
     if user:
         request.session['user_id'] = user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse('200', status=200)
+        return HttpResponse('Logged in successfully')
     else:
-        return HttpResponseNotFound('404')
-
-def list_quizzes(request):
-    quizzes = Quiz.objects.all()
-    template = Template("""
-        <h1>Quizzes</h1>
-        <ul>
-        {% for quiz in quizzes %}
-            <li>{{ quiz.question }} (ID: {{ quiz.quiz_id }})</li>
-        {% endfor %}
-        </ul>
-    """)
-    context = Context({'quizzes': quizzes})
-    return HttpResponse(template.render(context))
+        return HttpResponseNotFound('User not found')
 
 @csrf_exempt
 def submit_answer(request, quiz_id):
-    if 'user_id' not in request.session:
-        return HttpResponse('401', status=401)
-    user = User.objects.get(user_id=request.session['user_id'])
-    quiz = Quiz.objects.get(quiz_id=quiz_id)
-    user_answer = request.POST.get('user_answer')
-    is_correct = user_answer == quiz.answer
-    QuizAttempt.objects.create(
-        user=user, quiz=quiz, user_answer=user_answer, is_correct=is_correct, created_at=timezone.now())
-    return HttpResponse('200')
+    if request.method == 'POST':
+        user_id = request.session.get('user_id')
+        if user_id:
+            user = User.objects.get(user_id=user_id)
+            quiz = Quiz.objects.get(quiz_id=quiz_id)
+            user_answer = request.POST.get('user_answer')
+            is_correct = user_answer == quiz.answer
+            QuizAttempt.objects.create(user=user, quiz=quiz, user_answer=user_answer, is_correct=is_correct)
+            return JsonResponse({'is_correct': is_correct})
+        else:
+            return HttpResponse('User not logged in', status=401)
+    else:
+        return HttpResponse('Invalid request method', status=405)
+
+def list_quizzes(request):
+    quizzes = Quiz.objects.all()
+    template = Template('<ul>{% for quiz in quizzes %}<li>{{ quiz.question }}</li>{% endfor %}</ul>')
+    context = Context({'quizzes': quizzes})
+    return HttpResponse(template.render(context))
 
 def view_attempts(request):
-    if 'user_id' not in request.session:
-        return HttpResponse('401', status=401)
-    user_attempts = QuizAttempt.objects.filter(user_id=request.session['user_id'])
-    template = Template("""
-        <h1>My Attempts</h1>
-        <ul>
-        {% for attempt in attempts %}
-            <li>Question: {{ attempt.quiz.question }}, User Answer: {{ attempt.user_answer }}, Correct: {{ attempt.is_correct }}, Created At: {{ attempt.created_at }}</li>
-        {% endfor %}
-        </ul>
-    """)
-    context = Context({'attempts': user_attempts})
-    return HttpResponse(template.render(context))
+    user_id = request.session.get('user_id')
+    if user_id:
+        user = User.objects.get(user_id=user_id)
+        attempts = QuizAttempt.objects.filter(user=user)
+        template = Template('<ul>{% for attempt in attempts %}<li>{{ attempt.quiz.question }} - {{ attempt.user_answer }} - {{ attempt.is_correct }} - {{ attempt.created_at }}</li>{% endfor %}</ul>')
+        context = Context({'attempts': attempts})
+        return HttpResponse(template.render(context))
+    else:
+        return HttpResponse('User not logged in', status=401)
 
 urlpatterns = [
     path('login/<int:user_id>/', login, name='login'),

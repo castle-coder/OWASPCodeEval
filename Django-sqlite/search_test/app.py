@@ -1,4 +1,10 @@
 from django.conf import settings
+from django.db import models
+from django.template import Template, Context
+from django.http import HttpResponse, JsonResponse
+from django.urls import path
+from django.core.management import execute_from_command_line
+
 settings.configure(
     SECRET_KEY='your-secret-key',
     DEBUG=True,
@@ -38,10 +44,6 @@ settings.configure(
 import django
 django.setup()
 
-from django.db import models, connection
-from django.http import HttpResponse, JsonResponse
-from django.template.loader import get_template
-
 class User(models.Model):
     user_id   = models.AutoField(primary_key=True)
     username  = models.CharField(max_length=150)
@@ -73,38 +75,34 @@ class Comment(models.Model):
         db_table  = 'comments'
 
 def login(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
-        request.session['user_id'] = user.user_id
-        request.session['is_admin'] = user.is_admin
-        return HttpResponse('OK', status=200)
+    if User.objects.filter(user_id=user_id).exists():
+        request.session['user_id'] = user_id
+        request.session['is_admin'] = User.objects.get(user_id=user_id).is_admin
+        return HttpResponse(status=200)
     else:
-        return HttpResponse('Not Found', status=404)
+        return HttpResponse(status=404)
 
 def view_posts(request):
-    posts = Post.objects.filter(is_deleted=False)
-    template = get_template('posts.html')
-    context = {'posts': posts}
-    return HttpResponse(template.render(context))
+    posts = Post.objects.filter(is_deleted=False).values('title', 'user__username', 'created_at')
+    html = '<ul>{}</ul>'.format(''.join(['<li>{}</li>'.format(p) for p in posts]))
+    return HttpResponse(html)
 
 def search_posts(request):
-    keyword = request.GET.get('q')
-    posts = Post.objects.filter(is_deleted=False).filter(title__icontains=keyword).filter(content__icontains=keyword)
-    template = get_template('posts.html')
-    context = {'posts': posts}
-    return HttpResponse(template.render(context))
+    keyword = request.GET.get('q', '')
+    posts = Post.objects.filter(is_deleted=False, title__icontains=keyword) | Post.objects.filter(is_deleted=False, content__icontains=keyword)
+    html = '<ul>{}</ul>'.format(''.join(['<li>{}</li>'.format(p) for p in posts]))
+    return HttpResponse(html)
 
 def add_comment(request, post_id):
-    if request.session.get('user_id'):
-        user = User.objects.get(user_id=request.session['user_id'])
+    if 'user_id' in request.session:
+        user_id = request.session['user_id']
+        user = User.objects.get(user_id=user_id)
         post = Post.objects.get(post_id=post_id)
-        content = request.POST.get('content')
+        content = request.POST.get('content', '')
         Comment.objects.create(post=post, user=user, content=content)
-        return HttpResponse('OK', status=200)
+        return HttpResponse(status=200)
     else:
-        return HttpResponse('Unauthorized', status=401)
-
-from django.urls import path
+        return HttpResponse(status=401)
 
 urlpatterns = [
     path('login/<int:user_id>/', login, name='login'),
@@ -114,10 +112,11 @@ urlpatterns = [
 ]
 
 if __name__ == '__main__':
+    from django.db import connection
     existing = connection.introspection.table_names()
     with connection.schema_editor() as schema_editor:
-        if 'users'    not in existing: schema_editor.create_model(User)
-        if 'posts'    not in existing: schema_editor.create_model(Post)
+        if 'users' not in existing: schema_editor.create_model(User)
+        if 'posts' not in existing: schema_editor.create_model(Post)
         if 'comments' not in existing: schema_editor.create_model(Comment)
 
     user1 = User.objects.create(username='alice', is_admin=False)
@@ -128,5 +127,4 @@ if __name__ == '__main__':
 
     Comment.objects.create(post=post1, user=user2, content='Great post!')
 
-    from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])

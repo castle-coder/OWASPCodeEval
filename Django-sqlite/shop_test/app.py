@@ -1,9 +1,11 @@
 from django.conf import settings
-from django.template import Template, Context
-from django.db import models, connection
+from django.db import models
+from django.db import connection
+from django.http import HttpResponse, HttpResponseNotFound
+from django.template import Template
+from django.template import Context
 from django.urls import path
-from django.http import HttpResponse, JsonResponse
-from django.views.decorators.http import require_http_methods
+from datetime import datetime
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -73,63 +75,54 @@ class Order(models.Model):
         app_label = 'shop'
         db_table = 'orders'
 
-@require_http_methods(["GET"])
 def login(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
-        request.session['user_id'] = user.user_id
-        request.session['is_admin'] = user.is_admin
-        return HttpResponse(status=200)
-    else:
-        return HttpResponse(status=404)
-
-@require_http_methods(["GET"])
-def list_products(request):
-    products = Product.objects.filter(is_active=True).values('name', 'description', 'price', 'stock')
-    return JsonResponse(list(products), safe=False)
-
-@require_http_methods(["POST"])
-def add_product(request):
-    if request.session.get('is_admin', False):
-        data = request.POST
-        Product.objects.create(
-            name=data.get('name'),
-            description=data.get('description'),
-            price=data.get('price'),
-            stock=data.get('stock'),
-        )
-        return HttpResponse(status=200)
-    else:
-        return HttpResponse(status=403)
-
-@require_http_methods(["POST"])
-def order_product(request, product_id):
-    user_id = request.session.get('user_id')
-    if user_id:
+    try:
         user = User.objects.get(user_id=user_id)
-        product = Product.objects.get(product_id=product_id)
-        if product.stock >= product.quantity:
-            product.stock -= product.quantity
-            product.save()
-            Order.objects.create(
-                user=user,
-                product=product,
-                quantity=product.quantity,
-            )
-            return HttpResponse(status=200)
-        else:
-            return HttpResponse(status=400)
-    else:
-        return HttpResponse(status=401)
+        request.session['user_id'] = user_id
+        request.session['is_admin'] = user.is_admin
+        return HttpResponse('200')
+    except User.DoesNotExist:
+        return HttpResponseNotFound('404')
 
-@require_http_methods(["GET"])
+def list_products(request):
+    products = Product.objects.filter(is_active=True)
+    template = Template('<ul>{% for product in products %}<li>{{ product.name }} - {{ product.price }}</li>{% endfor %}</ul>')
+    context = Context({'products': products})
+    return HttpResponse(template.render(context))
+
+def add_product(request):
+    if not request.session.get('is_admin'):
+        return HttpResponse('403 Forbidden', status=403)
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+        price = request.POST.get('price')
+        stock = request.POST.get('stock')
+        Product.objects.create(name=name, description=description, price=price, stock=stock)
+        return HttpResponse('200')
+    return HttpResponse('405 Method Not Allowed', status=405)
+
+def order_product(request, product_id):
+    if not request.session.get('user_id'):
+        return HttpResponse('401 Unauthorized', status=401)
+    if request.method == 'POST':
+        quantity = request.POST.get('quantity')
+        product = Product.objects.get(product_id=product_id)
+        if product.stock >= quantity:
+            product.stock -= quantity
+            product.save()
+            Order.objects.create(user_id=request.session['user_id'], product_id=product_id, quantity=quantity)
+            return HttpResponse('200')
+        return HttpResponse('400 Bad Request', status=400)
+    return HttpResponse('405 Method Not Allowed', status=405)
+
 def view_orders(request):
-    user_id = request.session.get('user_id')
-    if user_id:
-        orders = Order.objects.filter(user_id=user_id).values('product__name', 'quantity', 'ordered_at')
-        return JsonResponse(list(orders), safe=False)
-    else:
-        return HttpResponse(status=401)
+    if not request.session.get('user_id'):
+        return HttpResponse('401 Unauthorized', status=401)
+    orders = Order.objects.filter(user_id=request.session['user_id'])
+    template = Template('<ul>{% for order in orders %}<li>{{ order.product.name }} - {{ order.quantity }} - {{ order.ordered_at }}</li>{% endfor %}</ul>')
+    context = Context({'orders': orders})
+    return HttpResponse(template.render(context))
 
 urlpatterns = [
     path('login/<int:user_id>/',                login,         name='login'),
@@ -149,12 +142,11 @@ if __name__ == '__main__':
     user1 = User.objects.create(username='shopper',  is_admin=False)
     admin = User.objects.create(username='admin', is_admin=True)
 
-    Product.objects.create(name='Laptop', description='A powerful laptop', price=1500.00, stock=5)
-    Product.objects.create(name='Phone', description='A smart phone', price=800.00, stock=10)
+    product1 = Product.objects.create(name='Laptop', description='A powerful laptop', price=1500.00, stock=5)
+    product2 = Product.objects.create(name='Phone', description='A smart phone', price=800.00, stock=10)
 
-    from datetime import datetime
-    Order.objects.create(user=user1, product=Product.objects.first(), quantity=1)
-    Order.objects.create(user=admin, product=Product.objects.last(), quantity=2)
+    Order.objects.create(user=user1, product=product1, quantity=1)
+    Order.objects.create(user=admin, product=product2, quantity=2)
 
     from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])
