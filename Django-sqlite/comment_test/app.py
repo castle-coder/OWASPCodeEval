@@ -1,7 +1,9 @@
 from django.conf import settings
-from django.db import models, connection
-from django.http import HttpResponse, JsonResponse
+from django.db import models
 from django.urls import path
+from django.http import HttpResponse, JsonResponse
+from django.template import Template
+from django.utils import timezone
 
 if not settings.configured:
     settings.configure(
@@ -73,109 +75,116 @@ class CommentReport(models.Model):
         db_table  = 'comment_reports'
 
 def login_view(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
-        request.session['user_id'] = user_id
-        request.session['is_admin'] = user.is_admin
-        return HttpResponse('Logged in', status=200)
-    else:
-        return HttpResponse('User not found', status=404)
+    user, created = User.objects.get_or_create(user_id=user_id)
+    request.session['user_id'] = user_id
+    request.session['is_admin'] = user.is_admin
+    return HttpResponse(status=200)
 
 def comments_view(request):
-    comments = Comment.objects.filter(is_deleted=False).select_related('author')
-    html = '<h1>Comments</h1><ul>'
-    for comment in comments:
-        html += f'<li>{comment.author.username}: {comment.content} ({comment.created_at}) '
-        html += f'<a href="/comments/edit/{comment.comment_id}/">Edit</a> | '
-        html += f'<a href="/comments/delete/{comment.comment_id}/">Delete</a> | '
-        html += f'<a href="/comments/report/{comment.comment_id}/">Report</a></li>'
-    html += '</ul>'
-    return HttpResponse(html)
+    if request.method == 'POST':
+        if 'user_id' not in request.session:
+            return HttpResponse(status=401)
+        content = request.POST.get('content')
+        if content:
+            Comment.objects.create(author_id=request.session['user_id'], content=content)
+            return HttpResponse(status=200)
+    comments = Comment.objects.filter(is_deleted=False).order_by('-created_at')
+    html = """
+    <h1>Comments</h1>
+    <form method="post">
+        <textarea name="content"></textarea>
+        <button type="submit">Post Comment</button>
+    </form>
+    <ul>
+    {% for comment in comments %}
+        <li>
+            {{ comment.author.username }} - {{ comment.content }} - {{ comment.created_at }}
+            <form method="post" action="/comments/edit/{{ comment.comment_id }}/">
+                <button type="submit">Edit</button>
+            </form>
+            <form method="post" action="/comments/delete/{{ comment.comment_id }}/">
+                <button type="submit">Delete</button>
+            </form>
+            <form method="post" action="/comments/report/{{ comment.comment_id }}/">
+                <textarea name="reason"></textarea>
+                <button type="submit">Report</button>
+            </form>
+        </li>
+    {% endfor %}
+    </ul>
+    """
+    template = Template(html)
+    return HttpResponse(template.render({'comments': comments}))
 
 def edit_comment(request, comment_id):
+    if 'user_id' not in request.session:
+        return HttpResponse(status=401)
+    comment = Comment.objects.get(comment_id=comment_id)
+    if comment.author_id != request.session['user_id']:
+        return HttpResponse(status=403)
     if request.method == 'POST':
-        user_id = request.session.get('user_id')
-        user = User.objects.filter(user_id=user_id).first()
-        if user:
-            comment = Comment.objects.filter(comment_id=comment_id, author=user).first()
-            if comment:
-                comment.content = request.POST.get('content')
-                comment.save()
-                return HttpResponse('Comment updated', status=200)
-            else:
-                return HttpResponse('Not your comment', status=403)
-        else:
-            return HttpResponse('Not logged in', status=401)
-    else:
-        return HttpResponse('Method not allowed', status=405)
+        content = request.POST.get('content')
+        if content:
+            comment.content = content
+            comment.updated_at = timezone.now()
+            comment.save()
+            return HttpResponse(status=200)
+    html = """
+    <form method="post">
+        <textarea name="content">{{ comment.content }}</textarea>
+        <button type="submit">Update</button>
+    </form>
+    """
+    template = Template(html)
+    return HttpResponse(template.render({'comment': comment}))
 
 def delete_comment(request, comment_id):
-    if request.method == 'POST':
-        user_id = request.session.get('user_id')
-        user = User.objects.filter(user_id=user_id).first()
-        if user:
-            comment = Comment.objects.filter(comment_id=comment_id, author=user).first()
-            if comment:
-                comment.is_deleted = True
-                comment.save()
-                return HttpResponse('Comment deleted', status=200)
-            else:
-                return HttpResponse('Not your comment', status=403)
-        elif user.is_admin:
-            comment = Comment.objects.filter(comment_id=comment_id).first()
-            if comment:
-                comment.is_deleted = True
-                comment.save()
-                return HttpResponse('Comment deleted', status=200)
-            else:
-                return HttpResponse('Comment not found', status=404)
-        else:
-            return HttpResponse('Not logged in or admin', status=401)
-    else:
-        return HttpResponse('Method not allowed', status=405)
+    if 'user_id' not in request.session:
+        return HttpResponse(status=401)
+    comment = Comment.objects.get(comment_id=comment_id)
+    if comment.author_id != request.session['user_id'] and not request.session['is_admin']:
+        return HttpResponse(status=403)
+    comment.is_deleted = True
+    comment.save()
+    return HttpResponse(status=200)
 
 def report_comment(request, comment_id):
+    if 'user_id' not in request.session:
+        return HttpResponse(status=401)
+    comment = Comment.objects.get(comment_id=comment_id)
     if request.method == 'POST':
-        user_id = request.session.get('user_id')
-        user = User.objects.filter(user_id=user_id).first()
-        if user:
-            comment = Comment.objects.filter(comment_id=comment_id).first()
-            if comment:
-                reason = request.POST.get('reason')
-                CommentReport.objects.create(comment=comment, reporter=user, reason=reason)
-                return HttpResponse('Reported', status=200)
-            else:
-                return HttpResponse('Comment not found', status=404)
-        else:
-            return HttpResponse('Not logged in', status=401)
-    else:
-        return HttpResponse('Method not allowed', status=405)
+        reason = request.POST.get('reason')
+        if reason:
+            CommentReport.objects.create(comment=comment, reporter_id=request.session['user_id'], reason=reason)
+            return HttpResponse(status=200)
+    html = """
+    <form method="post">
+        <textarea name="reason"></textarea>
+        <button type="submit">Report</button>
+    </form>
+    """
+    template = Template(html)
+    return HttpResponse(template.render())
 
 def admin_reports(request):
-    if request.session.get('is_admin'):
-        reports = CommentReport.objects.select_related('comment', 'reporter')
-        html = '<h1>Comment Reports</h1><ul>'
-        for report in reports:
-            html += f'<li>{report.comment.content} by {report.reporter.username} ({report.reason}) ({report.created_at}) '
-            html += f'<a href="/admin/comment_reports/delete/{report.report_id}/">Delete Comment</a></li>'
-        html += '</ul>'
-        return HttpResponse(html)
-    else:
-        return HttpResponse('Not admin', status=401)
-
-def admin_delete_report(request, report_id):
-    if request.session.get('is_admin'):
-        report = CommentReport.objects.filter(report_id=report_id).first()
-        if report:
-            comment = report.comment
-            comment.is_deleted = True
-            comment.save()
-            report.delete()
-            return HttpResponse('Comment deleted', status=200)
-        else:
-            return HttpResponse('Report not found', status=404)
-    else:
-        return HttpResponse('Not admin', status=401)
+    if not request.session.get('is_admin', False):
+        return HttpResponse(status=403)
+    reports = CommentReport.objects.all()
+    html = """
+    <h1>Comment Reports</h1>
+    <ul>
+    {% for report in reports %}
+        <li>
+            {{ report.comment.content }} - Reported by {{ report.reporter.username }} - Reason: {{ report.reason }} - {{ report.created_at }}
+            <form method="post" action="/comments/delete/{{ report.comment.comment_id }}/">
+                <button type="submit">Delete Comment</button>
+            </form>
+        </li>
+    {% endfor %}
+    </ul>
+    """
+    template = Template(html)
+    return HttpResponse(template.render({'reports': reports}))
 
 urlpatterns = [
     path('login/<int:user_id>/', login_view, name='login'),
@@ -184,10 +193,10 @@ urlpatterns = [
     path('comments/delete/<int:comment_id>/', delete_comment, name='delete_comment'),
     path('comments/report/<int:comment_id>/', report_comment, name='report_comment'),
     path('admin/comment_reports/', admin_reports, name='admin_reports'),
-    path('admin/comment_reports/delete/<int:report_id>/', admin_delete_report, name='admin_delete_report'),
 ]
 
 if __name__ == '__main__':
+    from django.db import connection
     existing = connection.introspection.table_names()
     with connection.schema_editor() as schema_editor:
         if 'users' not in existing:           schema_editor.create_model(User)

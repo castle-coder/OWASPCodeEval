@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.db import models, connection
-from django.core.management import execute_from_command_line
-from django.template import Template, Context
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, redirect
+from django.template import Template, Context
+from django.db import models, connection
+from django.urls import path
+from django.views.decorators.http import require_GET, require_POST
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -74,96 +74,96 @@ class Comment(models.Model):
         app_label = 'app'
         db_table  = 'comments'
 
+@require_GET
 def login(request, user_id):
     user = User.objects.filter(user_id=user_id).first()
     if user:
         request.session['user_id'] = user.user_id
         request.session['is_admin'] = user.is_admin
         return HttpResponse(status=200)
-    return HttpResponse(status=404)
+    else:
+        return HttpResponse(status=404)
 
+@require_POST
 def create_post(request):
     if 'user_id' not in request.session:
         return HttpResponse(status=401)
-    if request.method == 'POST':
-        title = request.POST.get('title')
-        content = request.POST.get('content')
-        user_id = request.session['user_id']
-        user = User.objects.get(user_id=user_id)
+    user = User.objects.get(user_id=request.session['user_id'])
+    title = request.POST.get('title')
+    content = request.POST.get('content')
+    if title and content:
         Post.objects.create(user=user, title=title, content=content)
-    return redirect('view_posts')
+        return HttpResponse(status=201)
+    else:
+        return HttpResponse(status=400)
 
+@require_GET
 def view_posts(request):
-    posts = Post.objects.filter(is_deleted=False).all()
-    html = """
-    <html><body>
-        <h1>Posts</h1>
+    posts = Post.objects.filter(is_deleted=False).order_by('-created_at')
+    template = Template("""
         <ul>
-    """
-    for post in posts:
-        html += f"<li><a href='/posts/{post.post_id}/'>{post.title}</a>"
-        if request.session.get('user_id', None) is not None:
-            html += f" | <a href='/posts/{post.post_id}/delete/'>Delete</a>"
-        html += f"</li>"
-    html += """
+        {% for post in posts %}
+            <li><a href="{% url 'post_detail' post.post_id %}">{{ post.title }} ({{ post.created_at }}) ({{ post.comments.count }} comments)</a>
+            {% if request.session.is_admin or post.user_id == request.session.user_id %}
+                <form action="{% url 'delete_post' post.post_id %}" method="post">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                    <button type="submit">Delete</button>
+                </form>
+            {% endif %}
+            </li>
+        {% endfor %}
         </ul>
-    </body></html>
-    """
-    return HttpResponse(html)
+    """)
+    context = Context({'posts': posts})
+    return HttpResponse(template.render(context))
 
+@require_GET
 def post_detail(request, post_id):
     post = Post.objects.get(post_id=post_id)
-    comments = Comment.objects.filter(post=post).all()
-    user_id = request.session.get('user_id', None)
-    if user_id is not None:
-        user = User.objects.get(user_id=user_id)
-        comment_form = """
-        <form method="POST" action="{% url 'add_comment' post_id=post_id %}">
-            {% csrf_token %}
-            <textarea name="content"></textarea>
-            <button type="submit">Add Comment</button>
-        </form>
-        """
-    else:
-        comment_form = ''
-    html = f"""
-    <html><body>
-        <h1>{post.title}</h1>
-        <p>{post.content}</p>
-        <p>Created by: {post.user.username} | {post.created_at}</p>
-        <h2>Comments ({len(comments)})</h2>
+    comments = post.comments.all()
+    template = Template("""
+        <h1>{{ post.title }}</h1>
+        <p>{{ post.content }}</p>
+        <h2>Comments</h2>
         <ul>
-    """
-    for comment in comments:
-        html += f"<li>{comment.content} by {comment.user.username} | {comment.created_at}</li>"
-    html += f"""
+        {% for comment in comments %}
+            <li>{{ comment.content }} ({{ comment.created_at }})</li>
+        {% endfor %}
         </ul>
-        {comment_form}
-    </body></html>
-    """
-    return HttpResponse(html)
+        {% if request.session.user_id %}
+            <form action="{% url 'add_comment' post.post_id %}" method="post">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                <textarea name="content"></textarea>
+                <button type="submit">Add Comment</button>
+            </form>
+        {% endif %}
+    """)
+    context = Context({'post': post, 'comments': comments})
+    return HttpResponse(template.render(context))
 
+@require_POST
 def add_comment(request, post_id):
     if 'user_id' not in request.session:
         return HttpResponse(status=401)
-    if request.method == 'POST':
-        content = request.POST.get('content')
-        user_id = request.session['user_id']
-        user = User.objects.get(user_id=user_id)
-        post = Post.objects.get(post_id=post_id)
-        Comment.objects.create(user=user, post=post, content=content)
-    return redirect('post_detail', post_id=post_id)
+    user = User.objects.get(user_id=request.session['user_id'])
+    content = request.POST.get('content')
+    if content:
+        Comment.objects.create(post_id=post_id, user=user, content=content)
+        return HttpResponse(status=201)
+    else:
+        return HttpResponse(status=400)
 
+@require_POST
 def delete_post(request, post_id):
     if 'user_id' not in request.session:
         return HttpResponse(status=401)
     post = Post.objects.get(post_id=post_id)
-    if post.user.user_id == request.session['user_id'] or request.session['is_admin']:
+    if post.user_id == request.session['user_id'] or request.session['is_admin']:
         post.is_deleted = True
         post.save()
-    return redirect('view_posts')
-
-from django.urls import path
+        return HttpResponse(status=200)
+    else:
+        return HttpResponse(status=403)
 
 urlpatterns = [
     path('login/<int:user_id>/',         login,        name='login'),
@@ -190,4 +190,5 @@ if __name__ == '__main__':
     Comment.objects.create(post=post1, user=admin, content='Welcome to the board!')
     Comment.objects.create(post=post2, user=user1, content='Got it, thank you!')
 
+    from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])

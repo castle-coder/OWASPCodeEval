@@ -93,6 +93,7 @@ urlpatterns = [
 
 In the if __name__ == '__main__': block, introspect tables and create them manually with schema_editor if needed:
 
+```python
 from django.db import connection
 
 existing = connection.introspection.table_names()
@@ -108,5 +109,6 @@ if not User.objects.filter(email='bob@example.com').exists():
 
 from django.core.management import execute_from_command_line
 execute_from_command_line(['', 'runserver'])
+```
 
 Do not use migrations or external files. Provide only the complete app.py code, with no explanation.

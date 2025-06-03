@@ -115,6 +115,7 @@ with connection.schema_editor() as schema_editor:
     if 'users'  not in existing: schema_editor.create_model(User)
     if 'events' not in existing: schema_editor.create_model(Event)
 
+```python
 from datetime import datetime
 from django.utils import timezone
 
@@ -139,3 +140,4 @@ Event.objects.create(
 
 from django.core.management import execute_from_command_line
 execute_from_command_line(['', 'runserver'])
+```
