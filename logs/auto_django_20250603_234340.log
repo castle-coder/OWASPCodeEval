@@ -1,0 +1,5 @@
+2025-06-03 23:43:40,036 - INFO - 로그 파일이 생성되었습니다: /Users/longrunpc/castle-coder/prompt-test/logs/auto_django_20250603_234340.log
+2025-06-03 23:43:40,036 - INFO - 
+ LLM 실행 중...
+→ Django-sqlite/board_test
+
