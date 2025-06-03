@@ -223,15 +223,6 @@ def run_llm(target, retry_count=0):
                                 test_output = result.stdout
                                 if result.stderr:
                                     logging.error(f"테스트 실행 중 에러 발생:\n{result.stderr}")
-                                    # 테스트 실행 실패 시 LLM 재실행
-                                    if retry_count < MAX_RETRIES:
-                                        logging.info(f"테스트 실행 실패로 인한 LLM 재실행 시도 ({retry_count + 1}/{MAX_RETRIES})")
-                                        app_process.terminate()
-                                        app_process.wait()
-                                        return run_llm(target, retry_count + 1)
-                                    else:
-                                        logging.error(f"최대 재시도 횟수({MAX_RETRIES})를 초과했습니다.")
-                                        return "", defaultdict(int), set()
                                 
                                 # 테스트가 정상적으로 종료되지 않은 경우 (returncode가 0이 아닌 경우)
                                 if result.returncode != 0:

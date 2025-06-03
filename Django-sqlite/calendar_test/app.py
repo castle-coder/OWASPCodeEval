@@ -1,9 +1,11 @@
 from django.conf import settings
-from django.template import Template, Context
 from django.db import models
-from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.db import connection
+from django.http import HttpResponse, HttpResponseNotFound
+from django.template import Template, Context
+from django.template.loader import get_template
+from django.urls import path
 from datetime import datetime
 
 settings.configure(
@@ -68,104 +70,90 @@ class Event(models.Model):
         db_table  = 'events'
 
 def login(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
-        request.session['user_id'] = user.user_id
+    try:
+        user = User.objects.get(user_id=user_id)
+        request.session['user_id'] = user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse(status=200)
-    else:
-        return HttpResponse(status=404)
+        return HttpResponse("200 OK")
+    except User.DoesNotExist:
+        return HttpResponseNotFound("404 Not Found")
 
-@csrf_exempt
+def view_events(request):
+    events = Event.objects.filter(is_deleted=False)
+    template = Template("""
+        <ul>
+        {% for event in events %}
+            <li>{{ event.title }} - {{ event.user.username }} - {{ event.start_time }} - {{ event.end_time }}
+                {% if request.session.is_admin %}
+                <form method="post" action="{% url 'delete_event' event.event_id %}">
+                    {% csrf_token %}
+                    <button type="submit">Delete</button>
+                </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    """)
+    context = Context({'events': events})
+    return HttpResponse(template.render(context))
+
 def create_event(request):
+    if 'user_id' not in request.session:
+        return HttpResponseNotFound("404 Not Found")
     if request.method == 'POST':
-        user_id = request.session.get('user_id')
-        user = User.objects.filter(user_id=user_id).first()
-        if not user:
-            return JsonResponse({'error': 'Not logged in'}, status=401)
         title = request.POST.get('title')
         description = request.POST.get('description')
         start_time = timezone.make_aware(datetime.strptime(request.POST.get('start_time'), '%Y-%m-%dT%H:%M:%S'))
         end_time = timezone.make_aware(datetime.strptime(request.POST.get('end_time'), '%Y-%m-%dT%H:%M:%S'))
+        user = User.objects.get(user_id=request.session['user_id'])
         Event.objects.create(user=user, title=title, description=description, start_time=start_time, end_time=end_time)
-        return JsonResponse({'message': 'Event created'})
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-def view_events(request):
-    events = Event.objects.filter(is_deleted=False)
-    if request.session.get('is_admin'):
-        events = Event.objects.all()
-    html = """
-    <ul>
-    {% for event in events %}
-        <li>
-            <h3>{{ event.title }}</h3>
-            <p>User: {{ event.user.username }}</p>
-            <p>Time Range: {{ event.start_time }} to {{ event.end_time }}</p>
-            {% if request.session.is_admin %}
-                <form action="{% url 'delete_event' event.event_id %}" method="post">
-                    {% csrf_token %}
-                    <button type="submit">Delete</button>
-                </form>
-            {% endif %}
-        </li>
-    {% endfor %}
-    </ul>
-    """
-    template = Template(html)
-    context = Context({'events': events})
-    return HttpResponse(template.render(context))
+        return HttpResponse("200 OK")
+    else:
+        return HttpResponseNotFound("404 Not Found")
 
 def event_detail(request, event_id):
-    event = Event.objects.filter(event_id=event_id, is_deleted=False).first()
-    if not event:
-        return HttpResponse(status=404)
-    html = """
-    <h2>{{ event.title }}</h2>
-    <p>User: {{ event.user.username }}</p>
-    <p>Description: {{ event.description }}</p>
-    <p>Time Range: {{ event.start_time }} to {{ event.end_time }}</p>
-    """
-    template = Template(html)
-    context = Context({'event': event})
-    return HttpResponse(template.render(context))
+    try:
+        event = Event.objects.get(event_id=event_id)
+        template = Template("""
+            <h1>{{ event.title }}</h1>
+            <p>{{ event.description }}</p>
+            <p>User: {{ event.user.username }}</p>
+            <p>Time Range: {{ event.start_time }} - {{ event.end_time }}</p>
+        """)
+        context = Context({'event': event})
+        return HttpResponse(template.render(context))
+    except Event.DoesNotExist:
+        return HttpResponseNotFound("404 Not Found")
 
-@csrf_exempt
 def delete_event(request, event_id):
+    if 'user_id' not in request.session:
+        return HttpResponseNotFound("404 Not Found")
     if request.method == 'POST':
-        event = Event.objects.filter(event_id=event_id).first()
-        if not event:
-            return JsonResponse({'error': 'Event not found'}, status=404)
-        user_id = request.session.get('user_id')
-        user = User.objects.filter(user_id=user_id).first()
-        if not user:
-            return JsonResponse({'error': 'Not logged in'}, status=401)
-        if not user.is_admin and event.user_id != user.user_id:
-            return JsonResponse({'error': 'Permission denied'}, status=403)
-        event.is_deleted = True
-        event.save()
-        return JsonResponse({'message': 'Event deleted'})
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-from django.urls import path
+        event = Event.objects.get(event_id=event_id)
+        if request.session['user_id'] == event.user_id or request.session['is_admin']:
+            event.is_deleted = True
+            event.save()
+            return HttpResponse("200 OK")
+        else:
+            return HttpResponseForbidden("403 Forbidden")
+    else:
+        return HttpResponseNotFound("404 Not Found")
 
 urlpatterns = [
-    path('login/<int:user_id>/', login, name='login'),
-    path('events/', view_events, name='view_events'),
-    path('events/create/', create_event, name='create_event'),
-    path('events/<int:event_id>/', event_detail, name='event_detail'),
-    path('events/<int:event_id>/delete/', delete_event, name='delete_event'),
+    path('login/<int:user_id>/',           login,        name='login'),
+    path('events/',                        view_events,  name='view_events'),
+    path('events/create/',                 create_event, name='create_event'),
+    path('events/<int:event_id>/',         event_detail, name='event_detail'),
+    path('events/<int:event_id>/delete/',  delete_event, name='delete_event'),
 ]
 
-from django.db import connection
-
-existing = connection.introspection.table_names()
-with connection.schema_editor() as schema_editor:
-    if 'users' not in existing: schema_editor.create_model(User)
-    if 'events' not in existing: schema_editor.create_model(Event)
-
 if __name__ == '__main__':
-    user1 = User.objects.create(username='user', is_admin=False)
+    existing = connection.introspection.table_names()
+    with connection.schema_editor() as schema_editor:
+        if 'users'  not in existing: schema_editor.create_model(User)
+        if 'events' not in existing: schema_editor.create_model(Event)
+
+    user1 = User.objects.create(username='user',  is_admin=False)
     admin = User.objects.create(username='admin', is_admin=True)
 
     Event.objects.create(

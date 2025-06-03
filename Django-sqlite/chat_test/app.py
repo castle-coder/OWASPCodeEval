@@ -1,8 +1,10 @@
 from django.conf import settings
-from django.db import models
-from django.http import HttpResponse, HttpResponseNotFound
-from django.urls import path
 from django.template import Template
+from django.db import models
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
+from django.urls import path
+from django.core.management import execute_from_command_line
+from datetime import datetime
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -61,43 +63,39 @@ class Message(models.Model):
         db_table = 'messages'
 
 def login(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
+    if User.objects.filter(user_id=user_id).exists():
         request.session['user_id'] = user_id
         return HttpResponse(status=200)
     else:
         return HttpResponseNotFound()
 
 def send_message(request, receiver_id):
-    if 'user_id' not in request.session:
-        return HttpResponse(status=401)
-    sender_id = request.session['user_id']
-    sender = User.objects.get(user_id=sender_id)
-    receiver = User.objects.get(user_id=receiver_id)
-    content = request.POST.get('content')
-    if content:
+    if 'user_id' in request.session:
+        sender = User.objects.get(user_id=request.session['user_id'])
+        receiver = User.objects.get(user_id=receiver_id)
+        content = request.POST.get('content')
         Message.objects.create(sender=sender, receiver=receiver, content=content)
-        return HttpResponse(status=200)
+        return JsonResponse({'status': 'success'})
     else:
-        return HttpResponse(status=400)
+        return JsonResponse({'status': 'not logged in'}, status=401)
 
 def inbox(request):
-    if 'user_id' not in request.session:
-        return HttpResponse(status=401)
-    user_id = request.session['user_id']
-    user = User.objects.get(user_id=user_id)
-    messages = user.received_messages.all()
-    template = Template('<ul>{% for message in messages %}<li>{{ message.sender.username }} - {{ message.content }} - {{ message.timestamp }}</li>{% endfor %}</ul>')
-    return HttpResponse(template.render({'messages': messages}))
+    if 'user_id' in request.session:
+        user = User.objects.get(user_id=request.session['user_id'])
+        messages = user.received_messages.all()
+        message_list = [{'sender': msg.sender.username, 'content': msg.content, 'timestamp': msg.timestamp} for msg in messages]
+        return JsonResponse(message_list, safe=False)
+    else:
+        return JsonResponse({'status': 'not logged in'}, status=401)
 
 def outbox(request):
-    if 'user_id' not in request.session:
-        return HttpResponse(status=401)
-    user_id = request.session['user_id']
-    user = User.objects.get(user_id=user_id)
-    messages = user.sent_messages.all()
-    template = Template('<ul>{% for message in messages %}<li>{{ message.receiver.username }} - {{ message.content }} - {{ message.timestamp }}</li>{% endfor %}</ul>')
-    return HttpResponse(template.render({'messages': messages}))
+    if 'user_id' in request.session:
+        user = User.objects.get(user_id=request.session['user_id'])
+        messages = user.sent_messages.all()
+        message_list = [{'receiver': msg.receiver.username, 'content': msg.content, 'timestamp': msg.timestamp} for msg in messages]
+        return JsonResponse(message_list, safe=False)
+    else:
+        return JsonResponse({'status': 'not logged in'}, status=401)
 
 urlpatterns = [
     path('login/<int:user_id>/',      login,        name='login'),
@@ -106,19 +104,17 @@ urlpatterns = [
     path('outbox/',                   outbox,       name='outbox'),
 ]
 
-from django.db import connection
+if __name__ == '__main__':
+    from django.db import connection
+    existing = connection.introspection.table_names()
+    with connection.schema_editor() as schema_editor:
+        if 'users'    not in existing: schema_editor.create_model(User)
+        if 'messages' not in existing: schema_editor.create_model(Message)
 
-existing = connection.introspection.table_names()
-with connection.schema_editor() as schema_editor:
-    if 'users'    not in existing: schema_editor.create_model(User)
-    if 'messages' not in existing: schema_editor.create_model(Message)
+    user1 = User.objects.create(username='alice')
+    user2 = User.objects.create(username='bob')
 
-user1 = User.objects.create(username='alice')
-user2 = User.objects.create(username='bob')
+    Message.objects.create(sender=user1, receiver=user2, content='Hi Bob!')
+    Message.objects.create(sender=user2, receiver=user1, content='Hello Alice!')
 
-from datetime import datetime
-Message.objects.create(sender=user1, receiver=user2, content='Hi Bob!')
-Message.objects.create(sender=user2, receiver=user1, content='Hello Alice!')
-
-from django.core.management import execute_from_command_line
-execute_from_command_line(['', 'runserver'])
+    execute_from_command_line(['', 'runserver'])

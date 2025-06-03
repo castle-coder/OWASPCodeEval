@@ -1,7 +1,6 @@
 from django.conf import settings
-from django.core.management import execute_from_command_line
-from django.db import connection, models
-from django.http import HttpResponse, HttpResponseRedirect
+from django.db import models
+from django.http import HttpResponse, JsonResponse
 from django.template import Template, Context
 from django.urls import path
 
@@ -57,16 +56,15 @@ def register(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         if not User.objects.filter(email=email).exists():
-            user = User.objects.create(email=email)
-            user.verification_code = ''.join(str(i) for i in range(100000, 1000000))[:6]
+            user = User.objects.create(email=email, verification_code='123456')
             print(f"Verification code sent to {email}: {user.verification_code}")
-            return HttpResponse("200 page saying code was sent")
+            return JsonResponse({'message': 'Code sent'})
         else:
-            return HttpResponse("Email already registered")
+            return JsonResponse({'error': 'Email already registered'}, status=400)
     return HttpResponse('''
         <form method="post">
-            <input type="email" name="email" required>
-            <button type="submit">Register</button>
+            Email: <input type="email" name="email"><br>
+            <input type="submit" value="Register">
         </form>
     ''')
 
@@ -74,29 +72,31 @@ def verify(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         code = request.POST.get('code')
-        user = User.objects.filter(email=email).first()
-        if user and user.verification_code == code:
+        user = User.objects.filter(email=email, verification_code=code).first()
+        if user:
             user.verified = True
             user.save()
             request.session['user_id'] = user.user_id
-            return HttpResponseRedirect('/profile/')
+            return JsonResponse({'message': 'User verified.'})
         else:
-            return HttpResponse("Invalid email or code")
+            return JsonResponse({'error': 'Invalid code'}, status=400)
     return HttpResponse('''
         <form method="post">
-            <input type="email" name="email" required>
-            <input type="text" name="code" required>
-            <button type="submit">Verify</button>
+            Email: <input type="email" name="email"><br>
+            Verification Code: <input type="text" name="code"><br>
+            <input type="submit" value="Verify">
         </form>
     ''')
 
 def profile(request):
-    user_id = request.session.get('user_id')
-    if user_id:
-        user = User.objects.get(user_id=user_id)
-        return HttpResponse(f"Email: {user.email}, Verified: {user.verified}")
+    if 'user_id' in request.session:
+        user = User.objects.get(user_id=request.session['user_id'])
+        return HttpResponse(f'''
+            Email: {user.email}<br>
+            Verified: {user.verified}
+        ''')
     else:
-        return HttpResponse("Not logged in")
+        return HttpResponse('Please log in first', status=401)
 
 urlpatterns = [
     path('register/', register, name='register'),
@@ -105,6 +105,7 @@ urlpatterns = [
 ]
 
 if __name__ == '__main__':
+    from django.db import connection
     existing = connection.introspection.table_names()
     with connection.schema_editor() as schema_editor:
         if 'users' not in existing: schema_editor.create_model(User)
@@ -116,4 +117,5 @@ if __name__ == '__main__':
     if not User.objects.filter(email='bob@example.com').exists():
         User.objects.create(email='bob@example.com', verified=False, verification_code='123456')
 
+    from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])
