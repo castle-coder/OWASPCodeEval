@@ -1,11 +1,8 @@
 from django.conf import settings
-from django.db import models
-from django.db import connection
-from django.http import HttpResponse, HttpResponseNotFound
-from django.template import Template
-from django.template import Context
+from django.db import models, connection
+from django.http import HttpResponse, JsonResponse
+from django.template import Template, Context
 from django.urls import path
-from datetime import datetime
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -76,53 +73,58 @@ class Order(models.Model):
         db_table = 'orders'
 
 def login(request, user_id):
-    try:
-        user = User.objects.get(user_id=user_id)
+    user = User.objects.filter(user_id=user_id).first()
+    if user:
         request.session['user_id'] = user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse('200')
-    except User.DoesNotExist:
-        return HttpResponseNotFound('404')
+        return HttpResponse('200 OK')
+    else:
+        return HttpResponse('404 Not Found')
 
 def list_products(request):
     products = Product.objects.filter(is_active=True)
-    template = Template('<ul>{% for product in products %}<li>{{ product.name }} - {{ product.price }}</li>{% endfor %}</ul>')
-    context = Context({'products': products})
-    return HttpResponse(template.render(context))
+    response = '<ul>'
+    for product in products:
+        response += f'<li>{product.name} - {product.description} - ${product.price} - Stock: {product.stock}</li>'
+    response += '</ul>'
+    return HttpResponse(response)
 
 def add_product(request):
-    if not request.session.get('is_admin'):
-        return HttpResponse('403 Forbidden', status=403)
-    if request.method == 'POST':
+    if request.session.get('is_admin'):
         name = request.POST.get('name')
         description = request.POST.get('description')
         price = request.POST.get('price')
         stock = request.POST.get('stock')
         Product.objects.create(name=name, description=description, price=price, stock=stock)
-        return HttpResponse('200')
-    return HttpResponse('405 Method Not Allowed', status=405)
+        return HttpResponse('200 OK')
+    else:
+        return HttpResponse('403 Forbidden')
 
 def order_product(request, product_id):
-    if not request.session.get('user_id'):
-        return HttpResponse('401 Unauthorized', status=401)
-    if request.method == 'POST':
-        quantity = request.POST.get('quantity')
-        product = Product.objects.get(product_id=product_id)
-        if product.stock >= quantity:
-            product.stock -= quantity
+    if request.session.get('user_id'):
+        user_id = request.session.get('user_id')
+        product = Product.objects.filter(product_id=product_id).first()
+        if product and product.stock >= int(request.POST.get('quantity')):
+            product.stock -= int(request.POST.get('quantity'))
             product.save()
-            Order.objects.create(user_id=request.session['user_id'], product_id=product_id, quantity=quantity)
-            return HttpResponse('200')
-        return HttpResponse('400 Bad Request', status=400)
-    return HttpResponse('405 Method Not Allowed', status=405)
+            Order.objects.create(user_id=user_id, product_id=product_id, quantity=int(request.POST.get('quantity')))
+            return HttpResponse('200 OK')
+        else:
+            return HttpResponse('400 Bad Request')
+    else:
+        return HttpResponse('401 Unauthorized')
 
 def view_orders(request):
-    if not request.session.get('user_id'):
-        return HttpResponse('401 Unauthorized', status=401)
-    orders = Order.objects.filter(user_id=request.session['user_id'])
-    template = Template('<ul>{% for order in orders %}<li>{{ order.product.name }} - {{ order.quantity }} - {{ order.ordered_at }}</li>{% endfor %}</ul>')
-    context = Context({'orders': orders})
-    return HttpResponse(template.render(context))
+    if request.session.get('user_id'):
+        user_id = request.session.get('user_id')
+        orders = Order.objects.filter(user_id=user_id)
+        response = '<ul>'
+        for order in orders:
+            response += f'<li>{order.product.name} - Quantity: {order.quantity} - Ordered At: {order.ordered_at}</li>'
+        response += '</ul>'
+        return HttpResponse(response)
+    else:
+        return HttpResponse('401 Unauthorized')
 
 urlpatterns = [
     path('login/<int:user_id>/',                login,         name='login'),

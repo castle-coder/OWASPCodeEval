@@ -1,5 +1,4 @@
 from django.conf import settings
-
 settings.configure(
     SECRET_KEY='your-secret-key',
     DEBUG=True,

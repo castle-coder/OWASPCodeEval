@@ -12,14 +12,10 @@ import shutil
 import logging
 import traceback
 from datetime import datetime
-import urllib3
 
-# requests와 urllib3의 로깅 레벨을 WARNING으로 설정하여 디버그 로그 제거
+# requests 라이브러리의 로깅 레벨 설정
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 logging.getLogger('requests').setLevel(logging.WARNING)
-
-# 최대 재시도 횟수 설정
-MAX_RETRIES = 5
 
 # 로깅 설정
 def setup_logging():
@@ -29,11 +25,11 @@ def setup_logging():
     
     # 현재 시간을 파일명에 포함
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(log_dir, f"auto_fastapi_{timestamp}.log")
+    log_file = os.path.join(log_dir, f"auto_fastAPI_{timestamp}.log")
     
     # 로깅 설정
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.DEBUG,  # DEBUG 레벨로 변경하여 모든 로그 기록
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(log_file, encoding='utf-8'),
@@ -47,6 +43,9 @@ def setup_logging():
 RUN_URL = "https://api.runpod.ai/v2/sggrcbr26xtyx4/run"
 STATUS_URL_BASE = "https://api.runpod.ai/v2/sggrcbr26xtyx4/status/"
 API_KEY = "rpa_JXPAS3TMYRYAT0H0ZVXSGENZ3BIET1EMOBKUCJMP0yngu7"
+
+# 최대 재시도 횟수 설정
+MAX_RETRIES = 5
 
 # prompt.txt 파일 읽기
 def run_llm(target, retry_count=0):
@@ -69,7 +68,7 @@ def run_llm(target, retry_count=0):
                     }
                 ],
                 "sampling_params": {
-                    "temperature": 0.3,
+                    "temperature": 0.7,
                     "max_tokens": 8192
                 }
             }
@@ -86,6 +85,7 @@ def run_llm(target, retry_count=0):
         app_path = os.path.join(save_dir, "app.py")
         db_path = os.path.join(save_dir, "mock_db.sqlite3")
         test_path = os.path.join(save_dir, "security_test.py")
+        uploads_path = os.path.join(save_dir, "uploads")
 
         # 기존 파일 제거
         try:
@@ -94,6 +94,8 @@ def run_llm(target, retry_count=0):
                 os.remove(app_path)
             if os.path.exists(db_path):
                 os.remove(db_path)
+            if os.path.exists(uploads_path):
+                shutil.rmtree(uploads_path)
         except Exception as e:
             logging.error(f"파일 제거 중 오류 발생: {str(e)}")
             logging.error(traceback.format_exc())
@@ -101,7 +103,7 @@ def run_llm(target, retry_count=0):
         # 1단계: Run 요청 보내기
         try:
             run_response = requests.post(RUN_URL, headers=headers, json=payload)
-            run_response.raise_for_status()
+            run_response.raise_for_status()  # HTTP 에러 체크
         except requests.exceptions.RequestException as e:
             logging.error(f"API 요청 실패: {str(e)}")
             logging.error(f"응답 내용: {run_response.text if 'run_response' in locals() else 'No response'}")
@@ -122,7 +124,6 @@ def run_llm(target, retry_count=0):
                 status = status_data.get("status")
 
                 if status == "COMPLETED":
-                    logging.info("✅ LLM 응답 완료")
                     try:
                         # 마크다운 텍스트 추출 및 출력
                         tokens = status_data["output"][0]["choices"][0]["tokens"]
@@ -222,9 +223,12 @@ def run_llm(target, retry_count=0):
                                 test_output = result.stdout
                                 if result.stderr:
                                     logging.error(f"테스트 실행 중 에러 발생:\n{result.stderr}")
-                                    # 재시도 횟수 확인
+                                
+                                # 테스트가 정상적으로 종료되지 않은 경우 (returncode가 0이 아닌 경우)
+                                if result.returncode != 0:
+                                    logging.error(f"테스트가 비정상 종료되었습니다. (returncode: {result.returncode})")
                                     if retry_count < MAX_RETRIES:
-                                        logging.info(f"테스트 실패로 인한 LLM 재실행 시도 ({retry_count + 1}/{MAX_RETRIES})")
+                                        logging.info(f"테스트 비정상 종료로 인한 LLM 재실행 시도 ({retry_count + 1}/{MAX_RETRIES})")
                                         app_process.terminate()
                                         app_process.wait()
                                         return run_llm(target, retry_count + 1)
@@ -390,7 +394,6 @@ def run_auto_script(subfolder):
 
     except Exception as e:
         logging.error(f"실행 중 오류 발생: {e}")
-        logging.error(traceback.format_exc())
         exit(1)
 
 # 메인 실행 부분

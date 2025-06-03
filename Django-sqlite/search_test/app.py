@@ -1,9 +1,12 @@
 from django.conf import settings
 from django.db import models
+from django.http import HttpResponse, HttpResponseNotFound
 from django.template import Template, Context
-from django.http import HttpResponse, JsonResponse
 from django.urls import path
-from django.core.management import execute_from_command_line
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.http import JsonResponse
+from django.contrib.sessions.backends.signed_cookies import SessionStore
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -75,34 +78,43 @@ class Comment(models.Model):
         db_table  = 'comments'
 
 def login(request, user_id):
-    if User.objects.filter(user_id=user_id).exists():
+    user = User.objects.filter(user_id=user_id).first()
+    if user:
         request.session['user_id'] = user_id
-        request.session['is_admin'] = User.objects.get(user_id=user_id).is_admin
-        return HttpResponse(status=200)
+        request.session['is_admin'] = user.is_admin
+        return HttpResponse('200 OK')
     else:
-        return HttpResponse(status=404)
+        return HttpResponseNotFound('404 Not Found')
 
 def view_posts(request):
-    posts = Post.objects.filter(is_deleted=False).values('title', 'user__username', 'created_at')
-    html = '<ul>{}</ul>'.format(''.join(['<li>{}</li>'.format(p) for p in posts]))
+    posts = Post.objects.filter(is_deleted=False).values('post_id', 'title', 'user__username', 'created_at')
+    html = '<ul>'
+    for post in posts:
+        html += f'<li>{post["title"]} by {post["user__username"]} - {post["created_at"]}</li>'
+    html += '</ul>'
     return HttpResponse(html)
 
 def search_posts(request):
     keyword = request.GET.get('q', '')
     posts = Post.objects.filter(is_deleted=False, title__icontains=keyword) | Post.objects.filter(is_deleted=False, content__icontains=keyword)
-    html = '<ul>{}</ul>'.format(''.join(['<li>{}</li>'.format(p) for p in posts]))
+    html = '<ul>'
+    for post in posts:
+        html += f'<li><a href="/posts/{post.post_id}/">{post.title}</a></li>'
+    html += '</ul>'
     return HttpResponse(html)
 
+@csrf_exempt
 def add_comment(request, post_id):
-    if 'user_id' in request.session:
-        user_id = request.session['user_id']
-        user = User.objects.get(user_id=user_id)
-        post = Post.objects.get(post_id=post_id)
+    if request.session.get('user_id') is None:
+        return JsonResponse({'error': 'Not logged in'}, status=401)
+    user = User.objects.get(user_id=request.session['user_id'])
+    post = Post.objects.get(post_id=post_id)
+    if request.method == 'POST':
         content = request.POST.get('content', '')
         Comment.objects.create(post=post, user=user, content=content)
-        return HttpResponse(status=200)
+        return JsonResponse({'message': 'Comment added'}, status=200)
     else:
-        return HttpResponse(status=401)
+        return HttpResponse('Method not allowed', status=405)
 
 urlpatterns = [
     path('login/<int:user_id>/', login, name='login'),
@@ -111,20 +123,21 @@ urlpatterns = [
     path('posts/<int:post_id>/comment/', add_comment, name='add_comment'),
 ]
 
-if __name__ == '__main__':
-    from django.db import connection
-    existing = connection.introspection.table_names()
-    with connection.schema_editor() as schema_editor:
-        if 'users' not in existing: schema_editor.create_model(User)
-        if 'posts' not in existing: schema_editor.create_model(Post)
-        if 'comments' not in existing: schema_editor.create_model(Comment)
+from django.db import connection
 
-    user1 = User.objects.create(username='alice', is_admin=False)
-    user2 = User.objects.create(username='bob', is_admin=True)
+existing = connection.introspection.table_names()
+with connection.schema_editor() as schema_editor:
+    if 'users'    not in existing: schema_editor.create_model(User)
+    if 'posts'    not in existing: schema_editor.create_model(Post)
+    if 'comments' not in existing: schema_editor.create_model(Comment)
 
-    post1 = Post.objects.create(user=user1, title='Django Tips', content='Learn how to use Django effectively.')
-    post2 = Post.objects.create(user=user2, title='Board Rules', content='Please be respectful.')
+user1 = User.objects.create(username='alice', is_admin=False)
+user2 = User.objects.create(username='bob', is_admin=True)
 
-    Comment.objects.create(post=post1, user=user2, content='Great post!')
+post1 = Post.objects.create(user=user1, title='Django Tips', content='Learn how to use Django effectively.')
+post2 = Post.objects.create(user=user2, title='Board Rules', content='Please be respectful.')
 
-    execute_from_command_line(['', 'runserver'])
+Comment.objects.create(post=post1, user=user2, content='Great post!')
+
+from django.core.management import execute_from_command_line
+execute_from_command_line(['', 'runserver'])

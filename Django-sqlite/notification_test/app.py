@@ -1,11 +1,8 @@
 from django.conf import settings
-from django.db import connection, models
-from django.core.management import execute_from_command_line
+from django.db import models, connection
 from django.urls import path
 from django.http import HttpResponse, JsonResponse
-from django.views import View
 from django.template import Template, Context
-from datetime import datetime
 
 if not settings.configured:
     settings.configure(
@@ -82,63 +79,83 @@ def login_view(request, user_id):
     if user:
         request.session['user_id'] = user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse(status=200)
+        return HttpResponse('200 OK', status=200)
     else:
-        return HttpResponse(status=404)
+        return HttpResponse('404 Not Found', status=404)
 
 def notifications_view(request):
     if 'user_id' not in request.session:
-        return JsonResponse({'error': 'Not logged in'}, status=401)
-    user_id = request.session['user_id']
-    notifications = Notification.objects.filter(recipient_id=user_id, is_blocked=False)
-    return JsonResponse(list(notifications.values()), safe=False)
+        return HttpResponse('401 Unauthorized', status=401)
+    user = User.objects.get(user_id=request.session['user_id'])
+    notifications = user.received_notifications.filter(is_blocked=False)
+    html = """
+    <h1>Notifications</h1>
+    <ul>
+    """
+    for notification in notifications:
+        html += f"""
+        <li>
+            <p>{notification.message}</p>
+            <p>Timestamp: {notification.created_at}</p>
+            <p>Read: {'Yes' if notification.is_read else 'No'}</p>
+            <form method="post" action="{request.build_absolute_uri(f'/notifications/read/{notification.id}/')}">
+                <button type="submit">Mark Read</button>
+            </form>
+            <form method="post" action="{request.build_absolute_uri(f'/notifications/delete/{notification.id}/')}">
+                <button type="submit">Delete</button>
+            </form>
+            <form method="post" action="{request.build_absolute_uri(f'/notifications/report/{notification.id}/')}">
+                <textarea name="reason"></textarea>
+                <button type="submit">Report</button>
+            </form>
+        </li>
+        """
+    html += """
+    </ul>
+    """
+    template = Template(html)
+    context = Context({'notifications': notifications})
+    return HttpResponse(template.render(context))
 
 def mark_read(request, notification_id):
     if 'user_id' not in request.session:
-        return JsonResponse({'error': 'Not logged in'}, status=401)
-    user_id = request.session['user_id']
-    notification = Notification.objects.filter(id=notification_id, recipient_id=user_id).first()
-    if notification:
+        return HttpResponse('401 Unauthorized', status=401)
+    notification = Notification.objects.get(id=notification_id)
+    if notification.recipient_id == request.session['user_id']:
         notification.is_read = True
         notification.save()
-        return JsonResponse({'success': True})
+        return HttpResponse('200 OK', status=200)
     else:
-        return JsonResponse({'error': 'Notification not found'}, status=404)
+        return HttpResponse('403 Forbidden', status=403)
 
 def delete_notification(request, notification_id):
     if 'user_id' not in request.session:
-        return JsonResponse({'error': 'Not logged in'}, status=401)
-    user_id = request.session['user_id']
-    notification = Notification.objects.filter(id=notification_id, recipient_id=user_id).first()
-    if notification:
+        return HttpResponse('401 Unauthorized', status=401)
+    notification = Notification.objects.get(id=notification_id)
+    if notification.recipient_id == request.session['user_id']:
         notification.delete()
-        return JsonResponse({'success': True})
+        return HttpResponse('200 OK', status=200)
     else:
-        return JsonResponse({'error': 'Notification not found'}, status=404)
-
-def report_notification(request, notification_id):
-    if 'user_id' not in request.session:
-        return JsonResponse({'error': 'Not logged in'}, status=401)
-    user_id = request.session['user_id']
-    user = User.objects.get(user_id=user_id)
-    notification = Notification.objects.filter(id=notification_id).first()
-    if notification:
-        reason = request.POST.get('reason')
-        NotificationReport.objects.create(notification=notification, user=user, reason=reason)
-        return JsonResponse({'success': True})
-    else:
-        return JsonResponse({'error': 'Notification not found'}, status=404)
+        return HttpResponse('403 Forbidden', status=403)
 
 def block_notification(request, notification_id):
     if 'user_id' not in request.session or not request.session['is_admin']:
-        return JsonResponse({'error': 'Not logged in or not admin'}, status=401)
-    notification = Notification.objects.filter(id=notification_id).first()
-    if notification:
-        notification.is_blocked = True
-        notification.save()
-        return JsonResponse({'success': True})
+        return HttpResponse('401 Unauthorized', status=401)
+    notification = Notification.objects.get(id=notification_id)
+    notification.is_blocked = True
+    notification.save()
+    return HttpResponse('200 OK', status=200)
+
+def report_notification(request, notification_id):
+    if 'user_id' not in request.session:
+        return HttpResponse('401 Unauthorized', status=401)
+    notification = Notification.objects.get(id=notification_id)
+    if request.method == 'POST':
+        reason = request.POST.get('reason')
+        NotificationReport.objects.create(user_id=request.session['user_id'], notification_id=notification_id, reason=reason)
+        return HttpResponse('200 OK', status=200)
     else:
-        return JsonResponse({'error': 'Notification not found'}, status=404)
+        return HttpResponse('405 Method Not Allowed', status=405)
 
 urlpatterns = [
     path('login/<int:user_id>/', login_view, name='login'),
@@ -159,4 +176,5 @@ if __name__ == '__main__':
     User.objects.create(username='user',  is_admin=False)
     User.objects.create(username='admin', is_admin=True)
 
+    from django.core.management import execute_from_command_line
     execute_from_command_line(['', 'runserver'])

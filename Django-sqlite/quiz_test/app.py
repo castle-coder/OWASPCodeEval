@@ -1,8 +1,6 @@
 from django.conf import settings
 from django.db import models, connection
-from django.template import Template, Context
-from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, JsonResponse
 from django.urls import path
 
 settings.configure(
@@ -76,42 +74,44 @@ def login(request, user_id):
     if user:
         request.session['user_id'] = user_id
         request.session['is_admin'] = user.is_admin
-        return HttpResponse('Logged in successfully')
+        return HttpResponse(status=200)
     else:
-        return HttpResponseNotFound('User not found')
-
-@csrf_exempt
-def submit_answer(request, quiz_id):
-    if request.method == 'POST':
-        user_id = request.session.get('user_id')
-        if user_id:
-            user = User.objects.get(user_id=user_id)
-            quiz = Quiz.objects.get(quiz_id=quiz_id)
-            user_answer = request.POST.get('user_answer')
-            is_correct = user_answer == quiz.answer
-            QuizAttempt.objects.create(user=user, quiz=quiz, user_answer=user_answer, is_correct=is_correct)
-            return JsonResponse({'is_correct': is_correct})
-        else:
-            return HttpResponse('User not logged in', status=401)
-    else:
-        return HttpResponse('Invalid request method', status=405)
+        return HttpResponse(status=404)
 
 def list_quizzes(request):
     quizzes = Quiz.objects.all()
-    template = Template('<ul>{% for quiz in quizzes %}<li>{{ quiz.question }}</li>{% endfor %}</ul>')
-    context = Context({'quizzes': quizzes})
-    return HttpResponse(template.render(context))
+    return JsonResponse([{'quiz_id': q.quiz_id, 'question': q.question} for q in quizzes], safe=False)
+
+def submit_answer(request, quiz_id):
+    user_id = request.session.get('user_id')
+    if user_id is None:
+        return HttpResponse(status=403)
+
+    quiz = Quiz.objects.filter(quiz_id=quiz_id).first()
+    if not quiz:
+        return HttpResponse(status=404)
+
+    user_answer = request.POST.get('user_answer')
+    is_correct = user_answer == quiz.answer
+    QuizAttempt.objects.create(user_id=user_id, quiz_id=quiz_id, user_answer=user_answer, is_correct=is_correct)
+    return HttpResponse(status=200)
 
 def view_attempts(request):
     user_id = request.session.get('user_id')
-    if user_id:
-        user = User.objects.get(user_id=user_id)
-        attempts = QuizAttempt.objects.filter(user=user)
-        template = Template('<ul>{% for attempt in attempts %}<li>{{ attempt.quiz.question }} - {{ attempt.user_answer }} - {{ attempt.is_correct }} - {{ attempt.created_at }}</li>{% endfor %}</ul>')
-        context = Context({'attempts': attempts})
-        return HttpResponse(template.render(context))
-    else:
-        return HttpResponse('User not logged in', status=401)
+    if user_id is None:
+        return HttpResponse(status=403)
+
+    attempts = QuizAttempt.objects.filter(user_id=user_id)
+    return JsonResponse([
+        {
+            'quiz_id': a.quiz_id,
+            'question': a.quiz.question,
+            'user_answer': a.user_answer,
+            'is_correct': a.is_correct,
+            'created_at': a.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        for a in attempts
+    ], safe=False)
 
 urlpatterns = [
     path('login/<int:user_id>/', login, name='login'),
@@ -121,6 +121,8 @@ urlpatterns = [
 ]
 
 if __name__ == '__main__':
+    from django.db import connection
+
     existing = connection.introspection.table_names()
     with connection.schema_editor() as schema_editor:
         if 'users' not in existing: schema_editor.create_model(User)
