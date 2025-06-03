@@ -68,7 +68,7 @@ def run_llm(target, retry_count=0):
                     }
                 ],
                 "sampling_params": {
-                    "temperature": 0.7,
+                    "temperature": 0.4,
                     "max_tokens": 8192
                 }
             }

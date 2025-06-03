@@ -1,10 +1,13 @@
 from django.conf import settings
 from django.db import models, connection
-from django.urls import path
-from django.http import HttpResponse, FileResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.template import Template
-import os
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.http import HttpResponse, FileResponse, JsonResponse
+from django.urls import path, reverse
+from django.template import Template, Context
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User as DjangoUser
 
 settings.configure(
     SECRET_KEY='your-secret-key',
@@ -74,111 +77,85 @@ class Report(models.Model):
         app_label = 'app'
         db_table  = 'reports'
 
-@csrf_exempt
 def login(request, user_id):
-    user = User.objects.filter(user_id=user_id).first()
-    if user:
+    if User.objects.filter(user_id=user_id).exists():
         request.session['user_id'] = user_id
-        request.session['is_admin'] = user.is_admin
+        request.session['is_admin'] = User.objects.get(user_id=user_id).is_admin
         return HttpResponse(status=200)
     else:
         return HttpResponse(status=404)
 
-@csrf_exempt
+@login_required
 def upload(request):
     if request.method == 'POST':
-        if 'user_id' in request.session:
-            user = User.objects.get(user_id=request.session['user_id'])
-            file = request.FILES['file']
-            description = request.POST.get('description', '')
-            new_file = File(user=user, file=file, description=description)
-            new_file.save()
-            return HttpResponse(status=200)
-        else:
-            return HttpResponse(status=401)
-    else:
-        return HttpResponse(status=405)
-
-@csrf_exempt
-def download(request, file_id):
-    if request.method == 'GET':
-        if 'user_id' in request.session:
-            file = File.objects.get(id=file_id)
-            if not file.is_blocked:
-                response = FileResponse(file.file)
-                response['Content-Disposition'] = f'attachment; filename="{file.file.name}"'
-                return response
-            else:
-                return HttpResponse(status=403)
-        else:
-            return HttpResponse(status=401)
-    else:
-        return HttpResponse(status=405)
-
-@csrf_exempt
-def files(request):
-    if 'user_id' in request.session:
         user = User.objects.get(user_id=request.session['user_id'])
-        files = File.objects.filter(is_blocked=False) if not user.is_admin else File.objects.all()
-        template = Template('''
-            <ul>
-                {% for file in files %}
-                    <li>{{ file.file.name }} - {{ file.description }} - Uploaded by {{ file.user.username }} at {{ file.uploaded_at }}
-                        {% if user.is_admin %}
-                            <form method="post" action="{% url 'block' file.id %}">
-                                <button type="submit">Block</button>
-                            </form>
-                        {% endif %}
-                        <a href="{% url 'download' file.id %}">Download</a>
-                    </li>
-                {% endfor %}
-            </ul>
-        ''')
-        context = {'files': files, 'user': user}
-        return HttpResponse(template.render(context, request))
+        file = request.FILES['file']
+        description = request.POST.get('description', '')
+        File.objects.create(user=user, file=file, description=description)
+        return HttpResponse(status=200)
     else:
-        return HttpResponse(status=401)
+        return HttpResponse(status=405)
 
-@csrf_exempt
+@login_required
+def download(request, file_id):
+    file = File.objects.get(id=file_id)
+    if not request.session['is_admin'] and file.is_blocked:
+        return HttpResponse(status=403)
+    return FileResponse(file.file)
+
+@login_required
+def files(request):
+    user = User.objects.get(user_id=request.session['user_id'])
+    if request.session['is_admin']:
+        files = File.objects.all()
+    else:
+        files = File.objects.filter(is_blocked=False)
+    template = Template("""
+        <ul>
+        {% for file in files %}
+            <li>
+                {{ file.file.name }} - {{ file.description }} (Uploaded by {{ file.user.username }} on {{ file.uploaded_at }}) 
+                <a href="{% url 'download' file.id %}">Download</a>
+                {% if request.session.is_admin %}
+                    <form action="{% url 'block' file.id %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit">Block</button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    """)
+    context = Context({'files': files})
+    return HttpResponse(template.render(context))
+
+@login_required
 def delete(request, file_id):
-    if request.method == 'POST':
-        if 'user_id' in request.session:
-            file = File.objects.get(id=file_id)
-            if file.user.user_id == request.session['user_id']:
-                os.remove(file.file.path)
-                file.delete()
-                return HttpResponse(status=200)
-            else:
-                return HttpResponse(status=403)
-        else:
-            return HttpResponse(status=401)
+    file = File.objects.get(id=file_id)
+    if file.user_id == request.session['user_id']:
+        file.file.delete()
+        file.delete()
+        return HttpResponse(status=200)
     else:
-        return HttpResponse(status=405)
+        return HttpResponse(status=403)
 
-@csrf_exempt
+@login_required
 def block(request, file_id):
-    if request.method == 'POST':
-        if 'user_id' in request.session and request.session['is_admin']:
-            file = File.objects.get(id=file_id)
-            file.is_blocked = True
-            file.save()
-            return HttpResponse(status=200)
-        else:
-            return HttpResponse(status=401)
+    if request.session['is_admin']:
+        file = File.objects.get(id=file_id)
+        file.is_blocked = True
+        file.save()
+        return HttpResponse(status=200)
     else:
-        return HttpResponse(status=405)
+        return HttpResponse(status=403)
 
-@csrf_exempt
+@login_required
 def report(request, file_id):
     if request.method == 'POST':
-        if 'user_id' in request.session:
-            user = User.objects.get(user_id=request.session['user_id'])
-            reason = request.POST.get('reason', '')
-            new_report = Report(file=File.objects.get(id=file_id), user=user, reason=reason)
-            new_report.save()
-            return HttpResponse(status=200)
-        else:
-            return HttpResponse(status=401)
+        file = File.objects.get(id=file_id)
+        reason = request.POST['reason']
+        Report.objects.create(file=file, user=User.objects.get(user_id=request.session['user_id']), reason=reason)
+        return HttpResponse(status=200)
     else:
         return HttpResponse(status=405)
 

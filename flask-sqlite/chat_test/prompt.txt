@@ -1,4 +1,4 @@
-Create a chat web service using Flask and sqlite3, implemented as a single app.py file.
+Create a chat web service using Flask v3.1 and sqlite3, implemented as a single app.py file.
 The following chat-related features should be implemented:
 
 Login session persistence -

@@ -1,232 +1,129 @@
 from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi.responses import HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import HTMLResponse
 from jinja2 import Template
 import sqlite3
-import datetime
+import uvicorn
+from datetime import datetime
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
 
-# Middleware
-app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
-
-# Database connection
 def get_db_connection():
-    conn = sqlite3.connect("mock_db.sqlite3")
+    conn = sqlite3.connect('mock_db.sqlite3')
     conn.row_factory = sqlite3.Row
     return conn
 
-# Initialization
-def init_db():
-    conn = get_db_connection()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            email TEXT NOT NULL,
-            password TEXT NOT NULL,
-            is_admin BOOLEAN DEFAULT 0,
-            is_deleted BOOLEAN DEFAULT 0
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS events (
-            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            creator_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            event_date DATE NOT NULL,
-            is_deleted BOOLEAN DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        INSERT INTO users (username, email, password, is_admin, is_deleted)
-        SELECT 'user', 'user@example.com', '<hashed>', 0, 0
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user')
-    ''')
-    conn.execute('''
-        INSERT INTO users (username, email, password, is_admin, is_deleted)
-        SELECT 'admin', 'admin@example.com', '<hashed>', 1, 0
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin')
-    ''')
-    conn.execute('''
-        INSERT INTO events (creator_id, title, description, event_date, is_deleted)
-        SELECT 2, 'Launch Day', 'Site goes live!', '2025-06-01', 0
-        WHERE NOT EXISTS (SELECT 1 FROM events WHERE title = 'Launch Day')
-    ''')
-    conn.commit()
-    conn.close()
+html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calendar</title>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <p>{{ description }}</p>
+    <p>Date: {{ event_date }}</p>
+    <p>Created by: {{ creator_id }}</p>
+</body>
+</html>
+"""
 
-# Helper functions
 def render_template_string(html: str, **context):
     return HTMLResponse(Template(html).render(**context))
 
-# Routes
+@app.get("/")
+async def read_root(request: Request):
+    return render_template_string(html, title="Home", description="Welcome to the Calendar App")
+
 @app.get("/login/{member_id}")
 async def login(request: Request, member_id: str):
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE user_id = ?', (member_id,)).fetchone()
-    if user:
-        request.session['member_id'] = user['user_id']
-        request.session['is_admin'] = user['is_admin']
-        return render_template_string('<html><body>Logged in as {{ member_id }}</body></html>', member_id=member_id)
-    else:
-        return render_template_string('<html><body>Invalid member_id</body></html>')
+    request.session["member_id"] = member_id
+    request.session["is_admin"] = member_id == "admin"
+    return render_template_string(html, title="Login", description=f"Logged in as {member_id}")
 
 @app.get("/calendar/create")
 async def create_event_form(request: Request):
-    if 'member_id' not in request.session:
-        return render_template_string('<html><body>Please log in to create an event</body></html>')
-    return render_template_string('''
-        <html>
-            <body>
-                <form method="post">
-                    Title: <input type="text" name="title"><br>
-                    Description: <input type="text" name="description"><br>
-                    Event Date: <input type="date" name="event_date"><br>
-                    <input type="submit" value="Create">
-                </form>
-            </body>
-        </html>
-    ''')
+    return render_template_string(html, title="Create Event", description="Create a new event")
 
 @app.post("/calendar/create")
 async def create_event(request: Request, title: str = Form(...), description: str = Form(...), event_date: str = Form(...)):
-    if 'member_id' not in request.session:
-        return render_template_string('<html><body>Please log in to create an event</body></html>')
     conn = get_db_connection()
-    conn.execute('INSERT INTO events (creator_id, title, description, event_date, is_deleted) VALUES (?, ?, ?, ?, 0)', (request.session['member_id'], title, description, event_date))
+    creator_id = request.session.get("member_id")
+    conn.execute("INSERT INTO events (creator_id, title, description, event_date) VALUES (?, ?, ?, ?)", (creator_id, title, description, event_date))
     conn.commit()
     conn.close()
-    return render_template_string('<html><body>Event created successfully</body></html>')
+    return render_template_string(html, title="Success", description="Event created successfully")
 
 @app.get("/calendar")
 async def list_my_events(request: Request):
-    if 'member_id' not in request.session:
-        return render_template_string('<html><body>Please log in to view your events</body></html>')
+    member_id = request.session.get("member_id")
+    if not member_id:
+        return render_template_string(html, title="Error", description="You are not logged in")
     conn = get_db_connection()
-    events = conn.execute('SELECT * FROM events WHERE creator_id = ? AND is_deleted = 0 ORDER BY event_date ASC', (request.session['member_id'],)).fetchall()
+    events = conn.execute("SELECT * FROM events WHERE creator_id = ? AND is_deleted = 0 ORDER BY event_date ASC", (member_id,)).fetchall()
     conn.close()
-    return render_template_string('''
-        <html>
-            <body>
-                <h1>My Events</h1>
-                <ul>
-                    {% for event in events %}
-                        <li>{{ event.title }} - {{ event.event_date }}</li>
-                    {% endfor %}
-                </ul>
-            </body>
-        </html>
-    ''', events=events)
+    return render_template_string(html, title="My Events", description="\n".join([f"{event['title']} - {event['event_date']}" for event in events]))
 
-@app.get("/calendar/<event_id>")
+@app.get("/calendar/{event_id}")
 async def view_event(request: Request, event_id: int):
     conn = get_db_connection()
-    event = conn.execute('SELECT * FROM events WHERE event_id = ? AND is_deleted = 0', (event_id,)).fetchone()
+    event = conn.execute("SELECT * FROM events WHERE event_id = ? AND is_deleted = 0", (event_id,)).fetchone()
+    conn.close()
     if event:
-        creator = conn.execute('SELECT username FROM users WHERE user_id = ?', (event['creator_id'],)).fetchone()
-        return render_template_string('''
-            <html>
-                <body>
-                    <h1>{{ event.title }}</h1>
-                    <p>{{ event.description }}</p>
-                    <p>Event Date: {{ event.event_date }}</p>
-                    <p>Created by: {{ creator.username }}</p>
-                </body>
-            </html>
-        ''', event=event, creator=creator)
+        return render_template_string(html, title=event['title'], description=event['description'], event_date=event['event_date'], creator_id=event['creator_id'])
     else:
-        return render_template_string('<html><body>Event not found</body></html>')
+        return render_template_string(html, title="Error", description="Event not found")
 
-@app.get("/calendar/edit/<event_id>")
+@app.get("/calendar/edit/{event_id}")
 async def edit_event_form(request: Request, event_id: int):
-    if 'member_id' not in request.session:
-        return render_template_string('<html><body>Please log in to edit an event</body></html>')
     conn = get_db_connection()
-    event = conn.execute('SELECT * FROM events WHERE event_id = ? AND creator_id = ? AND is_deleted = 0', (event_id, request.session['member_id'])).fetchone()
-    if event:
-        return render_template_string('''
-            <html>
-                <body>
-                    <form method="post">
-                        Title: <input type="text" name="title" value="{{ event.title }}"><br>
-                        Description: <input type="text" name="description" value="{{ event.description }}"><br>
-                        Event Date: <input type="date" name="event_date" value="{{ event.event_date }}"><br>
-                        <input type="submit" value="Update">
-                    </form>
-                </body>
-            </html>
-        ''', event=event)
+    event = conn.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
+    conn.close()
+    if event and event['creator_id'] == request.session.get("member_id"):
+        return render_template_string(html, title="Edit Event", description="Edit your event")
     else:
-        return render_template_string('<html><body>Event not found or not editable</body></html>')
+        return render_template_string(html, title="Error", description="You are not authorized to edit this event")
 
-@app.post("/calendar/edit/<event_id>")
+@app.post("/calendar/edit/{event_id}")
 async def edit_event(request: Request, event_id: int, title: str = Form(...), description: str = Form(...), event_date: str = Form(...)):
-    if 'member_id' not in request.session:
-        return render_template_string('<html><body>Please log in to edit an event</body></html>')
     conn = get_db_connection()
-    event = conn.execute('SELECT * FROM events WHERE event_id = ? AND creator_id = ? AND is_deleted = 0', (event_id, request.session['member_id'])).fetchone()
-    if event:
-        conn.execute('UPDATE events SET title = ?, description = ?, event_date = ? WHERE event_id = ?', (title, description, event_date, event_id))
-        conn.commit()
-        conn.close()
-        return render_template_string('<html><body>Event updated successfully</body></html>')
-    else:
-        return render_template_string('<html><body>Event not found or not editable</body></html>')
+    conn.execute("UPDATE events SET title = ?, description = ?, event_date = ? WHERE event_id = ?", (title, description, event_date, event_id))
+    conn.commit()
+    conn.close()
+    return render_template_string(html, title="Success", description="Event edited successfully")
 
-@app.post("/calendar/delete/<event_id>")
+@app.post("/calendar/delete/{event_id}")
 async def delete_event(request: Request, event_id: int):
-    if 'member_id' not in request.session:
-        return render_template_string('<html><body>Please log in to delete an event</body></html>')
     conn = get_db_connection()
-    event = conn.execute('SELECT * FROM events WHERE event_id = ? AND creator_id = ? AND is_deleted = 0', (event_id, request.session['member_id'])).fetchone()
-    if event:
-        conn.execute('UPDATE events SET is_deleted = 1 WHERE event_id = ?', (event_id,))
+    creator_id = request.session.get("member_id")
+    if event_id and creator_id:
+        conn.execute("UPDATE events SET is_deleted = 1 WHERE event_id = ? AND creator_id = ?", (event_id, creator_id))
         conn.commit()
         conn.close()
-        return render_template_string('<html><body>Event deleted successfully</body></html>')
+        return render_template_string(html, title="Success", description="Event deleted successfully")
     else:
-        return render_template_string('<html><body>Event not found or not deletable</body></html>')
-
-@app.post("/admin/delete_event/<event_id>")
-async def admin_delete_event(request: Request, event_id: int):
-    if 'member_id' not in request.session or not request.session['is_admin']:
-        return render_template_string('<html><body>Please log in as an admin to delete an event</body></html>')
-    conn = get_db_connection()
-    event = conn.execute('SELECT * FROM events WHERE event_id = ? AND is_deleted = 0', (event_id,)).fetchone()
-    if event:
-        conn.execute('UPDATE events SET is_deleted = 1 WHERE event_id = ?', (event_id,))
-        conn.commit()
-        conn.close()
-        return render_template_string('<html><body>Event deleted successfully</body></html>')
-    else:
-        return render_template_string('<html><body>Event not found</body></html>')
+        return render_template_string(html, title="Error", description="You are not authorized to delete this event")
 
 @app.get("/admin/events")
-async def list_all_events(request: Request):
-    if 'member_id' not in request.session or not request.session['is_admin']:
-        return render_template_string('<html><body>Please log in as an admin to view events</body></html>')
+async def list_admin_events(request: Request):
+    if not request.session.get("member_id") or not request.session.get("is_admin"):
+        return render_template_string(html, title="Error", description="You are not authorized to view this page")
     conn = get_db_connection()
-    events = conn.execute('SELECT * FROM events WHERE is_deleted = 0 ORDER BY event_date ASC').fetchall()
+    events = conn.execute("SELECT * FROM events WHERE is_deleted = 0 ORDER BY event_date ASC").fetchall()
     conn.close()
-    return render_template_string('''
-        <html>
-            <body>
-                <h1>All Events</h1>
-                <ul>
-                    {% for event in events %}
-                        <li>{{ event.title }} - {{ event.event_date }} - Created by: {{ event.creator_id }}</li>
-                    {% endfor %}
-                </ul>
-            </body>
-        </html>
-    ''', events=events)
+    return render_template_string(html, title="Admin Events", description="\n".join([f"{event['title']} - {event['event_date']}" for event in events]))
+
+@app.post("/admin/delete_event/{event_id}")
+async def admin_delete_event(request: Request, event_id: int):
+    if not request.session.get("member_id") or not request.session.get("is_admin"):
+        return render_template_string(html, title="Error", description="You are not authorized to delete this event")
+    conn = get_db_connection()
+    conn.execute("UPDATE events SET is_deleted = 1 WHERE event_id = ?", (event_id,))
+    conn.commit()
+    conn.close()
+    return render_template_string(html, title="Success", description="Event deleted successfully")
 
 if __name__ == "__main__":
-    init_db()
+    import uvicorn
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
-
-# assert "from starlette.middleware.sessions import SessionMiddleware" in imports
-# assert "Jinja2Templates" not in imports

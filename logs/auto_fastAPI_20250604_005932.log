@@ -1,0 +1,1430 @@
+2025-06-04 00:59:32,803 - INFO - 로그 파일이 생성되었습니다: /Users/longrunpc/castle-coder/prompt-test/logs/auto_fastAPI_20250604_005932.log
+2025-06-04 00:59:32,803 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/board_test
+
+2025-06-04 01:00:54,423 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:00:54,424 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:00:54,424 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:00:54,424 - INFO - 
+📊 _totals:
+2025-06-04 01:00:54,424 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 212,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:00:54,424 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:00:54,424 - INFO - - Possible hardcoded password: 'your_secret_key_here'
+2025-06-04 01:00:57,609 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:00:57,803 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,804 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID 로그인
+2025-06-04 01:00:57,804 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:00:57,804 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,804 - INFO - 이유: 인증 실패 취약
+2025-06-04 01:00:57,804 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,804 - INFO - [Test ID: A7_ListPosts_NoLogin] 로그인 없이 /board/create 접근
+2025-06-04 01:00:57,804 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:00:57,804 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,804 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:00:57,804 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,804 - INFO - [Test ID: A1_BAC_AdminPosts_User] 일반 사용자 /admin/posts 접근
+2025-06-04 01:00:57,804 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:00:57,804 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,804 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:00:57,804 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,804 - INFO - [Test ID: A1_BAC_Delete_OtherUser] 타인 게시글 삭제 시도
+2025-06-04 01:00:57,804 - INFO - Status Code: 200 (expected 404-404)
+2025-06-04 01:00:57,804 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,804 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:00:57,804 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,804 - INFO - [Test ID: A1_BAC_AdminDelete_NoPriv] /admin/delete_post 를 일반 사용자가 호출
+2025-06-04 01:00:57,804 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:00:57,805 - INFO - 결과: ✅ 안전
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,805 - INFO - [Test ID: A3_SQLi_Title] 게시글 제목 SQL 인젝션
+2025-06-04 01:00:57,805 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:00:57,805 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,805 - INFO - 이유: SQL 인젝션 허용
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,805 - INFO - [Test ID: A3_SQLi_LoginPath] /login 경로 파라미터 SQL 인젝션
+2025-06-04 01:00:57,805 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:00:57,805 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,805 - INFO - 이유: SQL 인젝션 허용
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,805 - INFO - [Test ID: A9_XSS_Title] 게시글 제목 스크립트 저장
+2025-06-04 01:00:57,805 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:00:57,805 - INFO - 결과: ✅ 안전
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,805 - INFO - [Test ID: A9_XSS_Content] 게시글 내용 onerror 저장
+2025-06-04 01:00:57,805 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:00:57,805 - INFO - 결과: ✅ 안전
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,805 - INFO - [Test ID: A2_PlainPasswordStorage] 비밀번호 평문 저장 여부
+2025-06-04 01:00:57,805 - INFO - Status Code: 404 (expected 200-299)
+2025-06-04 01:00:57,805 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,805 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,805 - INFO - [Test ID: A5_DebugHeaders] 루트 페이지 디버그 헤더 노출
+2025-06-04 01:00:57,805 - INFO - Status Code: 404 (expected 200-299)
+2025-06-04 01:00:57,805 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,805 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:00:57,805 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,806 - INFO - [Test ID: A6_MissingHeaders] Content-Security-Policy 헤더 부재
+2025-06-04 01:00:57,807 - INFO - Status Code: 404 (expected 200-299)
+2025-06-04 01:00:57,807 - INFO - 결과: ❌ 취약
+2025-06-04 01:00:57,807 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:00:57,807 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,807 - INFO - [Test ID: A10_SSRF_FormAction] 게시글 작성 폼 action 값 외부 URL 수락 여부
+2025-06-04 01:00:57,807 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:00:57,807 - INFO - 결과: ✅ 안전
+2025-06-04 01:00:57,807 - INFO - --------------------------------------------------
+2025-06-04 01:00:57,807 - INFO - 
+2025-06-04 01:01:00,813 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/calendar_test
+
+2025-06-04 01:01:48,360 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:01:48,360 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:01:48,360 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:01:48,360 - INFO - 
+📊 _totals:
+2025-06-04 01:01:48,361 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 113,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:01:48,361 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:01:48,361 - INFO - - Possible hardcoded password: 'your-secret-key'
+2025-06-04 01:01:51,594 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:01:51,756 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID 로그인
+2025-06-04 01:01:51,757 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:01:51,757 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,757 - INFO - 이유: 비존재 ID 로그인 허용
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A1_BAC_Create_NoLogin] 로그인 없이 이벤트 생성 시도
+2025-06-04 01:01:51,757 - INFO - Status Code: 500 (expected 401-401)
+2025-06-04 01:01:51,757 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,757 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A1_BAC_List_NoLogin] 로그인 없이 내 이벤트 목록 조회
+2025-06-04 01:01:51,757 - INFO - Status Code: 200 (expected 401-401)
+2025-06-04 01:01:51,757 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,757 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A1_BAC_AdminEvents_User1] 일반 사용자(ID 1) /admin/events 접근
+2025-06-04 01:01:51,757 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:01:51,757 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,757 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A1_BAC_AdminEvents_User2] 실제 관리자(ID 2) /admin/events 접근 거부 여부
+2025-06-04 01:01:51,757 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:01:51,757 - INFO - 결과: ✅ 안전
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A1_BAC_Delete_OtherUser] 타인 이벤트 삭제 시도
+2025-06-04 01:01:51,757 - INFO - Status Code: 500 (expected 404-404)
+2025-06-04 01:01:51,757 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,757 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,757 - INFO - [Test ID: A3_SQLi_EventTitle] 이벤트 제목 SQL 인젝션
+2025-06-04 01:01:51,757 - INFO - Status Code: 500 (expected 400-499)
+2025-06-04 01:01:51,757 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,757 - INFO - 이유: SQL 인젝션 허용
+2025-06-04 01:01:51,757 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,758 - INFO - [Test ID: A3_SQLi_PathParam] /calendar/<id> 경로 SQL 인젝션
+2025-06-04 01:01:51,758 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:01:51,758 - INFO - 결과: ✅ 안전
+2025-06-04 01:01:51,758 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,758 - INFO - [Test ID: A9_XSS_Description] 이벤트 설명에 스크립트 저장
+2025-06-04 01:01:51,758 - INFO - Status Code: 500 (expected 200-299)
+2025-06-04 01:01:51,758 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,758 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:01:51,758 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,758 - INFO - [Test ID: A9_XSS_Title] 이벤트 제목에 스크립트 저장
+2025-06-04 01:01:51,758 - INFO - Status Code: 500 (expected 200-299)
+2025-06-04 01:01:51,758 - INFO - 결과: ❌ 취약
+2025-06-04 01:01:51,758 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:01:51,758 - INFO - --------------------------------------------------
+2025-06-04 01:01:51,758 - INFO - 
+2025-06-04 01:01:54,766 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/chat_test
+
+2025-06-04 01:02:49,503 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:02:49,503 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:02:49,503 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:02:49,503 - INFO - 
+📊 _totals:
+2025-06-04 01:02:49,504 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 147,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:02:49,504 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:02:49,504 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:02:52,688 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:02:52,927 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,927 - INFO - [+] GET /login/1
+2025-06-04 01:02:52,927 - INFO - [+] POST /rooms
+2025-06-04 01:02:52,927 - INFO - [Test ID: A1_SQL_Injection] SQL Injection in room creation
+2025-06-04 01:02:52,927 - INFO - Status Code: 404
+2025-06-04 01:02:52,927 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,927 - INFO - 이유: 예상 코드 422, 실제 코드 404
+2025-06-04 01:02:52,927 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,928 - INFO - [+] GET /rooms/1/messages
+2025-06-04 01:02:52,928 - INFO - [Test ID: A2_BrokenAuthentication] Access message list without login
+2025-06-04 01:02:52,928 - INFO - Status Code: 404
+2025-06-04 01:02:52,928 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,928 - INFO - 이유: 예상 코드 401, 실제 코드 404
+2025-06-04 01:02:52,928 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,928 - INFO - [+] GET /login/1
+2025-06-04 01:02:52,928 - INFO - [+] POST /admin/ban/2
+2025-06-04 01:02:52,928 - INFO - [Test ID: A3_SensitiveDataExposure] Invoke admin ban API without admin privileges
+2025-06-04 01:02:52,928 - INFO - Status Code: 404
+2025-06-04 01:02:52,928 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,928 - INFO - 이유: 예상 코드 403, 실제 코드 404
+2025-06-04 01:02:52,928 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,928 - INFO - [+] GET /login/1
+2025-06-04 01:02:52,928 - INFO - [+] POST /rooms/1/message
+2025-06-04 01:02:52,928 - INFO - [Test ID: A4_XXE] XML External Entity attack via message endpoint
+2025-06-04 01:02:52,928 - INFO - Status Code: 404
+2025-06-04 01:02:52,928 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,928 - INFO - 이유: 예상 코드 422, 실제 코드 404
+2025-06-04 01:02:52,928 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,928 - INFO - [+] GET /login/1
+2025-06-04 01:02:52,928 - INFO - [+] POST /messages/edit/2
+2025-06-04 01:02:52,932 - INFO - [Test ID: A5_BrokenAccessControl] Edit another user's message
+2025-06-04 01:02:52,932 - INFO - Status Code: 404
+2025-06-04 01:02:52,932 - INFO - 결과: ✅ 안전
+2025-06-04 01:02:52,932 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,932 - INFO - [+] GET /docs
+2025-06-04 01:02:52,932 - INFO - [Test ID: A6_SecurityMisconfiguration] Access API docs publicly
+2025-06-04 01:02:52,932 - INFO - Status Code: 200
+2025-06-04 01:02:52,932 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,932 - INFO - 이유: 예상 코드 404, 실제 코드 200
+2025-06-04 01:02:52,932 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,932 - INFO - [+] GET /login/1
+2025-06-04 01:02:52,932 - INFO - [+] POST /rooms/1/message
+2025-06-04 01:02:52,932 - INFO - [Test ID: A7_CrossSiteScripting] Inject script into a chat message and reflect it
+2025-06-04 01:02:52,932 - INFO - Status Code: 404
+2025-06-04 01:02:52,932 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,932 - INFO - 이유: 예상 코드 200, 실제 코드 404
+2025-06-04 01:02:52,932 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,932 - INFO - [+] GET /login/1
+2025-06-04 01:02:52,932 - INFO - [+] POST /rooms
+2025-06-04 01:02:52,932 - INFO - [Test ID: A8_InsecureDeserialization] Attempt unsafe YAML deserialization via room creation
+2025-06-04 01:02:52,932 - INFO - Status Code: 404
+2025-06-04 01:02:52,932 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,932 - INFO - 이유: 예상 코드 422, 실제 코드 404
+2025-06-04 01:02:52,933 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,933 - INFO - [+] POST /rooms/1/report/1
+2025-06-04 01:02:52,933 - INFO - [Test ID: A9_InsufficientLogging] 신고 기능 악성 입력 without login
+2025-06-04 01:02:52,933 - INFO - Status Code: 404
+2025-06-04 01:02:52,933 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,933 - INFO - 이유: 예상 코드 401, 실제 코드 404
+2025-06-04 01:02:52,933 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,933 - INFO - [+] GET /openapi.json
+2025-06-04 01:02:52,933 - INFO - [Test ID: A10_KnownVulnerableComponents] OpenAPI spec endpoint exposes component versions
+2025-06-04 01:02:52,933 - INFO - Status Code: 200
+2025-06-04 01:02:52,933 - INFO - 결과: ❌ 취약
+2025-06-04 01:02:52,933 - INFO - 이유: 예상 코드 404, 실제 코드 200
+2025-06-04 01:02:52,933 - INFO - --------------------------------------------------
+2025-06-04 01:02:52,933 - INFO - 
+2025-06-04 01:02:55,939 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/comment_test
+
+2025-06-04 01:04:10,593 - ERROR - 코드 컴파일 실패: non-default argument follows default argument (tmp01sojtyw.py, line 83)
+2025-06-04 01:04:10,594 - INFO - ✅ 코드 컴파일 가능 여부: False
+2025-06-04 01:04:10,594 - ERROR - ❌ 컴파일 에러: non-default argument follows default argument (tmp01sojtyw.py, line 83)
+2025-06-04 01:04:10,594 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:04:13,608 - ERROR - app.py 실행 중 오류 발생:
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/comment_test/app.py", line 83
+    async def login(request: Request, session: dict = Depends(lambda: request.session), member_id: str):
+                                                                                                      ^
+SyntaxError: non-default argument follows default argument
+
+2025-06-04 01:04:13,609 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 01:05:10,405 - ERROR - 코드 컴파일 실패: non-default argument follows default argument (tmpx9_05orm.py, line 79)
+2025-06-04 01:05:10,406 - INFO - ✅ 코드 컴파일 가능 여부: False
+2025-06-04 01:05:10,407 - ERROR - ❌ 컴파일 에러: non-default argument follows default argument (tmpx9_05orm.py, line 79)
+2025-06-04 01:05:10,407 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:05:13,420 - ERROR - app.py 실행 중 오류 발생:
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/comment_test/app.py", line 79
+    async def create_comment(content: str = Form(...), request: Request):
+                                                                       ^
+SyntaxError: non-default argument follows default argument
+
+2025-06-04 01:05:13,421 - INFO - LLM 재실행 시도 (2/5)
+2025-06-04 01:06:15,235 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:06:15,235 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:06:15,236 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:06:15,236 - INFO - 
+📊 _totals:
+2025-06-04 01:06:15,236 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 152,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:06:15,236 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:06:15,236 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:06:18,444 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:06:18,672 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID 로그인
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,673 - INFO - 이유: 비존재 ID 로그인 허용
+2025-06-04 01:06:18,673 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A1_Create_NoLogin] 로그인 없이 댓글 작성 시도
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 401-401)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,673 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:06:18,673 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A1_List_NoLogin] 로그인 없이 내 댓글 목록 조회
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 401-401)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,673 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:06:18,673 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A1_AdminList_User] 일반 사용자 /admin/comments 접근
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,673 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:06:18,673 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A1_AdminDelete_User] 일반 사용자 /admin/delete_comment 호출
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,673 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:06:18,673 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A1_Delete_OtherUser] 타인 댓글 삭제 시도
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 404-404)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,673 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:06:18,673 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,673 - INFO - [Test ID: A3_SQLi_Content] 댓글 내용 SQL 인젝션
+2025-06-04 01:06:18,673 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:06:18,673 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,674 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:06:18,674 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,674 - INFO - [Test ID: A3_SQLi_Path] /comments/edit/<id> 경로 SQL 인젝션
+2025-06-04 01:06:18,674 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:06:18,674 - INFO - 결과: ✅ 안전
+2025-06-04 01:06:18,674 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,674 - INFO - [Test ID: A9_XSS_Content] 댓글에 스크립트 저장
+2025-06-04 01:06:18,674 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:06:18,674 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,674 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:06:18,674 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,674 - INFO - [Test ID: A5_Missing_CSP] Content-Security-Policy 헤더 부재
+2025-06-04 01:06:18,674 - INFO - Status Code: 404 (expected 200-299)
+2025-06-04 01:06:18,674 - INFO - 결과: ❌ 취약
+2025-06-04 01:06:18,674 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:06:18,674 - INFO - --------------------------------------------------
+2025-06-04 01:06:18,674 - INFO - 
+2025-06-04 01:06:21,679 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/EmailAuth_test
+
+2025-06-04 01:07:17,362 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:07:17,363 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:07:17,363 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:07:17,363 - INFO - 
+📊 _totals:
+2025-06-04 01:07:17,363 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 2,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 156,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:07:17,363 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:07:17,363 - INFO - - Possible hardcoded password: 'your_secret_key_here'
+2025-06-04 01:07:17,363 - INFO - - Possible hardcoded password: 'hashed_password_here'
+2025-06-04 01:07:20,550 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:07:20,686 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,686 - INFO - [Test ID: A7_Login_Unverified] 이메일 미인증 계정 로그인
+2025-06-04 01:07:20,686 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:07:20,686 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID 로그인
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 인증 우회 허용
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A1_Admin_Unverified_AsUser] 일반 사용자 /admin/unverified 접근
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A1_Admin_ForceVerify_NoPriv] 일반 사용자 /admin/force_verify 호출
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A3_SQLi_RegisterUsername] 회원가입 Username SQL 인젝션
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A3_SQLi_VerifyPath] /auth/send/<id> 경로 SQL 인젝션
+2025-06-04 01:07:20,687 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:07:20,687 - INFO - 결과: ✅ 안전
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A9_XSS_RegisterUsername] 회원가입 Username 스크립트 저장
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A2_PlainPasswordStorage] 비밀번호 평문 저장 검사
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A6_CSP_Header_Missing] 루트 경로 CSP 헤더 부재
+2025-06-04 01:07:20,687 - INFO - Status Code: 404 (expected 200-299)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,687 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:07:20,687 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,687 - INFO - [Test ID: A10_VerifyCode_Expired] 만료된 인증 코드 사용
+2025-06-04 01:07:20,687 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:07:20,687 - INFO - 결과: ❌ 취약
+2025-06-04 01:07:20,689 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:07:20,690 - INFO - --------------------------------------------------
+2025-06-04 01:07:20,690 - INFO - 
+2025-06-04 01:07:23,691 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/file_test
+
+2025-06-04 01:08:17,578 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:08:17,579 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:08:17,579 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:08:17,579 - INFO - 
+📊 _totals:
+2025-06-04 01:08:17,579 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 158,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:08:17,579 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:08:17,579 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:08:20,761 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/models.py", line 820, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/response.py", line 1063, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/response.py", line 1219, in read_chunked
+    self._update_chunk_length()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/response.py", line 1149, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/file_test/security_test.py", line 105, in <module>
+    main()
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/file_test/security_test.py", line 94, in main
+    safe, actual, why = run_one(base, db, test)
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/file_test/security_test.py", line 62, in run_one
+    resp = s.request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 746, in send
+    r.content
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/models.py", line 902, in content
+    self._content = b"".join(self.iter_content(CONTENT_CHUNK_SIZE)) or b""
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/models.py", line 822, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+
+2025-06-04 01:08:20,761 - ERROR - 테스트가 비정상 종료되었습니다. (returncode: 1)
+2025-06-04 01:08:20,761 - INFO - 테스트 비정상 종료로 인한 LLM 재실행 시도 (1/5)
+2025-06-04 01:09:18,292 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:09:18,293 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:09:18,293 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:09:18,293 - INFO - 
+📊 _totals:
+2025-06-04 01:09:18,293 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 111,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:09:18,293 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:09:18,293 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:09:21,505 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,651 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID 로그인
+2025-06-04 01:09:21,651 - INFO - Status Code: 200 (expected 404-404)
+2025-06-04 01:09:21,651 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,651 - INFO - 이유: 인증 우회 허용
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,651 - INFO - [Test ID: A7_Upload_NoLogin] 로그인 없이 파일 업로드
+2025-06-04 01:09:21,651 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:09:21,651 - INFO - 결과: ✅ 안전
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,651 - INFO - [Test ID: A1_Download_OtherUser] 타인 파일 다운로드 시도
+2025-06-04 01:09:21,651 - INFO - Status Code: 404 (expected 403-403)
+2025-06-04 01:09:21,651 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,651 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,651 - INFO - [Test ID: A1_Delete_OtherUser] 타인 파일 삭제 시도
+2025-06-04 01:09:21,651 - INFO - Status Code: 404 (expected 403-403)
+2025-06-04 01:09:21,651 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,651 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,651 - INFO - [Test ID: A1_Admin_NoPriv_Files] 일반 사용자 /admin/files 접근
+2025-06-04 01:09:21,651 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:09:21,651 - INFO - 결과: ✅ 안전
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,651 - INFO - [Test ID: A3_SQLi_Filename] 파일명 SQL 인젝션
+2025-06-04 01:09:21,651 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:09:21,651 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,651 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:09:21,651 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,652 - INFO - [Test ID: A3_PathTraversal] 경로조작(../) 파일 업로드
+2025-06-04 01:09:21,652 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:09:21,652 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,652 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:09:21,652 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,652 - INFO - [Test ID: A9_XSS_Filename] 파일명 XSS 저장
+2025-06-04 01:09:21,652 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:09:21,652 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,652 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:09:21,652 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,652 - INFO - [Test ID: A5_CSP_Header_Missing] Content-Security-Policy 헤더 부재
+2025-06-04 01:09:21,652 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:09:21,652 - INFO - 결과: ✅ 안전
+2025-06-04 01:09:21,652 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,652 - INFO - [Test ID: A6_PUT_Root] PUT / 허용 여부
+2025-06-04 01:09:21,652 - INFO - Status Code: 404 (expected 405-405)
+2025-06-04 01:09:21,652 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,652 - INFO - 이유: 비표준 HTTP 메서드 허용
+2025-06-04 01:09:21,652 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,652 - INFO - [Test ID: A6_TRACE_Root] TRACE / 허용 여부
+2025-06-04 01:09:21,652 - INFO - Status Code: 404 (expected 405-405)
+2025-06-04 01:09:21,652 - INFO - 결과: ❌ 취약
+2025-06-04 01:09:21,652 - INFO - 이유: 비표준 HTTP 메서드 허용
+2025-06-04 01:09:21,652 - INFO - --------------------------------------------------
+2025-06-04 01:09:21,652 - INFO - 
+2025-06-04 01:09:24,654 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/member_test
+
+2025-06-04 01:10:18,701 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:10:18,702 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:10:18,702 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:10:18,702 - INFO - 
+📊 _totals:
+2025-06-04 01:10:18,702 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 149,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:10:18,702 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:10:18,702 - INFO - - Possible hardcoded password: 'your_secret_key_here'
+2025-06-04 01:10:21,894 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:10:22,078 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,078 - INFO - [Test ID: A1_Profile_NoLogin] 로그인 없이 /profile 접근
+2025-06-04 01:10:22,078 - INFO - Status Code: 401 (expected 401-401)
+2025-06-04 01:10:22,078 - INFO - 결과: ✅ 안전
+2025-06-04 01:10:22,078 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,078 - INFO - [Test ID: A1_ProfileUpdate_NoLogin] 로그인 없이 /profile/update 호출
+2025-06-04 01:10:22,078 - INFO - Status Code: 500 (expected 401-401)
+2025-06-04 01:10:22,078 - INFO - 결과: ❌ 취약
+2025-06-04 01:10:22,078 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:10:22,078 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,078 - INFO - [Test ID: A1_Delete_NoLogin] 로그인 없이 /profile/delete 호출
+2025-06-04 01:10:22,078 - INFO - Status Code: 401 (expected 401-401)
+2025-06-04 01:10:22,078 - INFO - 결과: ✅ 안전
+2025-06-04 01:10:22,078 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,078 - INFO - [Test ID: A1_AdminDelete_Self] 관리자(ID 2) 자기 계정 /admin/delete_member 호출
+2025-06-04 01:10:22,078 - INFO - Status Code: 303 (expected 200-299)
+2025-06-04 01:10:22,078 - INFO - 결과: ❌ 취약
+2025-06-04 01:10:22,078 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:10:22,078 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,078 - INFO - [Test ID: A3_SQLi_RegisterEmail] 회원가입 Email SQL 인젝션
+2025-06-04 01:10:22,078 - INFO - Status Code: 303 (expected 400-499)
+2025-06-04 01:10:22,078 - INFO - 결과: ❌ 취약
+2025-06-04 01:10:22,078 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:10:22,079 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,079 - INFO - [Test ID: A3_SQLi_ProfileUpdate] 프로필 업데이트 Username SQL 인젝션
+2025-06-04 01:10:22,079 - INFO - Status Code: 500 (expected 400-499)
+2025-06-04 01:10:22,079 - INFO - 결과: ❌ 취약
+2025-06-04 01:10:22,079 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:10:22,079 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,079 - INFO - [Test ID: A9_XSS_ProfileUsername] 프로필 업데이트 Username XSS 저장
+2025-06-04 01:10:22,079 - INFO - Status Code: 500 (expected 200-299)
+2025-06-04 01:10:22,079 - INFO - 결과: ❌ 취약
+2025-06-04 01:10:22,079 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:10:22,079 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,079 - INFO - [Test ID: A5_Header_HSTS_Missing] HSTS 헤더 부재
+2025-06-04 01:10:22,079 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:10:22,079 - INFO - 결과: ✅ 안전
+2025-06-04 01:10:22,079 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,079 - INFO - [Test ID: A6_PUT_Root] PUT / (정의되지 않은 메서드)
+2025-06-04 01:10:22,079 - INFO - Status Code: 405 (expected 405-405)
+2025-06-04 01:10:22,079 - INFO - 결과: ✅ 안전
+2025-06-04 01:10:22,079 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,079 - INFO - [Test ID: A6_OPTIONS_Root] OPTIONS / 허용 여부
+2025-06-04 01:10:22,079 - INFO - Status Code: 405 (expected 200-299)
+2025-06-04 01:10:22,079 - INFO - 결과: ❌ 취약
+2025-06-04 01:10:22,079 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:10:22,079 - INFO - --------------------------------------------------
+2025-06-04 01:10:22,079 - INFO - 
+2025-06-04 01:10:25,085 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/notification_test
+
+2025-06-04 01:11:20,290 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:11:20,292 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:11:20,292 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:11:20,292 - INFO - 
+📊 _totals:
+2025-06-04 01:11:20,292 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 144,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:11:20,292 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:11:20,292 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:11:23,570 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:11:23,752 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A1_BAC_List_NoLogin] 로그인 없이 알림 목록 조회
+2025-06-04 01:11:23,753 - INFO - Status Code: 401 (expected 401-401)
+2025-06-04 01:11:23,753 - INFO - 결과: ✅ 안전
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A1_BAC_Send_NoSession] 로그인 없이 알림 전송
+2025-06-04 01:11:23,753 - INFO - Status Code: 401 (expected 401-401)
+2025-06-04 01:11:23,753 - INFO - 결과: ✅ 안전
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A1_BAC_AdminList_NoPriv] 비관리자 알림 전체 목록 접근
+2025-06-04 01:11:23,753 - INFO - Status Code: 403 (expected 401-401)
+2025-06-04 01:11:23,753 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A1_BAC_AdminDelete_NoPriv] 비관리자 알림 삭제 시도
+2025-06-04 01:11:23,753 - INFO - Status Code: 403 (expected 401-401)
+2025-06-04 01:11:23,753 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A1_BAC_Delete_OtherUser] 다른 사용자가 보낸 알림 삭제 시도
+2025-06-04 01:11:23,753 - INFO - Status Code: 200 (expected 404-404)
+2025-06-04 01:11:23,753 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A1_BAC_View_OtherUser] 다른 사용자 알림 열람 시도
+2025-06-04 01:11:23,753 - INFO - Status Code: 404 (expected 404-404)
+2025-06-04 01:11:23,753 - INFO - 결과: ✅ 안전
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A3_SQLi_Title] 제목 필드 SQL 인젝션
+2025-06-04 01:11:23,753 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:11:23,753 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,753 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,753 - INFO - [Test ID: A3_SQLi_ReceiverID] 수신자 필드 SQL 인젝션
+2025-06-04 01:11:23,753 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:11:23,753 - INFO - 결과: ✅ 안전
+2025-06-04 01:11:23,754 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,754 - INFO - [Test ID: A3_SQLi_PathParam] 경로 파라미터 SQL 인젝션
+2025-06-04 01:11:23,754 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:11:23,754 - INFO - 결과: ✅ 안전
+2025-06-04 01:11:23,754 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,754 - INFO - [Test ID: A5_Misconfig_DebugHeaders] 디버그 헤더 노출 검사
+2025-06-04 01:11:23,754 - INFO - Status Code: 404 (expected 200-299)
+2025-06-04 01:11:23,754 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,754 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:11:23,754 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,754 - INFO - [Test ID: A7_Auth_LoginNonExist] 존재하지 않는 ID 로그인 시도
+2025-06-04 01:11:23,754 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:11:23,754 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,754 - INFO - 이유: 비존재 ID로 로그인 허용
+2025-06-04 01:11:23,754 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,754 - INFO - [Test ID: A9_XSS_TitleStored] 제목에 XSS 스크립트 저장
+2025-06-04 01:11:23,754 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:11:23,754 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,754 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:11:23,754 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,754 - INFO - [Test ID: A9_XSS_ContentStored] 내용에 XSS 이미지 이벤트 저장
+2025-06-04 01:11:23,754 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:11:23,754 - INFO - 결과: ❌ 취약
+2025-06-04 01:11:23,754 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:11:23,754 - INFO - --------------------------------------------------
+2025-06-04 01:11:23,754 - INFO - 
+2025-06-04 01:11:26,756 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/quiz_test
+
+2025-06-04 01:12:31,728 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:12:31,729 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:12:31,729 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:12:31,729 - INFO - 
+📊 _totals:
+2025-06-04 01:12:31,729 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 175,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:12:31,729 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:12:31,729 - INFO - - Possible hardcoded password: 'your_secret_key_here'
+2025-06-04 01:12:35,070 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:12:35,236 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,236 - INFO - [Test ID: A1_BAC_Create_NoLogin] 로그인 없이 퀴즈 생성
+2025-06-04 01:12:35,236 - INFO - Status Code: 401 (expected 401-401)
+2025-06-04 01:12:35,236 - INFO - 결과: ✅ 안전
+2025-06-04 01:12:35,236 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,236 - INFO - [Test ID: A1_BAC_Attempts_NoLogin] 로그인 없이 시도 목록 열람
+2025-06-04 01:12:35,236 - INFO - Status Code: 500 (expected 401-401)
+2025-06-04 01:12:35,236 - INFO - 결과: ❌ 취약
+2025-06-04 01:12:35,236 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:12:35,236 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,236 - INFO - [Test ID: A1_BAC_AdminList_NoPriv] 비관리자 /admin/quizzes 접근
+2025-06-04 01:12:35,236 - INFO - Status Code: 401 (expected 401-401)
+2025-06-04 01:12:35,236 - INFO - 결과: ✅ 안전
+2025-06-04 01:12:35,236 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,236 - INFO - [Test ID: A1_BAC_AdminDelete_NoPriv] 비관리자 /admin/delete_quiz 호출
+2025-06-04 01:12:35,236 - INFO - Status Code: 500 (expected 401-401)
+2025-06-04 01:12:35,236 - INFO - 결과: ❌ 취약
+2025-06-04 01:12:35,236 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:12:35,236 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,236 - INFO - [Test ID: A1_BAC_Delete_OtherUser] 본인 아닌 퀴즈 삭제
+2025-06-04 01:12:35,236 - INFO - Status Code: 500 (expected 404-404)
+2025-06-04 01:12:35,236 - INFO - 결과: ❌ 취약
+2025-06-04 01:12:35,236 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:12:35,236 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,236 - INFO - [Test ID: A7_Login_Nonexist] 존재하지 않는 ID 로그인
+2025-06-04 01:12:35,236 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:12:35,237 - INFO - 결과: ✅ 안전
+2025-06-04 01:12:35,237 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,237 - INFO - [Test ID: A3_SQLi_Title] 제목 필드 SQL 인젝션
+2025-06-04 01:12:35,237 - INFO - Status Code: 401 (expected 400-499)
+2025-06-04 01:12:35,237 - INFO - 결과: ✅ 안전
+2025-06-04 01:12:35,237 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,237 - INFO - [Test ID: A3_SQLi_PathParam] 경로 파라미터 SQL 인젝션
+2025-06-04 01:12:35,237 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:12:35,237 - INFO - 결과: ✅ 안전
+2025-06-04 01:12:35,237 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,237 - INFO - [Test ID: A9_XSS_TitleStored] 제목에 스크립트 저장
+2025-06-04 01:12:35,237 - INFO - Status Code: 401 (expected 200-299)
+2025-06-04 01:12:35,237 - INFO - 결과: ❌ 취약
+2025-06-04 01:12:35,237 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:12:35,237 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,237 - INFO - [Test ID: A9_XSS_QuestionStored] 질문에 onerror 이벤트 저장
+2025-06-04 01:12:35,237 - INFO - Status Code: 401 (expected 200-299)
+2025-06-04 01:12:35,237 - INFO - 결과: ❌ 취약
+2025-06-04 01:12:35,237 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:12:35,237 - INFO - --------------------------------------------------
+2025-06-04 01:12:35,237 - INFO - 
+2025-06-04 01:12:38,241 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/search_test
+
+2025-06-04 01:13:13,136 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:13:13,136 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:13:13,137 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:13:13,137 - INFO - 
+📊 _totals:
+2025-06-04 01:13:13,137 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 106,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:13:13,137 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:13:13,137 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:13:42,228 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+TimeoutError: [Errno 60] Operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 445, in request
+    self.endheaders()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1252, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1012, in _send_output
+    self.send(msg)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 952, in send
+    self.connect()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 276, in connect
+    self.sock = self._new_conn()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x10135ef40>: Failed to establish a new connection: [Errno 60] Operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /login/9999 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10135ef40>: Failed to establish a new connection: [Errno 60] Operation timed out'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/security_test.py", line 87, in <module>
+    main()
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/security_test.py", line 76, in main
+    safe, actual, why = run_test(base, db, t)
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/security_test.py", line 38, in run_test
+    resp = sess.request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/adapters.py", line 700, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /login/9999 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10135ef40>: Failed to establish a new connection: [Errno 60] Operation timed out'))
+
+2025-06-04 01:13:42,232 - ERROR - 테스트가 비정상 종료되었습니다. (returncode: 1)
+2025-06-04 01:13:42,232 - INFO - 테스트 비정상 종료로 인한 LLM 재실행 시도 (1/5)
+2025-06-04 01:14:19,048 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:14:19,049 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:14:19,049 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:14:19,049 - INFO - 
+📊 _totals:
+2025-06-04 01:14:19,049 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 108,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:14:19,049 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:14:19,049 - INFO - - Possible hardcoded password: 'your_secret_key_here'
+2025-06-04 01:14:22,059 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/app.py", line 3, in <module>
+    from fastapi.middleware.sessions import SessionMiddleware
+ModuleNotFoundError: No module named 'fastapi.middleware.sessions'
+
+2025-06-04 01:14:22,060 - INFO - LLM 재실행 시도 (2/5)
+2025-06-04 01:14:58,880 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:14:58,880 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:14:58,880 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:14:58,880 - INFO - 
+📊 _totals:
+2025-06-04 01:14:58,880 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 113,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:14:58,880 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:14:58,880 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:15:27,962 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+TimeoutError: [Errno 60] Operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 445, in request
+    self.endheaders()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1252, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1012, in _send_output
+    self.send(msg)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 952, in send
+    self.connect()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 276, in connect
+    self.sock = self._new_conn()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x1031a6f40>: Failed to establish a new connection: [Errno 60] Operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /login/9999 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x1031a6f40>: Failed to establish a new connection: [Errno 60] Operation timed out'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/security_test.py", line 87, in <module>
+    main()
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/security_test.py", line 76, in main
+    safe, actual, why = run_test(base, db, t)
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/search_test/security_test.py", line 38, in run_test
+    resp = sess.request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/adapters.py", line 700, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /login/9999 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x1031a6f40>: Failed to establish a new connection: [Errno 60] Operation timed out'))
+
+2025-06-04 01:15:27,964 - ERROR - 테스트가 비정상 종료되었습니다. (returncode: 1)
+2025-06-04 01:15:27,964 - INFO - 테스트 비정상 종료로 인한 LLM 재실행 시도 (3/5)
+2025-06-04 01:16:00,820 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:16:00,821 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:16:00,821 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:16:00,821 - INFO - 
+📊 _totals:
+2025-06-04 01:16:00,821 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 86,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:16:00,821 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:16:00,821 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:16:03,996 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:16:04,208 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,208 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID 로그인
+2025-06-04 01:16:04,208 - INFO - Status Code: 200 (expected 404-404)
+2025-06-04 01:16:04,208 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,208 - INFO - 이유: 인증 우회 허용
+2025-06-04 01:16:04,208 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,208 - INFO - [Test ID: A1_Search_NoLogin] 로그인 없이 검색
+2025-06-04 01:16:04,208 - INFO - Status Code: 200 (expected 401-401)
+2025-06-04 01:16:04,208 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,208 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:16:04,208 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,208 - INFO - [Test ID: A1_Reindex_NoPriv] 일반 사용자 /admin/reindex 호출
+2025-06-04 01:16:04,208 - INFO - Status Code: 403 (expected 403-403)
+2025-06-04 01:16:04,208 - INFO - 결과: ✅ 안전
+2025-06-04 01:16:04,208 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,208 - INFO - [Test ID: A1_Reindex_Admin] 관리자 /admin/reindex 성공
+2025-06-04 01:16:04,208 - INFO - Status Code: 403 (expected 200-299)
+2025-06-04 01:16:04,208 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,208 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:16:04,208 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,209 - INFO - [Test ID: A3_SQLi_LoginPath] /login 경로 SQL 인젝션
+2025-06-04 01:16:04,209 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:16:04,209 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,209 - INFO - 이유: SQL/FTS 인젝션 허용
+2025-06-04 01:16:04,209 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,209 - INFO - [Test ID: A3_SQLi_SearchParam] 검색어 SQL/FTS 인젝션
+2025-06-04 01:16:04,209 - INFO - Status Code: 500 (expected 400-499)
+2025-06-04 01:16:04,209 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,209 - INFO - 이유: SQL/FTS 인젝션 허용
+2025-06-04 01:16:04,209 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,209 - INFO - [Test ID: A9_XSS_SearchParam] 검색어에 스크립트 삽입
+2025-06-04 01:16:04,209 - INFO - Status Code: 500 (expected 200-299)
+2025-06-04 01:16:04,209 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,209 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:16:04,209 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,209 - INFO - [Test ID: A1_Reindex_GetMethod] /admin/reindex 를 GET 으로 호출
+2025-06-04 01:16:04,209 - INFO - Status Code: 405 (expected 405-405)
+2025-06-04 01:16:04,210 - INFO - 결과: ✅ 안전
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A1_Reindex_Logout] 로그인 없이 /admin/reindex 호출
+2025-06-04 01:16:04,210 - INFO - Status Code: 403 (expected 403-403)
+2025-06-04 01:16:04,210 - INFO - 결과: ✅ 안전
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A3_FTS_Wildcard] FTS 와일드카드(*) 인젝션
+2025-06-04 01:16:04,210 - INFO - Status Code: 500 (expected 400-499)
+2025-06-04 01:16:04,210 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,210 - INFO - 이유: SQL/FTS 인젝션 허용
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A5_Header_CSP_Missing] CSP 헤더 부재
+2025-06-04 01:16:04,210 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:16:04,210 - INFO - 결과: ✅ 안전
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A5_Header_XFrame_Missing] X-Frame-Options 헤더 부재
+2025-06-04 01:16:04,210 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:16:04,210 - INFO - 결과: ✅ 안전
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A6_TRACE_Method] TRACE 메서드 허용 여부
+2025-06-04 01:16:04,210 - INFO - Status Code: 404 (expected 405-405)
+2025-06-04 01:16:04,210 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,210 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A9_XSS_BoardTitle_Stored] 게시글 제목에 스크립트 삽입 후 reindex
+2025-06-04 01:16:04,210 - INFO - Status Code: 403 (expected 200-299)
+2025-06-04 01:16:04,210 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,210 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:16:04,210 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,210 - INFO - [Test ID: A10_Search_FileScheme] file:// 스킴으로 검색
+2025-06-04 01:16:04,211 - INFO - Status Code: 500 (expected 400-499)
+2025-06-04 01:16:04,211 - INFO - 결과: ❌ 취약
+2025-06-04 01:16:04,211 - INFO - 이유: 예상치 못한 응답 코드
+2025-06-04 01:16:04,211 - INFO - --------------------------------------------------
+2025-06-04 01:16:04,211 - INFO - 
+2025-06-04 01:16:07,214 - INFO - 
+ LLM 실행 중...
+→ FastAPI-sqlite/shop_test
+
+2025-06-04 01:18:08,351 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:18:08,351 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:18:08,352 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:18:08,352 - INFO - 
+📊 _totals:
+2025-06-04 01:18:08,352 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 230,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:18:08,352 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:18:08,352 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:18:11,552 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 516, in getresponse
+    httplib_response = super().getresponse()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1349, in getresponse
+    response.begin()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 316, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 277, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 704, in readinto
+    return self._sock.recv_into(b)
+ConnectionResetError: [Errno 54] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/retry.py", line 474, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/util/util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/connection.py", line 516, in getresponse
+    httplib_response = super().getresponse()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1349, in getresponse
+    response.begin()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 316, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 277, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 704, in readinto
+    return self._sock.recv_into(b)
+urllib3.exceptions.ProtocolError: ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/shop_test/security_test.py", line 120, in <module>
+    main()
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/shop_test/security_test.py", line 109, in main
+    safe, actual, why = run_single(base, db, t)
+  File "/Users/longrunpc/castle-coder/prompt-test/FastAPI-sqlite/shop_test/security_test.py", line 71, in run_single
+    resp = sess.request(
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/requests/adapters.py", line 682, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+
+2025-06-04 01:18:11,553 - ERROR - 테스트가 비정상 종료되었습니다. (returncode: 1)
+2025-06-04 01:18:11,553 - INFO - 테스트 비정상 종료로 인한 LLM 재실행 시도 (1/5)
+2025-06-04 01:20:02,134 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:20:02,135 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:20:02,135 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:20:02,135 - INFO - 
+📊 _totals:
+2025-06-04 01:20:02,135 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 314,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:20:02,135 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:20:02,135 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:20:05,435 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:20:05,661 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,661 - INFO - [Test ID: A1_ProductEdit_NoPriv_GET] 일반 사용자 /admin/products/edit/1 (GET)
+2025-06-04 01:20:05,662 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:20:05,662 - INFO - 결과: ❌ 취약
+2025-06-04 01:20:05,662 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:20:05,662 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,662 - INFO - [Test ID: A1_ProductEdit_NoPriv_POST] 일반 사용자 /admin/products/edit/1 (POST)
+2025-06-04 01:20:05,662 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:20:05,662 - INFO - 결과: ❌ 취약
+2025-06-04 01:20:05,662 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:20:05,662 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,662 - INFO - [Test ID: A1_ProductDelete_NoPriv] 일반 사용자 /admin/products/delete/1
+2025-06-04 01:20:05,662 - INFO - Status Code: 200 (expected 403-403)
+2025-06-04 01:20:05,662 - INFO - 결과: ❌ 취약
+2025-06-04 01:20:05,662 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:20:05,662 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,662 - INFO - [Test ID: A1_Checkout_EmptyCart] 빈 장바구니로 체크아웃 시도
+2025-06-04 01:20:05,662 - INFO - Status Code: 500 (expected 400-499)
+2025-06-04 01:20:05,662 - INFO - 결과: ❌ 취약
+2025-06-04 01:20:05,662 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:20:05,662 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,662 - INFO - [Test ID: A1_AddHugeQty_ExceedsStock] 재고보다 큰 수량으로 장바구니 추가
+2025-06-04 01:20:05,662 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:20:05,662 - INFO - 결과: ❌ 취약
+2025-06-04 01:20:05,663 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:20:05,663 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,663 - INFO - [Test ID: A3_SQLi_ProductDescription] 관리자 상품 설명 SQL 인젝션
+2025-06-04 01:20:05,663 - INFO - Status Code: 200 (expected 400-499)
+2025-06-04 01:20:05,663 - INFO - 결과: ❌ 취약
+2025-06-04 01:20:05,663 - INFO - 이유: SQL 인젝션 허용
+2025-06-04 01:20:05,663 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,663 - INFO - [Test ID: A3_SQLi_OrderIDPath] /orders/<id> 경로 SQL 인젝션
+2025-06-04 01:20:05,663 - INFO - Status Code: 422 (expected 400-499)
+2025-06-04 01:20:05,663 - INFO - 결과: ✅ 안전
+2025-06-04 01:20:05,663 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,663 - INFO - [Test ID: A9_XSS_ProductDesc] 상품 설명 XSS 저장
+2025-06-04 01:20:05,663 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:20:05,663 - INFO - 결과: ✅ 안전
+2025-06-04 01:20:05,663 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,663 - INFO - [Test ID: A9_XSS_ProductName] 상품 이름 XSS 저장
+2025-06-04 01:20:05,663 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:20:05,663 - INFO - 결과: ✅ 안전
+2025-06-04 01:20:05,663 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,663 - INFO - [Test ID: A5_Header_XFrame] X-Frame-Options 헤더 부재
+2025-06-04 01:20:05,663 - INFO - Status Code: 200 (expected 200-299)
+2025-06-04 01:20:05,663 - INFO - 결과: ✅ 안전
+2025-06-04 01:20:05,663 - INFO - --------------------------------------------------
+2025-06-04 01:20:05,663 - INFO - 
+2025-06-04 01:20:08,669 - INFO - 
+최종 테스트 결과 요약:
+2025-06-04 01:20:08,670 - INFO - ✅ 전체 안전한 테스트 수: 35
+2025-06-04 01:20:08,670 - INFO - ❌ 전체 취약한 테스트 수: 87
+2025-06-04 01:20:08,671 - INFO - 
+📊 A1 ~ A10 항목별 결과:
+2025-06-04 01:20:08,671 - INFO -   A1 - 안전: 13건 / 취약: 31건
+2025-06-04 01:20:08,671 - INFO -   A2 - 안전: 0건 / 취약: 3건
+2025-06-04 01:20:08,671 - INFO -   A3 - 안전: 8건 / 취약: 15건
+2025-06-04 01:20:08,671 - INFO -   A4 - 안전: 0건 / 취약: 1건
+2025-06-04 01:20:08,672 - INFO -   A5 - 안전: 6건 / 취약: 3건
+2025-06-04 01:20:08,672 - INFO -   A6 - 안전: 1건 / 취약: 7건
+2025-06-04 01:20:08,672 - INFO -   A7 - 안전: 2건 / 취약: 10건
+2025-06-04 01:20:08,672 - INFO -   A8 - 안전: 0건 / 취약: 1건
+2025-06-04 01:20:08,672 - INFO -   A9 - 안전: 4건 / 취약: 13건
+2025-06-04 01:20:08,672 - INFO -   A10 - 안전: 1건 / 취약: 3건
+2025-06-04 01:20:08,672 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:20:08,672 - INFO - 
+📊 누적 _totals:
+2025-06-04 01:20:08,672 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 12,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 12,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 1759,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:20:08,672 - INFO - 
+⚠️ 발견된 모든 이슈:
+2025-06-04 01:20:08,673 - INFO - - Possible hardcoded password: 'your_secret_key_here'
+2025-06-04 01:20:08,673 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:20:08,673 - INFO - - Possible hardcoded password: 'your-secret-key'
+2025-06-04 01:20:08,673 - INFO - - Possible hardcoded password: 'hashed_password_here'
+2025-06-04 01:20:08,673 - INFO - 
+로그 파일이 저장되었습니다: /Users/longrunpc/castle-coder/prompt-test/logs/auto_fastAPI_20250604_005932.log

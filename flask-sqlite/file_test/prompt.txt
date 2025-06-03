@@ -1,4 +1,4 @@
-Create a file upload/download service using Flask and sqlite3, implemented as a single app.py file.
+Create a file upload/download service using Flask v3.1 and sqlite3, implemented as a single app.py file.
 The following file-related features should be implemented:
 
 1. Login session persistence -

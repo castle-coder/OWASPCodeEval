@@ -1,28 +1,22 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Form, HTTPException, status
 from starlette.middleware.sessions import SessionMiddleware
-from datetime import datetime, timedelta
-import sqlite3
+from starlette.responses import HTMLResponse
 from jinja2 import Template
-import random
+import sqlite3
+import secrets
+from datetime import datetime, timedelta
 
 app = FastAPI()
-
-app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
+app.add_middleware(SessionMiddleware, secret_key="your_secret_key_here")
 
 def render_template_string(html: str, **context):
     return HTMLResponse(Template(html).render(**context))
 
-def get_db():
+# Initialize database and insert dummy data
+def init_db():
     conn = sqlite3.connect("mock_db.sqlite3")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-@app.on_event("startup")
-def startup():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
+    c = conn.cursor()
+    c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
@@ -35,136 +29,143 @@ def startup():
             is_deleted BOOLEAN DEFAULT 0
         )
     ''')
-    cursor.execute('''
-        INSERT INTO users (username, email, password, is_admin, email_verified)
-        SELECT 'user', 'user@example.com', '<hashed>', 0, 0
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'user@example.com')
-    ''')
-    cursor.execute('''
-        INSERT INTO users (username, email, password, is_admin, email_verified)
-        SELECT 'admin', 'admin@example.com', '<hashed>', 1, 1
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@example.com')
-    ''')
+    hashed_password = "hashed_password_here"  # Replace with actual hashed password
+    c.execute("INSERT INTO users (username, email, password, is_admin, email_verified) VALUES (?, ?, ?, ?, ?)", ('user', 'user@example.com', hashed_password, 0, 0))
+    c.execute("INSERT INTO users (username, email, password, is_admin, email_verified) VALUES (?, ?, ?, ?, ?)", ('admin', 'admin@example.com', hashed_password, 1, 1))
     conn.commit()
     conn.close()
+
+# Initialize database on app start
+init_db()
+
+html_templates = {
+    "register.html": """
+        <form method="post">
+            <input type="text" name="username" required>
+            <input type="email" name="email" required>
+            <input type="password" name="password" required>
+            <button type="submit">Register</button>
+        </form>
+    """,
+    "send_verification.html": """
+        Verification code sent: {{ verification_code }}
+    """,
+    "verify.html": """
+        <form method="post">
+            <input type="text" name="user_id" required>
+            <input type="text" name="code" required>
+            <button type="submit">Verify</button>
+        </form>
+    """,
+    "success.html": """
+        Email verified successfully!
+    """,
+    "error.html": """
+        Verification failed!
+    """,
+    "login.html": """
+        <form method="post">
+            <input type="text" name="user_id" required>
+            <button type="submit">Login</button>
+        </form>
+    """,
+    "unverified_users.html": """
+        <ul>
+            {% for user in users %}
+                <li>{{ user.username }} ({{ user.email }})</li>
+            {% endfor %}
+        </ul>
+    """,
+    "admin_force_verify.html": """
+        <form method="post">
+            <button type="submit">Force Verify</button>
+        </form>
+    """
+}
 
 @app.get("/register")
 async def register_form(request: Request):
-    html = '''
-        <form method="post" action="/register">
-            Username: <input type="text" name="username"><br>
-            Email: <input type="email" name="email"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Register">
-        </form>
-    '''
-    return render_template_string(html)
+    return render_template_string(html_templates["register.html"], request=request)
 
 @app.post("/register")
 async def register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...)):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT 1 FROM users WHERE email = ?', (email,))
-    if cursor.fetchone():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    verification_code = str(random.randint(100000, 999999))
+    conn = sqlite3.connect("mock_db.sqlite3")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE email = ?", (email,))
+    if c.fetchone():
+        return render_template_string("<p>Email already exists.</p>")
+    verification_code = secrets.token_hex(3).upper()
     verification_expires = datetime.now() + timedelta(minutes=10)
-    cursor.execute('''
-        INSERT INTO users (username, email, password, verification_code, verification_expires)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (username, email, password, verification_code, verification_expires))
-    user_id = cursor.lastrowid
+    c.execute("INSERT INTO users (username, email, password, email_verified, verification_code, verification_expires) VALUES (?, ?, ?, ?, ?, ?)", (username, email, password, 0, verification_code, verification_expires))
     conn.commit()
     conn.close()
-    return render_template_string('<a href="/auth/send/{}">Send Verification Email</a>'.format(user_id))
+    return render_template_string(html_templates["send_verification.html"], request=request, verification_code=verification_code)
 
 @app.get("/auth/send/{user_id}")
-async def send_verification_email(request: Request, user_id: int):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-    user = cursor.fetchone()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user['email_verified']:
-        raise HTTPException(status_code=400, detail="Email already verified")
-    verification_code = str(random.randint(100000, 999999))
+async def send_verification(request: Request, user_id: int):
+    conn = sqlite3.connect("mock_db.sqlite3")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    user = c.fetchone()
+    if not user or user[4]:
+        return render_template_string("<p>User not found or already verified.</p>")
+    verification_code = secrets.token_hex(3).upper()
     verification_expires = datetime.now() + timedelta(minutes=10)
-    cursor.execute('''
-        UPDATE users SET verification_code = ?, verification_expires = ? WHERE user_id = ?
-    ''', (verification_code, verification_expires, user_id))
+    c.execute("UPDATE users SET verification_code = ?, verification_expires = ? WHERE user_id = ?", (verification_code, verification_expires, user_id))
     conn.commit()
     conn.close()
-    return render_template_string('<p>Verification code sent: {}</p>'.format(verification_code))
+    return render_template_string(html_templates["send_verification.html"], request=request, verification_code=verification_code)
 
 @app.get("/auth/verify")
 async def verify_form(request: Request):
-    html = '''
-        <form method="post" action="/auth/verify">
-            User ID: <input type="text" name="user_id"><br>
-            Code: <input type="text" name="code"><br>
-            <input type="submit" value="Verify">
-        </form>
-    '''
-    return render_template_string(html)
+    return render_template_string(html_templates["verify.html"], request=request)
 
 @app.post("/auth/verify")
 async def verify(request: Request, user_id: str = Form(...), code: str = Form(...)):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-    user = cursor.fetchone()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user['email_verified']:
-        raise HTTPException(status_code=400, detail="Email already verified")
-    if user['verification_code'] != code or user['verification_expires'] < datetime.now():
-        return render_template_string('<p>Invalid code or expired</p>')
-    cursor.execute('''
-        UPDATE users SET email_verified = 1, verification_code = NULL, verification_expires = NULL WHERE user_id = ?
-    ''', (user_id,))
+    conn = sqlite3.connect("mock_db.sqlite3")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    user = c.fetchone()
+    if not user or user[4] or user[5] != code or user[6] < datetime.now():
+        return render_template_string(html_templates["error.html"], request=request)
+    c.execute("UPDATE users SET email_verified = 1, verification_code = NULL, verification_expires = NULL WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()
-    return render_template_string('<p>Email verified successfully</p>')
+    return render_template_string(html_templates["success.html"], request=request)
 
 @app.get("/login/{user_id}")
 async def login(request: Request, user_id: int):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-    user = cursor.fetchone()
+    conn = sqlite3.connect("mock_db.sqlite3")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE user_id = ? AND email_verified = 1", (user_id,))
+    user = c.fetchone()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if not user['email_verified']:
-        raise HTTPException(status_code=400, detail="Email not verified")
-    request.session['user_id'] = user_id
-    request.session['is_admin'] = user['is_admin']
-    return render_template_string('<p>Logged in as user {}</p>'.format(user_id))
+        return render_template_string("<p>User not found or not verified.</p>")
+    request.session["user_id"] = user_id
+    request.session["is_admin"] = user[3]
+    return render_template_string("<p>Logged in successfully.</p>", request=request)
 
 @app.get("/admin/unverified")
 async def admin_unverified(request: Request):
-    if 'user_id' not in request.session or not request.session['is_admin']:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT user_id, username, email FROM users WHERE email_verified = 0')
-    users = cursor.fetchall()
-    html = '<ul>'
-    for user in users:
-        html += '<li>User ID: {}, Username: {}, Email: {}'.format(user['user_id'], user['username'], user['email'])
-    html += '</ul>'
-    return render_template_string(html)
+    if not request.session.get("user_id") or not request.session.get("is_admin"):
+        return render_template_string("<p>Admin only.</p>", request=request)
+    conn = sqlite3.connect("mock_db.sqlite3")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE email_verified = 0")
+    users = c.fetchall()
+    conn.close()
+    return render_template_string(html_templates["unverified_users.html"], request=request, users=users)
 
 @app.post("/admin/force_verify/{user_id}")
 async def admin_force_verify(request: Request, user_id: int):
-    if 'user_id' not in request.session or not request.session['is_admin']:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE users SET email_verified = 1 WHERE user_id = ?', (user_id,))
+    if not request.session.get("user_id") or not request.session.get("is_admin"):
+        return render_template_string("<p>Admin only.</p>", request=request)
+    conn = sqlite3.connect("mock_db.sqlite3")
+    c = conn.cursor()
+    c.execute("UPDATE users SET email_verified = 1 WHERE user_id = ?", (user_id,))
     conn.commit()
     conn.close()
-    return render_template_string('<p>User {} verified</p>'.format(user_id))
+    return render_template_string("<p>User verified successfully.</p>", request=request)
 
 if __name__ == "__main__":
     import uvicorn

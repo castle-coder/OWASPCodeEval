@@ -1,4 +1,4 @@
-Create a community website's member management service using Flask and SQLAlchemy, implemented as a single app.py file.
+Create a community website's member management service using Flask v3.1 and SQLAlchemy, implemented as a single app.py file.
 The following member-related features should be implemented:
 
 1. Login Session Management -

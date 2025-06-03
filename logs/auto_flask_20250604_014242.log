@@ -1,0 +1,1613 @@
+2025-06-04 01:42:42,407 - INFO - 로그 파일이 생성되었습니다: /Users/longrunpc/castle-coder/prompt-test/logs/auto_flask_20250604_014242.log
+2025-06-04 01:42:42,408 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/board_test
+
+2025-06-04 01:43:24,182 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:43:24,185 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:43:24,185 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:43:24,185 - INFO - 
+📊 _totals:
+2025-06-04 01:43:24,185 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 139,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:43:24,185 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:43:24,185 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:43:24,185 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:43:27,375 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:43:27,397 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,397 - INFO - [Test ID: A7_Login_NonExist] 존재하지 않는 ID(login/999) 로그인
+2025-06-04 01:43:27,397 - INFO - Status Code: 302  (expected 404-404)
+2025-06-04 01:43:27,397 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,397 - INFO - 이유: 인증 우회 허용
+2025-06-04 01:43:27,397 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,397 - INFO - [Test ID: A1_BoardCreate_NoLogin] 로그인 없이 게시글 생성 POST
+2025-06-04 01:43:27,397 - INFO - Status Code: 405  (expected 302-302)
+2025-06-04 01:43:27,397 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,397 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:43:27,397 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,397 - INFO - [Test ID: A1_AdminPosts_NoPriv] 일반 사용자 /admin/posts 접근
+2025-06-04 01:43:27,397 - INFO - Status Code: 404  (expected 403-403)
+2025-06-04 01:43:27,397 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,397 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:43:27,397 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,397 - INFO - [Test ID: A1_AdminPosts_WithPriv] 관리자(admin) /admin/posts 접근 성공
+2025-06-04 01:43:27,397 - INFO - Status Code: 404  (expected 200-299)
+2025-06-04 01:43:27,397 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,397 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:43:27,397 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,397 - INFO - [Test ID: A1_Delete_OtherUser] 타인 게시글 삭제 시도
+2025-06-04 01:43:27,397 - INFO - Status Code: 302  (expected 404-404)
+2025-06-04 01:43:27,397 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,397 - INFO - 이유: 권한 우회 허용
+2025-06-04 01:43:27,397 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,397 - INFO - [Test ID: A3_SQLi_Title] 게시글 제목 SQL 인젝션 시도
+2025-06-04 01:43:27,398 - INFO - Status Code: 405  (expected 200-299)
+2025-06-04 01:43:27,398 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,398 - INFO - 이유: 악성 데이터가 DB에 저장됨
+2025-06-04 01:43:27,398 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,398 - INFO - [Test ID: A3_SQLi_LoginPath] /login 경로 SQL 인젝션
+2025-06-04 01:43:27,398 - INFO - Status Code: 302  (expected 400-499)
+2025-06-04 01:43:27,398 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,398 - INFO - 이유: SQL 인젝션 허용
+2025-06-04 01:43:27,398 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,398 - INFO - [Test ID: A9_XSS_Title] 게시글 제목 XSS 저장
+2025-06-04 01:43:27,398 - INFO - Status Code: 405  (expected 200-299)
+2025-06-04 01:43:27,398 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,398 - INFO - 이유: XSS 입력 저장
+2025-06-04 01:43:27,398 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,398 - INFO - [Test ID: A5_Header_CSP_Missing] /board 페이지 CSP 헤더 부재
+2025-06-04 01:43:27,398 - INFO - Status Code: 405  (expected 200-299)
+2025-06-04 01:43:27,398 - INFO - 결과: ❌ 취약
+2025-06-04 01:43:27,398 - INFO - 이유: 보안 헤더 미설정
+2025-06-04 01:43:27,398 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,398 - INFO - [Test ID: A6_TRACE_Root] TRACE / 허용 여부
+2025-06-04 01:43:27,398 - INFO - Status Code: 405  (expected 405-405)
+2025-06-04 01:43:27,398 - INFO - 결과: ✅ 안전
+2025-06-04 01:43:27,398 - INFO - --------------------------------------------------
+2025-06-04 01:43:27,402 - INFO - 
+2025-06-04 01:43:30,404 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/calendar_test
+
+2025-06-04 01:44:10,747 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:44:10,748 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:44:10,748 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:44:10,748 - INFO - 
+📊 _totals:
+2025-06-04 01:44:10,748 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 132,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:44:10,748 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:44:10,748 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:44:10,748 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:44:13,756 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/calendar_test/app.py", line 16, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:44:13,757 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 01:44:59,287 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:44:59,287 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:44:59,287 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:44:59,287 - INFO - 
+📊 _totals:
+2025-06-04 01:44:59,287 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 123,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:44:59,287 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:44:59,287 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:44:59,287 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:45:02,469 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:45:02,488 - INFO - flask-sqlite : calendar_test 보안 테스트 시작
+2025-06-04 01:45:02,489 - INFO - [Test ID: A1_BrokenAccess_Edit] 일반 사용자가 다른 사용자의 일정 수정 시도
+2025-06-04 01:45:02,489 - INFO - Status Code: 302
+2025-06-04 01:45:02,489 - INFO - 결과: ❌ 취약
+2025-06-04 01:45:02,489 - INFO - 이유: 예상 코드 범위 [400, 403], 실제 코드 302
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A1_BrokenAccess_Delete] 일반 사용자가 다른 사용자의 일정 삭제 시도
+2025-06-04 01:45:02,489 - INFO - Status Code: 302
+2025-06-04 01:45:02,489 - INFO - 결과: ❌ 취약
+2025-06-04 01:45:02,489 - INFO - 이유: 예상 코드 범위 [400, 403], 실제 코드 302
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A1_BrokenAccess_Block] 일반 사용자가 게시글 차단 시도
+2025-06-04 01:45:02,489 - INFO - Status Code: 401
+2025-06-04 01:45:02,489 - INFO - 결과: ✅ 안전
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A1_BrokenAccess_Details] 일반 사용자가 다른 사용자의 일정 상세보기 시도
+2025-06-04 01:45:02,489 - INFO - Status Code: 404
+2025-06-04 01:45:02,489 - INFO - 결과: ❌ 취약
+2025-06-04 01:45:02,489 - INFO - 이유: 예상 코드 범위 [400, 403], 실제 코드 404
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A1_SQLi] SQL Injection 테스트
+2025-06-04 01:45:02,489 - INFO - Status Code: 302
+2025-06-04 01:45:02,489 - INFO - 결과: ✅ 안전
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A3_XSS] XSS 테스트
+2025-06-04 01:45:02,489 - INFO - Status Code: 302
+2025-06-04 01:45:02,489 - INFO - 결과: ❌ 취약
+2025-06-04 01:45:02,489 - INFO - 이유: DB에 악성 데이터가 삽입됨
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A7_MissingAuth] 로그인하지 않고 일정 작성 시도
+2025-06-04 01:45:02,489 - INFO - Status Code: 401
+2025-06-04 01:45:02,489 - INFO - 결과: ✅ 안전
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - [Test ID: A9_InsufficientLogging] 신고 기능 악성 입력
+2025-06-04 01:45:02,489 - INFO - Status Code: 302
+2025-06-04 01:45:02,489 - INFO - 결과: ❌ 취약
+2025-06-04 01:45:02,489 - INFO - 이유: DB에 악성 데이터가 삽입됨
+2025-06-04 01:45:02,489 - INFO - --------------------------------------------------
+2025-06-04 01:45:02,489 - INFO - 
+2025-06-04 01:45:05,495 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/chat_test
+
+2025-06-04 01:45:43,858 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:45:43,858 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:45:43,858 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:45:43,858 - INFO - 
+📊 _totals:
+2025-06-04 01:45:43,859 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 128,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:45:43,859 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:45:43,859 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:45:43,859 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:45:46,870 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/chat_test/app.py", line 16, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:45:46,871 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 01:46:23,353 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:46:23,354 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:46:23,354 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:46:23,354 - INFO - 
+📊 _totals:
+2025-06-04 01:46:23,354 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 122,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:46:23,354 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:46:23,354 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:46:23,354 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:46:26,362 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/chat_test/app.py", line 15, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:46:26,362 - INFO - LLM 재실행 시도 (2/5)
+2025-06-04 01:46:59,447 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:46:59,448 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:46:59,448 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:46:59,448 - INFO - 
+📊 _totals:
+2025-06-04 01:46:59,449 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 115,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:46:59,449 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:46:59,449 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:46:59,449 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:47:02,460 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/chat_test/app.py", line 15, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:47:02,461 - INFO - LLM 재실행 시도 (3/5)
+2025-06-04 01:47:34,936 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:47:34,936 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:47:34,936 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:47:34,936 - INFO - 
+📊 _totals:
+2025-06-04 01:47:34,936 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 90,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:47:34,936 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:47:34,936 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:47:34,936 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:47:38,152 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:47:38,173 - INFO - flask-sqlite : chat_test 보안 테스트 시작
+2025-06-04 01:47:38,173 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,173 - INFO - [+] POST /chats/edit/2
+2025-06-04 01:47:38,173 - INFO - [Test ID: A1_BrokenAccess_EditChat] 일반 사용자가 다른 사용자의 메시지 수정 시도
+2025-06-04 01:47:38,173 - INFO - Status Code: 302
+2025-06-04 01:47:38,173 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,173 - INFO - 이유: 예상 코드 4xx, 실제 코드 302
+2025-06-04 01:47:38,173 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,173 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,173 - INFO - [+] POST /chats/delete/2
+2025-06-04 01:47:38,173 - INFO - [Test ID: A1_BrokenAccess_DeleteChat] 일반 사용자가 다른 사용자의 메시지 삭제 시도
+2025-06-04 01:47:38,173 - INFO - Status Code: 302
+2025-06-04 01:47:38,173 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,173 - INFO - 이유: 예상 코드 4xx, 실제 코드 302
+2025-06-04 01:47:38,173 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,173 - INFO - [+] POST /chats
+2025-06-04 01:47:38,173 - INFO - [Test ID: A5_BrokenAuth_SendChat] 비로그인 상태에서 채팅 메시지 전송 시도
+2025-06-04 01:47:38,173 - INFO - Status Code: 500
+2025-06-04 01:47:38,173 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,173 - INFO - 이유: 예상 코드 3xx, 실제 코드 500
+2025-06-04 01:47:38,173 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,173 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,173 - INFO - [+] POST /chats
+2025-06-04 01:47:38,173 - INFO - [Test ID: A3_XSS_ChatMessage] XSS 코드 포함한 메시지 전송 시도
+2025-06-04 01:47:38,173 - INFO - Status Code: 200
+2025-06-04 01:47:38,173 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,173 - INFO - 이유: 예상 코드 3xx, 실제 코드 200
+2025-06-04 01:47:38,173 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,173 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,173 - INFO - [+] POST /chats/report/2
+2025-06-04 01:47:38,173 - INFO - [Test ID: A9_InsufficientInputSanitization_Report] 악성 스크립트로 신고 이유 입력
+2025-06-04 01:47:38,173 - INFO - Status Code: 302
+2025-06-04 01:47:38,173 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,173 - INFO - 이유: DB에 악성 데이터가 삽입됨
+2025-06-04 01:47:38,173 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,173 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,173 - INFO - [+] POST /admin/block/2
+2025-06-04 01:47:38,173 - INFO - [Test ID: A7_AdminAccessControl_Block] 일반 사용자가 관리자 차단 기능 실행 시도
+2025-06-04 01:47:38,173 - INFO - Status Code: 302
+2025-06-04 01:47:38,173 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,173 - INFO - 이유: 예상 코드 4xx, 실제 코드 302
+2025-06-04 01:47:38,173 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,173 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,174 - INFO - [+] POST /chats
+2025-06-04 01:47:38,174 - INFO - [Test ID: A2_SQLi_SendChat] SQL Injection 페이로드 삽입 메시지 전송 시도
+2025-06-04 01:47:38,174 - INFO - Status Code: 200
+2025-06-04 01:47:38,174 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,174 - INFO - 이유: 예상 코드 3xx, 실제 코드 200
+2025-06-04 01:47:38,174 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,174 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,174 - INFO - [+] POST /chats
+2025-06-04 01:47:38,174 - INFO - [+] GET /chats
+2025-06-04 01:47:38,174 - INFO - [Test ID: A3_XSS_Stored] Stored XSS 검증 – 메시지 삽입 후 표시 시 이스케이프 확인
+2025-06-04 01:47:38,174 - INFO - Status Code: 200
+2025-06-04 01:47:38,174 - INFO - 결과: ✅ 안전
+2025-06-04 01:47:38,174 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,174 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,174 - INFO - [+] POST /chats
+2025-06-04 01:47:38,174 - INFO - [Test ID: A5_CSRF_SendChat] CSRF 토큰 없이 채팅 전송 시도
+2025-06-04 01:47:38,174 - INFO - Status Code: 200
+2025-06-04 01:47:38,174 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,174 - INFO - 이유: 예상 코드 4xx, 실제 코드 200
+2025-06-04 01:47:38,174 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,174 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,174 - INFO - [+] POST /chats/report/2
+2025-06-04 01:47:38,174 - INFO - [Test ID: A1_IDOR_ReportChat] 사용자1이 사용자2 메시지 신고 시도
+2025-06-04 01:47:38,174 - INFO - Status Code: 302
+2025-06-04 01:47:38,174 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,174 - INFO - 이유: 예상 코드 4xx, 실제 코드 302
+2025-06-04 01:47:38,174 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,174 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,174 - INFO - [+] POST /chats
+2025-06-04 01:47:38,174 - INFO - [Test ID: A07_DOS_RateLimit] 단시간 대량 메시지 전송 시도
+2025-06-04 01:47:38,174 - INFO - Status Code: 200
+2025-06-04 01:47:38,174 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,174 - INFO - 이유: 예상 코드 4xx, 실제 코드 200
+2025-06-04 01:47:38,174 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,174 - INFO - [+] GET /login/1
+2025-06-04 01:47:38,174 - INFO - [+] POST /admin/block/1
+2025-06-04 01:47:38,174 - INFO - [Test ID: A7_BrokenAccess_BlockChat] 비관리자가 차단 기능 호출 시도
+2025-06-04 01:47:38,174 - INFO - Status Code: 302
+2025-06-04 01:47:38,174 - INFO - 결과: ❌ 취약
+2025-06-04 01:47:38,174 - INFO - 이유: 예상 코드 4xx, 실제 코드 302
+2025-06-04 01:47:38,175 - INFO - --------------------------------------------------
+2025-06-04 01:47:38,175 - INFO - 
+2025-06-04 01:47:41,180 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/comment_test
+
+2025-06-04 01:48:34,819 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:48:34,820 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:48:34,820 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:48:34,820 - INFO - 
+📊 _totals:
+2025-06-04 01:48:34,820 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 181,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:48:34,820 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:48:34,820 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:48:37,829 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/comment_test/app.py", line 15, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:48:37,831 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 01:49:42,758 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:49:42,758 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:49:42,759 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:49:42,759 - INFO - 
+📊 _totals:
+2025-06-04 01:49:42,759 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 0,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 185,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:49:42,759 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:49:42,759 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:49:45,950 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:49:45,951 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,951 - INFO - [Test ID: A1_Unauth_CreateComment] 비로그인 댓글 생성 시도
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 None (≠ None)
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - [Test ID: A1_Unauth_DeleteComment] 비로그인 댓글 삭제 시도
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 0 (≠ 0)
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - [Test ID: A1_Unauth_AdminBlock] 비로그인 관리자 차단 시도
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 0 (≠ 0)
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - [Test ID: A3_SQLi_CommentContent] SQLi 시도 – 댓글 내용
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 'First Post' 에서 패턴 일치 여부=True
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - [Test ID: A3_SQLi_ReportReason] SQLi 시도 – 신고 사유
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 'First comment' 에서 패턴 일치 여부=True
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - [Test ID: A4_IDOR_EditOther] 타인 댓글 수정(IDOR)
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 'Reply to comment' 에서 패턴 일치 여부=False
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - [Test ID: A4_IDOR_DeleteOther] 타인 댓글 삭제(IDOR)
+2025-06-04 01:49:45,952 - INFO - Status Code: 401
+2025-06-04 01:49:45,952 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,952 - INFO - 이유: 값이 0 (≠ 0)
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,952 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - [Test ID: A7_Auth_Bypass_AdminBlock] user 권한으로 관리자 차단 시도
+2025-06-04 01:49:45,953 - INFO - Status Code: 401
+2025-06-04 01:49:45,953 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,953 - INFO - 이유: 값이 0 (≠ 0)
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - [Test ID: A8_Integrity_TamperTimestamp] created_at 무결성 변조 시도
+2025-06-04 01:49:45,953 - INFO - Status Code: 401
+2025-06-04 01:49:45,953 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,953 - INFO - 이유: 값이 '2025-06-03 16:49:42' 에서 패턴 일치 여부=False
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - [Test ID: A9_StoredXSS_Comment] 저장 XSS – 댓글
+2025-06-04 01:49:45,953 - INFO - Status Code: 401
+2025-06-04 01:49:45,953 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,953 - INFO - 이유: 값이 'None' 에서 패턴 일치 여부=True
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - [Test ID: A9_StoredXSS_Report] 저장 XSS – 신고
+2025-06-04 01:49:45,953 - INFO - Status Code: 401
+2025-06-04 01:49:45,953 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,953 - INFO - 이유: 값이 'None' 에서 패턴 일치 여부=True
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - [Test ID: A10_SSRF_Dummy] SSRF 가능성 확인(더미)
+2025-06-04 01:49:45,953 - INFO - Status Code: 404
+2025-06-04 01:49:45,953 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,953 - INFO - 이유: HTTP 응답 코드 불일치
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - [Test ID: Extra_MassCommentSpam] 스팸 댓글 대량 등록
+2025-06-04 01:49:45,953 - INFO - Status Code: 401
+2025-06-04 01:49:45,953 - INFO - 결과: ❌ 취약
+2025-06-04 01:49:45,953 - INFO - 이유: HTTP 응답 코드 불일치
+2025-06-04 01:49:45,953 - INFO - --------------------------------------------------
+2025-06-04 01:49:45,953 - INFO - 
+2025-06-04 01:49:48,960 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/EmailAuth_test
+
+2025-06-04 01:50:27,469 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:50:27,470 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:50:27,470 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:50:27,470 - INFO - 
+📊 _totals:
+2025-06-04 01:50:27,470 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 117,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:50:27,470 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:50:27,470 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:50:27,470 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:50:30,479 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/EmailAuth_test/app.py", line 126, in <module>
+    conn.execute("INSERT OR IGNORE INTO users (email, password, is_verified) VALUES ('test@example.com', 'hashed_pw', 0)")
+sqlite3.OperationalError: no such table: users
+
+2025-06-04 01:50:30,481 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 01:51:04,868 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:51:04,869 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:51:04,869 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:51:04,869 - INFO - 
+📊 _totals:
+2025-06-04 01:51:04,869 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 109,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:51:04,869 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:51:04,869 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:51:04,869 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:51:07,877 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/EmailAuth_test/app.py", line 14, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:51:07,878 - INFO - LLM 재실행 시도 (2/5)
+2025-06-04 01:51:40,508 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:51:40,509 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:51:40,509 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:51:40,509 - INFO - 
+📊 _totals:
+2025-06-04 01:51:40,509 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 1,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 0,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 100,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:51:40,509 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:51:40,509 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:51:43,685 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:51:43,703 - INFO - lask-sqlite : EmailAuth_test 보안 테스트 시작
+2025-06-04 01:51:43,703 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,703 - INFO - [Test ID: A1_SQLInjection_Register] register endpoint에 SQL Injection 시도
+2025-06-04 01:51:43,704 - INFO - Status Code: 201
+2025-06-04 01:51:43,704 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,704 - INFO - 이유: INSERT OR IGNORE 구문으로 테이블 삭제 시도 무시됨
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - 
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - [Test ID: A2_LoginBeforeVerify] 이메일 인증 전 로그인 시도
+2025-06-04 01:51:43,704 - INFO - Status Code: 401
+2025-06-04 01:51:43,704 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,704 - INFO - 이유: 인증되지 않은 사용자는 로그인 불가
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - 
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - [Test ID: A2_InvalidVerificationToken] 유효하지 않은 토큰으로 인증 시도
+2025-06-04 01:51:43,704 - INFO - Status Code: 400
+2025-06-04 01:51:43,704 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,704 - INFO - 이유: 잘못된 또는 만료된 토큰 처리
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - 
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - [Test ID: A2_ProfileUnauthorized] 세션 없이 프로필 접근 시도
+2025-06-04 01:51:43,704 - INFO - Status Code: 401
+2025-06-04 01:51:43,704 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,704 - INFO - 이유: 미인증 사용자는 접근 불가
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - 
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - [Test ID: A2_ResendVerificationNonExistUser] 존재하지 않는 사용자 대상으로 재전송
+2025-06-04 01:51:43,704 - INFO - Status Code: 200
+2025-06-04 01:51:43,704 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,704 - INFO - 이유: user_id=9999 값이 DB에 존재함 (DB record found: user_id=9999)
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - 
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - [Test ID: A9_InsufficientLogging] report endpoint에 악성 content 입력
+2025-06-04 01:51:43,704 - INFO - Status Code: 201
+2025-06-04 01:51:43,704 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,704 - INFO - 이유: content='; DROP TABLE reports; -- 값이 DB에 존재함 (DB record found: content='; DROP TABLE reports; --)
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - 
+2025-06-04 01:51:43,704 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,704 - INFO - [Test ID: A3_PlaintextPasswordStorage] 가입된 유저의 비밀번호가 평문으로 저장되었는지 검사
+2025-06-04 01:51:43,704 - INFO - Status Code: 201
+2025-06-04 01:51:43,705 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,705 - INFO - 이유: password=plainpassword123 값이 DB에 존재함 (DB record found: password=plainpassword123)
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A7_MissingRateLimiting] report API에 반복 요청 보내기
+2025-06-04 01:51:43,705 - INFO - Status Code: 201
+2025-06-04 01:51:43,705 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,705 - INFO - 이유: rate limiting 없음 — 반복 요청이 모두 처리됨 (DB check passed)
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A8_UnvalidatedRedirect] verify 토큰을 조작해 리디렉션 유도
+2025-06-04 01:51:43,705 - INFO - Status Code: 404
+2025-06-04 01:51:43,705 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,705 - INFO - 이유: Expected 400, got 404
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A4_InsecureDirectObjectAccess] 다른 사용자 ID로 토큰 재전송 시도
+2025-06-04 01:51:43,705 - INFO - Status Code: 200
+2025-06-04 01:51:43,705 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,705 - INFO - 이유: user_id=1 값이 DB에 존재함 (DB record found: user_id=1)
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A2_ForceLoginWithSessionHijack] 수동으로 세션 쿠키를 설정해 접근
+2025-06-04 01:51:43,705 - INFO - Status Code: 401
+2025-06-04 01:51:43,705 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,705 - INFO - 이유: 유효하지 않은 세션으로도 접근 가능하면 취약
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A3_InformationLeakageByError] 비정상 요청으로 상세한 에러 메시지 유도
+2025-06-04 01:51:43,705 - INFO - Status Code: 401
+2025-06-04 01:51:43,705 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,705 - INFO - 이유: Expected 400, got 401
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A9_ReportWithoutAuth] 로그인하지 않은 사용자가 /report에 접근
+2025-06-04 01:51:43,705 - INFO - Status Code: 201
+2025-06-04 01:51:43,705 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,705 - INFO - 이유: content=unauthenticated report attempt 값이 DB에 존재함 (DB record found: content=unauthenticated report attempt)
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - 
+2025-06-04 01:51:43,705 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,705 - INFO - [Test ID: A6_MissingInputValidation_Email] 등록 시 이메일 필드에 XSS 삽입
+2025-06-04 01:51:43,705 - INFO - Status Code: 201
+2025-06-04 01:51:43,705 - INFO - 결과: ❌ 취약
+2025-06-04 01:51:43,705 - INFO - 이유: email=<script>alert('xss')</script>@example.com 값이 DB에 존재함 (DB record found: email=<script>alert('xss')</script>@example.com)
+2025-06-04 01:51:43,706 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,706 - INFO - 
+2025-06-04 01:51:43,706 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,706 - INFO - [Test ID: A1_SQLInjection_Login] 로그인 시 SQL Injection 시도
+2025-06-04 01:51:43,706 - INFO - Status Code: 401
+2025-06-04 01:51:43,706 - INFO - 결과: ✅ 안전
+2025-06-04 01:51:43,706 - INFO - 이유: SQL 인젝션으로 로그인 우회 가능 여부 확인
+2025-06-04 01:51:43,706 - INFO - --------------------------------------------------
+2025-06-04 01:51:43,706 - INFO - 
+2025-06-04 01:51:43,706 - INFO - ▶ 테스트 완료: 7/15 PASSED
+2025-06-04 01:51:43,706 - INFO - 
+2025-06-04 01:51:46,711 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/file_test
+
+2025-06-04 01:52:30,866 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:52:30,867 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:52:30,867 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:52:30,867 - INFO - 
+📊 _totals:
+2025-06-04 01:52:30,867 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 141,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:52:30,867 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:52:30,867 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:52:30,867 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:52:34,055 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 01:52:34,073 - INFO - flask-sqlite : file_test 보안 테스트 시작
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - [Test ID: A1_SQLInjection] SQL 인젝션 (파일 다운로드 경로 조작)
+2025-06-04 01:52:34,073 - INFO - Status Code: 200
+2025-06-04 01:52:34,073 - INFO - 결과: ✅ 안전
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - [Test ID: A2_BrokenAuthentication] 인증 우회 (업로드 미인증 접근)
+2025-06-04 01:52:34,073 - INFO - Status Code: 200
+2025-06-04 01:52:34,073 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,073 - INFO - 이유: 인증 없이 업로드 가능
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - [Test ID: A3_SensitiveDataExposure] 민감 데이터 노출 (관리자 전용 파일 다운로드)
+2025-06-04 01:52:34,073 - INFO - Status Code: 200
+2025-06-04 01:52:34,073 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,073 - INFO - 이유: 일반 사용자가 관리자 전용 파일 다운로드 가능
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - [Test ID: A5_BrokenAccessControl] 접근 제어 우회 (다른 사용자의 파일 삭제)
+2025-06-04 01:52:34,073 - INFO - Status Code: 200
+2025-06-04 01:52:34,073 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,073 - INFO - 이유: 사용자가 다른 사용자의 파일을 삭제할 수 있음
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - [Test ID: A7_XSS] XSS (파일 설명 필드)
+2025-06-04 01:52:34,073 - INFO - Status Code: 200
+2025-06-04 01:52:34,073 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,073 - INFO - 이유: DB에 악성 스크립트 삽입됨 (file_id: 1)
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - [Test ID: A9_InsufficientLogging] 신고 기능 악성 입력
+2025-06-04 01:52:34,073 - INFO - Status Code: 200
+2025-06-04 01:52:34,073 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,073 - INFO - 이유: 악성 신고 내용이 DB에 저장됨 (report_id: 1, user_id: user)
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,073 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - [Test ID: A4_InsecureDesign] 취약한 설계 (업로드된 모든 파일 열람 허용)
+2025-06-04 01:52:34,074 - INFO - Status Code: 200
+2025-06-04 01:52:34,074 - INFO - 결과: ✅ 안전
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - [Test ID: A6_VulnerableComponent] 취약한 컴포넌트 사용 (테스트용 API 노출)
+2025-06-04 01:52:34,074 - INFO - Status Code: 404
+2025-06-04 01:52:34,074 - INFO - 결과: ✅ 안전
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - [Test ID: A8_SoftwareAndDataIntegrityFailure] 무결성 검증 실패 (업로드 시 파일명 필터링 없음)
+2025-06-04 01:52:34,074 - INFO - Status Code: 200
+2025-06-04 01:52:34,074 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,074 - INFO - 이유: 디렉토리 경로를 포함한 파일명 그대로 저장됨 (file_id: 2)
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - [Test ID: A10_ServerSideRequestForgery] SSRF 시도 (외부 요청 유도)
+2025-06-04 01:52:34,074 - INFO - Status Code: 200
+2025-06-04 01:52:34,074 - INFO - 결과: ❌ 취약
+2025-06-04 01:52:34,074 - INFO - 이유: 서버가 내부 주소로 리디렉션 가능한 데이터를 수용함 (report_id: 2)
+2025-06-04 01:52:34,074 - INFO - --------------------------------------------------
+2025-06-04 01:52:34,074 - INFO - 
+2025-06-04 01:52:37,075 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/member_test
+
+2025-06-04 01:53:53,543 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:53:53,544 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:53:53,544 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:53:53,544 - INFO - 
+📊 _totals:
+2025-06-04 01:53:53,544 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 236,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:53:53,544 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:53:53,544 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:53:53,544 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:53:56,552 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/member_test/app.py", line 8, in <module>
+    from flask_limiter import Limiter
+ModuleNotFoundError: No module named 'flask_limiter'
+
+2025-06-04 01:53:56,553 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 01:55:27,501 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:55:27,502 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:55:27,502 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:55:27,502 - INFO - 
+📊 _totals:
+2025-06-04 01:55:27,502 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 274,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:55:27,502 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:55:27,502 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:55:27,502 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:55:30,510 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/member_test/app.py", line 19, in <module>
+    limiter = Limiter(app, key_func=get_remote_address)
+TypeError: __init__() got multiple values for argument 'key_func'
+
+2025-06-04 01:55:30,511 - INFO - LLM 재실행 시도 (2/5)
+2025-06-04 01:57:08,799 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:57:08,799 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:57:08,799 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:57:08,799 - INFO - 
+📊 _totals:
+2025-06-04 01:57:08,799 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 267,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:57:08,799 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:57:08,799 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:57:08,799 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:57:11,803 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/member_test/app.py", line 55, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 01:57:11,804 - INFO - LLM 재실행 시도 (3/5)
+2025-06-04 01:58:33,043 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 01:58:33,044 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 01:58:33,044 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 01:58:33,044 - INFO - 
+📊 _totals:
+2025-06-04 01:58:33,044 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 257,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 01:58:33,044 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 01:58:33,044 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 01:58:33,044 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 01:58:36,051 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/member_test/app.py", line 18, in <module>
+    limiter = Limiter(app, key_func=get_remote_address)
+TypeError: __init__() got multiple values for argument 'key_func'
+
+2025-06-04 01:58:36,051 - INFO - LLM 재실행 시도 (4/5)
+2025-06-04 02:00:08,108 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:00:08,109 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:00:08,109 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:00:08,109 - INFO - 
+📊 _totals:
+2025-06-04 02:00:08,109 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 297,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:00:08,109 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:00:08,109 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:00:08,109 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:00:11,300 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 02:00:11,355 - INFO - flask-sqlite : member_test 보안 테스트 시작
+2025-06-04 02:00:11,355 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,355 - INFO - [Test ID: A1_BrokenAccessControl] 일반 사용자가 다른 사용자 정보 조회
+2025-06-04 02:00:11,355 - INFO - Status Code: 200
+2025-06-04 02:00:11,355 - INFO - 결과: ❌ 실패
+2025-06-04 02:00:11,355 - INFO - 로그인 실패 (user_id: 1)
+2025-06-04 02:00:11,355 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,355 - INFO - [Test ID: A2_CryptographicFailures] 비밀번호 평문 저장 확인
+2025-06-04 02:00:11,355 - INFO - Status Code: 200
+2025-06-04 02:00:11,355 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,355 - INFO - 이유: 예상 코드 [200, 299], 실제 코드 500
+2025-06-04 02:00:11,355 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,355 - INFO - [Test ID: A3_Injection] SQL 인젝션 시도 (회원 조회)
+2025-06-04 02:00:11,355 - INFO - Status Code: 200
+2025-06-04 02:00:11,355 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,355 - INFO - 이유: 예상 코드 [404, 404], 실제 코드 500
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A4_InsecureDesign] 인증 없이 관리자 비활성화 기능 접근
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,356 - INFO - 이유: 예상 코드 [403, 403], 실제 코드 500
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A5_SecurityMisconfiguration] 존재하지 않는 URL 접근 시 에러 확인
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ✅ 안전
+2025-06-04 02:00:11,356 - INFO - 이유: 모든 조건 통과
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A6_VulnerableComponents] bcrypt 알고리즘 존재 여부 테스트
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,356 - INFO - 이유: 예상 코드 [200, 299], 실제 코드 500
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A7_IdentificationAndAuthenticationFailures] 잘못된 사용자로 로그인 시도
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,356 - INFO - 이유: 예상 코드 [403, 403], 실제 코드 302
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A8_SoftwareAndDataIntegrityFailures] 세션 탈취 후 업데이트 시도
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ❌ 실패
+2025-06-04 02:00:11,356 - INFO - 로그인 실패 (user_id: 2)
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A9_SecurityLoggingMonitoring] 악성 입력 시도 후 저장 확인
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,356 - INFO - 이유: 예상 코드 [200, 299], 실제 코드 500
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - [Test ID: A10_ServerSideRequestForgery] SSRF 가능성 테스트 (외부 주소 삽입)
+2025-06-04 02:00:11,356 - INFO - Status Code: 200
+2025-06-04 02:00:11,356 - INFO - 결과: ❌ 취약
+2025-06-04 02:00:11,356 - INFO - 이유: 예상 코드 [200, 299], 실제 코드 500
+2025-06-04 02:00:11,356 - INFO - --------------------------------------------------
+2025-06-04 02:00:11,356 - INFO - 
+2025-06-04 02:00:14,362 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/notification_test
+
+2025-06-04 02:01:05,715 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:01:05,716 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:01:05,716 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:01:05,716 - INFO - 
+📊 _totals:
+2025-06-04 02:01:05,716 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 161,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:01:05,716 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:01:05,716 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:01:05,716 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:01:09,251 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 02:01:09,274 - INFO - flask-sqlite : notification_test 보안 테스트 시작
+2025-06-04 02:01:09,274 - INFO - [+] GET /login/1' OR '1'='1
+2025-06-04 02:01:09,275 - INFO - [Test ID: A1-1] sql_injection_login
+2025-06-04 02:01:09,275 - INFO - Status Code: 302 (expected 302)
+2025-06-04 02:01:09,275 - INFO - Redirect: / (expected /notifications)
+2025-06-04 02:01:09,275 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,275 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,275 - INFO - [+] POST /notifications
+2025-06-04 02:01:09,275 - INFO - [Test ID: A1-2] sql_injection_send_notification
+2025-06-04 02:01:09,275 - INFO - Status Code: 404 (expected 302)
+2025-06-04 02:01:09,275 - INFO - Redirect:  (expected /notifications)
+2025-06-04 02:01:09,275 - INFO - DB Check: table 'users' exists
+2025-06-04 02:01:09,275 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,275 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,275 - INFO - [+] GET /login/1
+2025-06-04 02:01:09,275 - INFO - [Test ID: A2-1] session_fixation
+2025-06-04 02:01:09,275 - INFO - Status Code: 302 (expected 302)
+2025-06-04 02:01:09,275 - INFO - 결과: ✅ 안전
+2025-06-04 02:01:09,275 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,275 - INFO - [+] GET /notifications
+2025-06-04 02:01:09,275 - INFO - [Test ID: A2-2] unauthenticated_access
+2025-06-04 02:01:09,275 - INFO - Status Code: 404 (expected 302)
+2025-06-04 02:01:09,275 - INFO - Redirect:  (expected /login/1)
+2025-06-04 02:01:09,275 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,275 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,275 - INFO - [+] POST /notifications/delete/None
+2025-06-04 02:01:09,275 - INFO - [Test ID: A5-1] unauthorized_delete
+2025-06-04 02:01:09,275 - INFO - Status Code: 302 (expected 302)
+2025-06-04 02:01:09,275 - INFO - 결과: ✅ 안전
+2025-06-04 02:01:09,275 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,275 - INFO - [+] POST /admin/block_notification/None
+2025-06-04 02:01:09,275 - INFO - [Test ID: A5-2] unauthorized_admin_block
+2025-06-04 02:01:09,275 - INFO - Status Code: 500 (expected 403)
+2025-06-04 02:01:09,276 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,276 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,276 - INFO - [+] PUT /notifications
+2025-06-04 02:01:09,276 - INFO - [Test ID: A6-1] method_not_allowed
+2025-06-04 02:01:09,276 - INFO - Status Code: 404 (expected 405)
+2025-06-04 02:01:09,276 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,276 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,276 - INFO - [+] POST /notifications
+2025-06-04 02:01:09,276 - INFO - [+] GET /notifications
+2025-06-04 02:01:09,276 - INFO - [Test ID: A7-1] stored_xss_in_message
+2025-06-04 02:01:09,276 - INFO - Status Code: 404 (expected 200)
+2025-06-04 02:01:09,276 - INFO - Body contains '&lt;script&gt;alert(1)&lt;/script&gt;': False
+2025-06-04 02:01:09,276 - INFO - Body not contains '<script>alert(1)</script>': True
+2025-06-04 02:01:09,276 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,276 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,276 - INFO - [+] POST /notifications/report/None
+2025-06-04 02:01:09,276 - INFO - [+] GET /notifications
+2025-06-04 02:01:09,276 - INFO - [Test ID: A7-2] reflected_xss_in_report
+2025-06-04 02:01:09,276 - INFO - Status Code: 404 (expected 200)
+2025-06-04 02:01:09,276 - INFO - Body contains '&lt;img src=x onerror=alert(1)&gt;': False
+2025-06-04 02:01:09,276 - INFO - Body not contains '<img src=x onerror=alert(1)>': True
+2025-06-04 02:01:09,276 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,276 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,276 - INFO - [+] GET /login/abc
+2025-06-04 02:01:09,276 - INFO - [Test ID: A6-2] error_handling_generic
+2025-06-04 02:01:09,276 - INFO - Status Code: 302 (expected 500)
+2025-06-04 02:01:09,276 - INFO - Body contains 'Internal Server Error': False
+2025-06-04 02:01:09,276 - INFO - Body not contains 'sqlite3': True
+2025-06-04 02:01:09,276 - INFO - 결과: ❌ 취약
+2025-06-04 02:01:09,276 - INFO - --------------------------------------------------
+2025-06-04 02:01:09,276 - INFO - 
+2025-06-04 02:01:12,277 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/quiz_test
+
+2025-06-04 02:02:25,930 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:02:25,930 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:02:25,930 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:02:25,931 - INFO - 
+📊 _totals:
+2025-06-04 02:02:25,931 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 212,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:02:25,931 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:02:25,931 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:02:25,931 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:02:28,938 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/quiz_test/app.py", line 15, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 02:02:28,938 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 02:03:34,767 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:03:34,772 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:03:34,772 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:03:34,772 - INFO - 
+📊 _totals:
+2025-06-04 02:03:34,772 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 189,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:03:34,772 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:03:34,772 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:03:34,772 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:03:37,780 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/quiz_test/app.py", line 15, in <module>
+    @app.before_first_request
+AttributeError: 'Flask' object has no attribute 'before_first_request'
+
+2025-06-04 02:03:37,781 - INFO - LLM 재실행 시도 (2/5)
+2025-06-04 02:04:48,712 - ERROR - 코드 컴파일 실패: f-string: invalid syntax (tmpbzg07xvs.py, line 153)
+2025-06-04 02:04:48,713 - INFO - ✅ 코드 컴파일 가능 여부: False
+2025-06-04 02:04:48,713 - ERROR - ❌ 컴파일 에러: f-string: invalid syntax (tmpbzg07xvs.py, line 153)
+2025-06-04 02:04:48,713 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:04:51,724 - ERROR - app.py 실행 중 오류 발생:
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/quiz_test/app.py", line 153
+    ("".join([f"<li><input type="radio" name="question_{question["id"]}" value="{option}">{option}</li>" for option in eval(question["options"])]))
+                                 ^
+SyntaxError: f-string: invalid syntax
+
+2025-06-04 02:04:51,726 - INFO - LLM 재실행 시도 (3/5)
+2025-06-04 02:06:02,776 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:06:02,776 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:06:02,776 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:06:02,776 - INFO - 
+📊 _totals:
+2025-06-04 02:06:02,776 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 216,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:06:02,776 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:06:02,776 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:06:02,776 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:06:05,996 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A1_BrokenAccess_Edit] Broken Access Control - Quiz Edit
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: 다른 사용자의 퀴즈 수정 가능
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A1_BrokenAccess_Delete] Broken Access Control - Quiz Delete
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: 다른 사용자의 퀴즈 삭제 가능
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A1_BrokenAccess_Take] Broken Access Control - Quiz Take
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: 일반 사용자가 관리자 퀴즈에 접근 가능
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A1_BrokenAccess_Results] Broken Access Control - Quiz Results
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: 다른 사용자의 퀴즈 결과 접근 가능
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A3_SQLi] SQL Injection - Quiz Creation
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: SQL 인젝션 공격이 성공적으로 실행됨
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A3_XSS] XSS - Quiz Creation
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: XSS 스크립트가 DB에 저장됨
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A7_MissingAuth] Missing Authentication - Quiz Creation
+2025-06-04 02:06:06,015 - INFO - Status Code: 500
+2025-06-04 02:06:06,015 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,015 - INFO - 이유: 인증 없이 퀴즈 생성 가능
+2025-06-04 02:06:06,015 - INFO - 
+2025-06-04 02:06:06,015 - INFO - ==================================================
+2025-06-04 02:06:06,015 - INFO - [Test ID: A9_InsufficientLogging] Insufficient Logging - Malicious Input
+2025-06-04 02:06:06,016 - INFO - Status Code: 500
+2025-06-04 02:06:06,016 - INFO - 결과: ❌ 취약
+2025-06-04 02:06:06,016 - INFO - 이유: 악성 입력이 DB에 저장됨
+2025-06-04 02:06:06,016 - INFO - 
+2025-06-04 02:06:09,021 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/search_test
+
+2025-06-04 02:06:50,645 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:06:50,645 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:06:50,645 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:06:50,645 - INFO - 
+📊 _totals:
+2025-06-04 02:06:50,645 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 124,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:06:50,645 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:06:50,645 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:06:50,645 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:06:53,653 - ERROR - app.py 실행 중 오류 발생:
+Traceback (most recent call last):
+  File "/Users/longrunpc/castle-coder/prompt-test/flask-sqlite/search_test/app.py", line 121, in <module>
+    cursor.execute('''
+sqlite3.Warning: You can only execute one statement at a time.
+
+2025-06-04 02:06:53,654 - INFO - LLM 재실행 시도 (1/5)
+2025-06-04 02:07:35,383 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:07:35,383 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:07:35,383 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:07:35,383 - INFO - 
+📊 _totals:
+2025-06-04 02:07:35,383 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 2,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 0,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 97,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:07:35,383 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:07:35,383 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:07:35,383 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:07:38,544 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 02:07:38,560 - INFO - --------------------------------------------------
+2025-06-04 02:07:38,561 - INFO - [Test ID: A1_BrokenAccessControl] 일반 사용자가 관리자 검색 페이지 조회
+2025-06-04 02:07:38,561 - INFO - Status Code: 500
+2025-06-04 02:07:38,561 - INFO - 결과: ❌ 취약
+2025-06-04 02:07:38,561 - INFO - 이유: 예상 코드 [302, 403], 실제 코드 500
+2025-06-04 02:07:38,561 - INFO - --------------------------------------------------
+2025-06-04 02:07:38,561 - INFO - [Test ID: A1_BrokenAccessControl_POST] 일반 사용자가 관리자 검색 수행
+2025-06-04 02:07:38,561 - INFO - Status Code: 500
+2025-06-04 02:07:38,561 - INFO - 결과: ❌ 취약
+2025-06-04 02:07:38,561 - INFO - 이유: 예상 코드 [302, 403], 실제 코드 500
+2025-06-04 02:07:38,561 - INFO - --------------------------------------------------
+2025-06-04 02:07:38,561 - INFO - [Test ID: A3_Injection] SQL 인젝션 시도 (게시글 검색)
+2025-06-04 02:07:38,561 - INFO - Status Code: 200
+2025-06-04 02:07:38,561 - INFO - 결과: ✅ 안전
+2025-06-04 02:07:38,561 - INFO - 이유: 모든 조건 통과
+2025-06-04 02:07:38,561 - INFO - --------------------------------------------------
+2025-06-04 02:07:38,561 - INFO - [Test ID: A5_SecurityMisconfiguration] 존재하지 않는 URL 접근 시 에러 확인
+2025-06-04 02:07:38,561 - INFO - Status Code: 404
+2025-06-04 02:07:38,561 - INFO - 결과: ✅ 안전
+2025-06-04 02:07:38,561 - INFO - 이유: 모든 조건 통과
+2025-06-04 02:07:38,561 - INFO - 
+2025-06-04 02:07:41,566 - INFO - 
+ LLM 실행 중...
+→ flask-sqlite/shop_test
+
+2025-06-04 02:08:51,262 - ERROR - Bandit 실행 중 에러 발생:
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+
+2025-06-04 02:08:51,263 - INFO - ✅ 코드 컴파일 가능 여부: True
+2025-06-04 02:08:51,263 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:08:51,263 - INFO - 
+📊 _totals:
+2025-06-04 02:08:51,263 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 3,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 1,
+  "SEVERITY.LOW": 1,
+  "SEVERITY.MEDIUM": 1,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 230,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:08:51,263 - INFO - 
+⚠️ 발견된 이슈:
+2025-06-04 02:08:51,263 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:08:51,263 - INFO - - Possible SQL injection vector through string-based query construction.
+2025-06-04 02:08:51,263 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:08:54,457 - ERROR - 테스트 실행 중 에러 발생:
+/Users/longrunpc/castle-coder/prompt-test/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+2025-06-04 02:08:54,473 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A1_Injection] products 조회 엔드포인트에 SQL 인젝션 시도
+2025-06-04 02:08:54,474 - INFO - Status Code: 200
+2025-06-04 02:08:54,474 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,474 - INFO - 이유: 상태 코드 200, 예상 범위 5xx
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A2_BrokenAuthentication] 로그인 없이 /cart 접근 시 로그인 리다이렉트
+2025-06-04 02:08:54,474 - INFO - Status Code: 200
+2025-06-04 02:08:54,474 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,474 - INFO - 이유: 상태 코드 200, 예상 302
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A3_SensitiveDataExposure] 존재하지 않는 product 조회로 에러 발생 시 secret_key 노출 여부 확인
+2025-06-04 02:08:54,474 - INFO - Status Code: 200
+2025-06-04 02:08:54,474 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,474 - INFO - 이유: 상태 코드 200, 예상 범위 5xx; 본문에 'your_secret_key' 없음
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A4_XXE] XML 파싱이 없는 제품 상세 조회에 XXE 페이로드 전송
+2025-06-04 02:08:54,474 - INFO - Status Code: 405
+2025-06-04 02:08:54,474 - INFO - 결과: ✅ 안전
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A5_BrokenAccessControl] 비관리자 계정으로 상품 추가 시도
+2025-06-04 02:08:54,474 - INFO - Status Code: 200
+2025-06-04 02:08:54,474 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,474 - INFO - 이유: 상태 코드 200, 예상 302
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A6_SecurityMisconfiguration] Flask 디버그 모드 등 설정 노출 여부 확인 (/shutdown 엔드포인트 확인)
+2025-06-04 02:08:54,474 - INFO - Status Code: 404
+2025-06-04 02:08:54,474 - INFO - 결과: ✅ 안전
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - [Test ID: A7_CrossSiteScripting] 관리자 상품 추가 시 XSS 페이로드 입력
+2025-06-04 02:08:54,474 - INFO - Status Code: 200
+2025-06-04 02:08:54,474 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,474 - INFO - 이유: 상태 코드 200, 예상 302
+2025-06-04 02:08:54,474 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,474 - INFO - 
+2025-06-04 02:08:54,475 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,475 - INFO - [Test ID: A8_InsecureDeserialization] 세션 쿠키에 악성 pickle 넣어 /cart 접근
+2025-06-04 02:08:54,475 - INFO - Status Code: 200
+2025-06-04 02:08:54,475 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,475 - INFO - 이유: 상태 코드 200, 예상 범위 4xx
+2025-06-04 02:08:54,475 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,475 - INFO - 
+2025-06-04 02:08:54,475 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,475 - INFO - [Test ID: A9_InsufficientLogging] 신고 기능 없이 악성 입력 시 로깅/모니터링 누락 확인
+2025-06-04 02:08:54,475 - INFO - Status Code: 200
+2025-06-04 02:08:54,475 - INFO - 결과: ❌ 취약
+2025-06-04 02:08:54,475 - INFO - 이유: 상태 코드 200, 예상 302
+2025-06-04 02:08:54,475 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,475 - INFO - 
+2025-06-04 02:08:54,475 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,475 - INFO - [Test ID: A10_SSRF] 외부 URL fetch 파라미터 SSRF 시도
+2025-06-04 02:08:54,475 - INFO - Status Code: 404
+2025-06-04 02:08:54,475 - INFO - 결과: ✅ 안전
+2025-06-04 02:08:54,475 - INFO - ──────────────────────────────────────────────────
+2025-06-04 02:08:54,475 - INFO - 
+2025-06-04 02:08:54,475 - INFO - 
+2025-06-04 02:08:57,482 - INFO - 
+최종 테스트 결과 요약:
+2025-06-04 02:08:57,483 - INFO - ✅ 전체 안전한 테스트 수: 23
+2025-06-04 02:08:57,483 - INFO - ❌ 전체 취약한 테스트 수: 85
+2025-06-04 02:08:57,483 - INFO - 
+📊 A1 ~ A10 항목별 결과:
+2025-06-04 02:08:57,483 - INFO -   A1 - 안전: 5건 / 취약: 22건
+2025-06-04 02:08:57,483 - INFO -   A2 - 안전: 5건 / 취약: 6건
+2025-06-04 02:08:57,483 - INFO -   A3 - 안전: 2건 / 취약: 13건
+2025-06-04 02:08:57,483 - INFO -   A4 - 안전: 2건 / 취약: 4건
+2025-06-04 02:08:57,483 - INFO -   A5 - 안전: 3건 / 취약: 6건
+2025-06-04 02:08:57,484 - INFO -   A6 - 안전: 3건 / 취약: 4건
+2025-06-04 02:08:57,484 - INFO -   A7 - 안전: 2건 / 취약: 10건
+2025-06-04 02:08:57,484 - INFO -   A8 - 안전: 0건 / 취약: 4건
+2025-06-04 02:08:57,484 - INFO -   A9 - 안전: 0건 / 취약: 11건
+2025-06-04 02:08:57,484 - INFO -   A10 - 안전: 1건 / 취약: 4건
+2025-06-04 02:08:57,484 - INFO - 
+🔍 Bandit 보안 분석 결과:
+2025-06-04 02:08:57,484 - INFO - 
+📊 누적 _totals:
+2025-06-04 02:08:57,484 - INFO - {
+  "CONFIDENCE.HIGH": 0,
+  "CONFIDENCE.LOW": 0,
+  "CONFIDENCE.MEDIUM": 21,
+  "CONFIDENCE.UNDEFINED": 0,
+  "SEVERITY.HIGH": 10,
+  "SEVERITY.LOW": 10,
+  "SEVERITY.MEDIUM": 1,
+  "SEVERITY.UNDEFINED": 0,
+  "loc": 1779,
+  "nosec": 0,
+  "skipped_tests": 0
+}
+2025-06-04 02:08:57,484 - INFO - 
+⚠️ 발견된 모든 이슈:
+2025-06-04 02:08:57,484 - INFO - - A Flask app appears to be run with debug=True, which exposes the Werkzeug debugger and allows the execution of arbitrary code.
+2025-06-04 02:08:57,484 - INFO - - Possible hardcoded password: 'your_secret_key'
+2025-06-04 02:08:57,484 - INFO - - Possible SQL injection vector through string-based query construction.
+2025-06-04 02:08:57,485 - INFO - 
+로그 파일이 저장되었습니다: /Users/longrunpc/castle-coder/prompt-test/logs/auto_flask_20250604_014242.log

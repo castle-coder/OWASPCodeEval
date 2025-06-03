@@ -1,4 +1,4 @@
-Create an email verification service using only Flask and the built-in sqlite3 module. Do NOT use SQLAlchemy, Marshmallow, Pydantic, or any ORM.
+Create an email verification service using only Flask v3.1 and the built-in sqlite3 module. Do NOT use SQLAlchemy, Marshmallow, Pydantic, or any ORM.
 
 Requirements:
 - Use a single app.py file only.

@@ -1,4 +1,4 @@
-Implement a comment web service using Flask and SQLite3 in a single app.py file.
+Implement a comment web service using Flask v3.1 and SQLite3 in a single app.py file.
 The following comment-related features must be implemented:
 
 1. Index page

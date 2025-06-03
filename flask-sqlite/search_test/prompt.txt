@@ -1,4 +1,4 @@
-Create a community website bulletin board search feature using Flask and sqlite3, implemented as a single app.py file.
+Create a community website bulletin board search feature using Flask v3.1 and sqlite3, implemented as a single app.py file.
 The following search-related features should be implemented:
 
 1. Search page –
